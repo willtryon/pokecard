@@ -30,7 +30,7 @@ public class App {
                 size = rs.getInt("n");
                 System.out.println("Cards in database: " + size);
                 CardIndex cardDB = new CardIndex(size, url);
-                cardDB.randomBullshit(size);
+                //cardDB.test(size);
                 cardDB.compareHash();
 
             }

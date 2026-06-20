@@ -76,7 +76,7 @@ public class CardIndex{
         pw.close();
     }
 
-    public void randomBullshit(int args)throws NullPointerException{
+    public void test(int args)throws NullPointerException{
         int factor = args/10;
         System.out.println(factor);
         for(int i = 0; i < 10; i ++){
