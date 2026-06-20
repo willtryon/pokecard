@@ -31,6 +31,7 @@ public class App {
                 System.out.println("Cards in database: " + size);
                 CardIndex cardDB = new CardIndex(size, url);
                 cardDB.randomBullshit(size);
+                cardDB.compareHash();
 
             }
         }
