@@ -71,7 +71,7 @@ public class CardIndex{
             }
         }
         System.out.println("Passed: " +passed+"\nFailed: "+failed+"\nCorrupt: "+corrupt+"\nOut of: "+line);
-        double result = ((double) passed / (failed+corrupt))*10;
+        double result = ((double) passed / (size))*100;
         System.out.println(result+"% passed.");
         pw.close();
     }
@@ -95,7 +95,7 @@ public class CardIndex{
     public void compareHash()throws NullPointerException, IOException{
         long pairCount = 0;
         long startTime = System.currentTimeMillis();
-        double record = 0;
+        double record = Double.MAX_VALUE;
         String recordHolderA = "";
         String recordHolderB = "";
         File file = new File("hashes.txt");
