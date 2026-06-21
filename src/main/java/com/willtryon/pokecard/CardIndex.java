@@ -29,7 +29,7 @@ public class CardIndex{
         }catch(IOException e){
             System.out.println("IO exception. Try again.");
         }
-        HashingAlgorithm hasher = new AverageColorHash(32);
+        HashingAlgorithm hasher = new PerceptiveHash(32);
         cardDB = new Card[size];
         try(Connection conn = DriverManager.getConnection(url);
             Statement st = conn.createStatement(); 
@@ -49,12 +49,12 @@ public class CardIndex{
                         File victim = new File(address);
                         try{
                             cardDB[line] = new Card(cardId, img, hasher.hash(victim));
+                            passed++;
                         }catch(IllegalArgumentException e){
 							//System.out.println("this file is corrupt."); corrupt++;
                             pw.println("File "+cardId+" apeears to he corrupt.");
                             corrupt++;
                         }
-                        passed++;
                     }catch(IOException e){
                         //System.out.println("An exception has occured.");
                         pw.println("An unknown exception occured when hashing "+cardId);
@@ -63,7 +63,7 @@ public class CardIndex{
                 }
                 else{
                     //System.out.println("LOSER * "+line+" XD");
-                    pw.println("File "+cardId+" cannot be found by the program.");
+                    pw.println("File "+cardId+" cannot be found by the program.\nLocation: "+img);
                     cardDB[line] = new Card(cardId, img, null);
                     failed++;
                 }
@@ -92,45 +92,55 @@ public class CardIndex{
         //System.out.println(cardDB[18038].toString());
     }
 
-    public void compareHash()throws NullPointerException, IOException{
+    public void compareHash() throws IOException {
+    // Keep only cards that actually have a hash — this skips the missing
+    // AND corrupt entries in one shot, so no null can reach the inner loop.
+        List<Card> hashed = new ArrayList<>();
+        for (Card c : cardDB) {
+            if (c != null && c.getBinaryHash() != null) {
+                hashed.add(c);
+            }
+        }
+        System.out.println("Comparing " + hashed.size() + " hashed cards...");
+
         long pairCount = 0;
-        long startTime = System.currentTimeMillis();
         double record = Double.MAX_VALUE;
-        String recordHolderA = "";
-        String recordHolderB = "";
-        File file = new File("hashes.txt");
-        PrintWriter pw = new PrintWriter(file);
-         try{
-            if(file.createNewFile()){
-                System.out.println("hashes.txt created.\n\n");
-            }
-            else{
-                System.out.println("File exists, skipping...\n\n");
-            }
-        }catch(IOException e){
-            System.out.println("IO exception. Try again.");
-        }
-        System.out.println("Starting hash analysis...\n");
-        for (int i = 0; i < cardDB.length; i++) {
-            for (int j = i + 1; j < cardDB.length; j++) {
-                System.out.print("\033[2A");
-                if(cardDB[i].getBinaryHash() == null || cardDB[j].getBinaryHash() == null){
-                    continue;
+        String recordHolderA = "", recordHolderB = "";
+        long startTime = System.currentTimeMillis();
+
+        try (PrintWriter pw = new PrintWriter("hashes.txt")) {
+            for (int i = 0; i < hashed.size(); i++) {
+                Hash hi = hashed.get(i).getBinaryHash();   // hoist out of inner loop
+                for (int j = i + 1; j < hashed.size(); j++) {
+                    double comp = hi.normalizedHammingDistance(hashed.get(j).getBinaryHash());
+                    if (comp < record) {
+                        record = comp;
+                        recordHolderA = hashed.get(i).getCardID();
+                        recordHolderB = hashed.get(j).getCardID();
+                        pw.println(record + "\t" + recordHolderA + " vs " + recordHolderB);
+                    }
+                    pairCount++;
                 }
-                System.out.println("\033[KComparing"+cardDB[i].getCardID()+" c;and "+cardDB[j].getCardID()+"...");
-                double comp = (cardDB[i].getBinaryHash()).normalizedHammingDistance(cardDB[j].getBinaryHash());
-                if(comp < record){
-                    pw.println("New record is "+comp+ ", set by "+recordHolderA+" and "+recordHolderB+". The previous record was "+record+".");
-                    record = comp;
-                    recordHolderA = cardDB[i].getCardID();
-                    recordHolderB = cardDB[j].getCardID();
-                }
-                System.out.println("\033[KCurrent record: "+ record +"Held by: "+recordHolderA+" and "+recordHolderB+"Performed "+pairCount+"operations...");
-                pairCount++;
+                if (i % 500 == 0) {   // progress per outer card, not per pair
+                    System.out.println(i + "/" + hashed.size() + "  (" + pairCount + " pairs)");
+                }   
             }
         }
 
-        long endTime = System.currentTimeMillis();
+    long ms = System.currentTimeMillis() - startTime;
+    System.out.println("Done: " + pairCount + " comparisons in " + ms + " ms");
+    System.out.println("Closest pair: " + recordHolderA + " vs " + recordHolderB + " @ " + record);
+    record = Double.MAX_VALUE;
+    File image = new File("/config/projects/pokecard/src/main/resources/image.jpg");
+    HashingAlgorithm hasher = new PerceptiveHash(32);
+    Hash test = hasher.hash(image);
+    for(int i = 0; i < hashed.size(); i++){
+        double comp = test.normalizedHammingDistance(hashed.get(i).getBinaryHash());
+        if (comp < record) {
+            record = comp;
+            recordHolderA = hashed.get(i).toString();
+        }
     }
-
+    System.out.println("Uploaded image appears to be closest to "+recordHolderA+".");
+    }
 }
