@@ -1,10 +1,9 @@
 package com.willtryon.pokecard;
-
 import java.nio.file.Path;
-
 import dev.brachtendorf.jimagehash.hash.Hash;
 
 public class Card{
+    //Simple card obj constructor, getters, setters ,etc. Might make this a record, i dunno.
     private String cardID;
     private Path img;
     private Hash hash;
