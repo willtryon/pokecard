@@ -1,22 +1,27 @@
 package com.willtryon.pokecard;
 import java.util.*;
+import java.util.stream.Stream;
 import dev.brachtendorf.jimagehash.hash.Hash;
 import dev.brachtendorf.jimagehash.hashAlgorithms.HashingAlgorithm;
 import dev.brachtendorf.jimagehash.hashAlgorithms.PerceptiveHash;
+
+import java.awt.image.BufferedImage;
 import java.io.*;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.*;
 public class CardIndex{
     private Card [] cardDB;
+    private Path imagesDir;
     /*Approach so far is the query sql db and dump it's contents for every hit to a new Card obj, wiich is stored
     in an array of cards...*/
-    public CardIndex(int size, String url) throws SQLException, FileNotFoundException{
+    public CardIndex(int size, String url, Path imagesDir) throws SQLException, FileNotFoundException{
         int line = 0;
-        double order = 0;
         int failed = 0;
         int passed = 0;
         int corrupt = 0;
+        this.imagesDir = imagesDir;
         File file = new File("log.txt"); 
         PrintWriter pw = new PrintWriter(file);
         try{
@@ -39,16 +44,11 @@ public class CardIndex{
             while (rs.next()){
                 String cardId = rs.getString("cardId");
                 String folder = rs.getString("expName").replace(" ", "-");
-                Path img = Path.of("/config","projects","pokedata","images", "cards", folder, cardId.replace("/", "-")+".jpg");
+                Path img = imagesDir.resolve(folder).resolve(cardId.replace("/", "-") + ".jpg");
                 System.out.print("\033[2A\033[K");
                 System.out.println("Now generating hash for "+cardId+"...");
-                long elapsed = System.currentTimeMillis()- startTime;
-                long hours = elapsed/3600000;
-                long minutes = (elapsed%3600000)/60000;
-                long seconds = (elapsed%60000)/1000;
-                String clock = String.format("%02d:%02d:%02d", hours, minutes, seconds);
-                String percent = String.format("%.0f", order = ((double)line/size)*100);
-                System.out.println("\033[KPassed: " +passed+"\tFailed: "+failed+"\tCorrupt: "+corrupt+"\t"+percent+"%\t"+clock+"\t("+line+"/"+size+")");
+                String percent = String.format("%.0f", ((double)line/size)*100);
+                System.out.println("\033[KPassed: " +passed+"\tFailed: "+failed+"\tCorrupt: "+corrupt+"\t"+percent+"%\t"+timer(startTime)+"\t("+line+"/"+size+")");
                 if (Files.exists(img)){
                     String address = img.toString();
                     try{
@@ -92,7 +92,7 @@ public class CardIndex{
         }
     }
 
-    public void compareHash() throws IOException {
+    public void testHash(Path args) throws IOException {
         /*Some card objects will have null hash vars if a file is not found or not accepted by the program,
         or will not even exist in the cardDB at all if the image is corrupt, which leads to a null value
         @ cardDB[index]. This for block checks for null values and adds them to an array list that only parses
@@ -132,17 +132,62 @@ public class CardIndex{
     System.out.println("\nDone: " + pairCount + " comparisons in " + ms + " ms");
     System.out.println("\nClosest pair: " + recordHolderA + " vs " + recordHolderB + " @ " + record);
     //VERY basic hash comp test for image outside of db...
-    record = Double.MAX_VALUE;
-    File image = new File("/config/projects/pokecard/src/main/resources/image.jpg");
-    HashingAlgorithm hasher = new PerceptiveHash(64);
-    Hash test = hasher.hash(image);
-    for(int i = 0; i < hashed.size(); i++){
-        double comp = test.normalizedHammingDistance(hashed.get(i).getBinaryHash());
-        if (comp < record) {
-            record = comp;
-            recordHolderA = hashed.get(i).toString();
-        }
+    //record = Double.MAX_VALUE;
+    //File image = new File("/config/projects/pokecard/src/main/resources/image.jpg");
+    //Path img = args;
+
     }
-    System.out.println("\nUploaded image appears to be closest to "+recordHolderA+".");
+
+    public void compareHash(Path args){
+        /*Some card objects will have null hash vars if a file is not found or not accepted by the program,
+        or will not even exist in the cardDB at all if the image is corrupt, which leads to a null value
+        @ cardDB[index]. This for block checks for null values and adds them to an array list that only parses
+        hashes so the program doesn't crash when it finds a null Card obj.*/
+        List<Card> hashed = new ArrayList<>();
+        for (int c = 0; c < cardDB.length; c++){
+            if (cardDB[c] != null && cardDB[c].getBinaryHash() != null) {
+                hashed.add(cardDB[c]);
+            }
+        }
+        System.out.println("Now looking through "+args.toString()+" for images to compare...\n");
+        try(Stream <Path> stream = Files.walk(args);){
+            stream.
+            filter(path -> {
+                String s = path.toString().toLowerCase();
+                return s.endsWith(".jpg") || s.endsWith(".png");
+            })
+            .forEach(path ->{
+                HashingAlgorithm hasher = new PerceptiveHash(64);
+                File victim = new File(path.toString());
+                try{
+                    Hash test = hasher.hash(victim);
+                    double record = Double.MAX_VALUE;
+                    String recordHolder = "";
+                    for(int i = 0; i < hashed.size(); i++){
+                        double comp = test.normalizedHammingDistance(hashed.get(i).getBinaryHash());
+                        if (comp < record) {
+                            record = comp;
+                            recordHolder = hashed.get(i).toString();
+                            }
+                        }
+                    System.out.println("\nUploaded image "+victim.toString()+" appears to be closest to "+recordHolder+".");
+                    System.out.println(record);
+                    }catch(IOException e){
+                        System.out.println("File no worky :(");
+                    }
+                //stream.close();
+            });
+        }catch(IOException e){
+            e.printStackTrace();
+            }
+    }
+    
+
+    private String timer(long args){
+        long elapsed = System.currentTimeMillis()- args;
+        long hours = elapsed/3600000;
+        long minutes = (elapsed%3600000)/60000;
+        long seconds = (elapsed%60000)/1000;
+        return String.format("%02d:%02d:%02d", hours, minutes, seconds);
     }
 }

@@ -14,6 +14,8 @@
     <properties>
         <!-- Compile against Java 21 (the JDK in your container). -->
         <maven.compiler.release>21</maven.compiler.release>
+        <maven.compiler.source>22</maven.compiler.source>
+        <maven.compiler.target>22</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- The class `mvn exec:java` will run. -->
         <exec.mainClass>com.yourname.pokecard.App</exec.mainClass>
