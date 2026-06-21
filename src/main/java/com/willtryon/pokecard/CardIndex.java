@@ -4,10 +4,7 @@ import java.util.stream.Stream;
 import dev.brachtendorf.jimagehash.hash.Hash;
 import dev.brachtendorf.jimagehash.hashAlgorithms.HashingAlgorithm;
 import dev.brachtendorf.jimagehash.hashAlgorithms.PerceptiveHash;
-
-import java.awt.image.BufferedImage;
 import java.io.*;
-import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.*;
@@ -92,7 +89,7 @@ public class CardIndex{
         }
     }
 
-    public void testHash(Path args) throws IOException {
+    public void testHash() throws IOException {
         /*Some card objects will have null hash vars if a file is not found or not accepted by the program,
         or will not even exist in the cardDB at all if the image is corrupt, which leads to a null value
         @ cardDB[index]. This for block checks for null values and adds them to an array list that only parses
@@ -131,18 +128,10 @@ public class CardIndex{
     long ms = System.currentTimeMillis() - startTime;
     System.out.println("\nDone: " + pairCount + " comparisons in " + ms + " ms");
     System.out.println("\nClosest pair: " + recordHolderA + " vs " + recordHolderB + " @ " + record);
-    //VERY basic hash comp test for image outside of db...
-    //record = Double.MAX_VALUE;
-    //File image = new File("/config/projects/pokecard/src/main/resources/image.jpg");
-    //Path img = args;
-
     }
 
     public void compareHash(Path args){
-        /*Some card objects will have null hash vars if a file is not found or not accepted by the program,
-        or will not even exist in the cardDB at all if the image is corrupt, which leads to a null value
-        @ cardDB[index]. This for block checks for null values and adds them to an array list that only parses
-        hashes so the program doesn't crash when it finds a null Card obj.*/
+    //VERY basic hash comp test for image outside of db...
         List<Card> hashed = new ArrayList<>();
         for (int c = 0; c < cardDB.length; c++){
             if (cardDB[c] != null && cardDB[c].getBinaryHash() != null) {
