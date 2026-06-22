@@ -2,7 +2,7 @@
 pokecard
 by willtryon
 version 0.1.1
-this build is from june 20th, 2026.
+this build is from june 21th, 2026.
 */
 
 package com.willtryon.pokecard;
@@ -13,6 +13,8 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.Scanner;
+import org.bytedeco.opencv.opencv_core.Mat;
+import static org.bytedeco.opencv.global.opencv_imgcodecs.imread;
 
 public class App {
     public static int size = 0;
@@ -28,13 +30,17 @@ public class App {
                 Statement st = conn.createStatement();
                 ResultSet rs = st.executeQuery("SELECT COUNT(*) AS n FROM cards")) {
                 System.out.println("Connected to Database.");
+                Mat img = imread("/config/projects/pokedata/images/cards/Base-Set/Base-Set-Charizard-004.jpg");
+                System.out.println(img.empty() ? "FAILED to load" : img.rows() + "x" + img.cols());
                 if (rs.next()) {
                     size = rs.getInt("n");
                     System.out.println("Cards in database: " + size);
                     CardIndex cardDB = new CardIndex(size, url, imagesDir);
+
                     cardDB.test(size);
                     cardDB.testHash();
                     cardDB.compareHash(compareDir);
+                    cardDB.goodMatchesTest();
                 }
             }
         }

@@ -18,7 +18,7 @@
         <maven.compiler.target>22</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- The class `mvn exec:java` will run. -->
-        <exec.mainClass>com.yourname.pokecard.App</exec.mainClass>
+        <exec.mainClass>com.willtryon.pokecard.App</exec.mainClass>
     </properties>
 
     <dependencies>
@@ -35,6 +35,13 @@
             <groupId>dev.brachtendorf</groupId>
             <artifactId>JImageHash</artifactId>
             <version>1.0.0</version>
+        </dependency>
+
+
+        <dependency>
+            <groupId>org.bytedeco</groupId>
+            <artifactId>opencv-platform</artifactId>
+            <version>4.13.0-1.5.13</version>
         </dependency>
     </dependencies>
 

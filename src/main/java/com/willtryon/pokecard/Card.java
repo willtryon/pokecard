@@ -22,6 +22,10 @@ public class Card{
         return img;
     }
 
+    public String getStringImgPath(){
+        return img.toString();
+    }
+
     public Hash getBinaryHash(){
         return hash;
     }
