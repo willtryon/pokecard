@@ -253,6 +253,10 @@ public class CardIndex{
                         pw.println(record + "\t" + recordHolderA + " vs " + recordHolderB);
                     }
                     pairCount++;
+                    System.out.print("\033[1A\033[J");
+                    String percent = String.format("%.0f", ((double)i/hashed.size())*100);
+                    System.out.println(""+percent+"\n"+ timer(startTime));
+                    
                 }
                 if (i % 500 == 0) {
                     System.out.println(i + "/" + hashed.size() + "  (" + pairCount + " comparisons...)");
