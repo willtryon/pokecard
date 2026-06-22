@@ -39,8 +39,8 @@ public class App {
 
                     cardDB.test(size);
                     cardDB.testHash();
-                    cardDB.compareHash(compareDir);
-                    cardDB.goodMatchesTest();
+                    cardDB.compareImage(compareDir);
+                    //cardDB.goodMatchesTest();
                 }
             }
         }

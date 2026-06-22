@@ -67,7 +67,7 @@ public class CardIndex{
                     try{
                         File victim = new File(address);
                         try{
-                            cardDB[line] = new CardSignature(cardId, img, hasher.hash(victim), describe(cardId, address, orb));
+                            cardDB[line] = new CardSignature(cardId, img, hasher.hash(victim), describe(address, orb));
                             System.out.print("\033[3A\033[J");
                             System.out.println("Hashing:  " + cardId + " ✓");
                             System.out.println("ORB map:  " + cardId + " ✓");
@@ -151,7 +151,7 @@ public class CardIndex{
     System.out.println("\nClosest pair: " + recordHolderA + " vs " + recordHolderB + " @ " + record);
     }
 
-    public void compareHash(Path args){
+    public void compareImage(Path args){
     //VERY basic hash comp test for image outside of db...
         List<CardSignature> hashed = new ArrayList<>();
         for (int c = 0; c < cardDB.length; c++){
@@ -180,7 +180,18 @@ public class CardIndex{
                             recordHolder = hashed.get(i).toString();
                             }
                         }
-                    System.out.println("\nUploaded image "+victim.toString()+" appears to be closest to "+recordHolder+".");
+                    System.out.println("\nUploaded image "+victim.toString()+" appears to be closest to "+recordHolder+". (pHash)");
+                    ORB orb = ORB.create();
+                    Mat test2 = describe(path.toString(), orb);
+                    for(int i = 0; i<hashed.size(); i++){
+                        int comp = goodMatches(test2, hashed.get(i).getMatData());
+                        if (comp < record) {
+                            record = comp;
+                            recordHolder = hashed.get(i).toString();
+                            }
+                    }
+                    System.out.println("\nUploaded image "+victim.toString()+" appears to be closest to "+recordHolder+". (ORB)");
+                    
                     System.out.println(record);
                     }catch(IOException e){
                         System.out.println("File no worky :(");
@@ -192,7 +203,7 @@ public class CardIndex{
             }
     }
     
-    private Mat describe(String cardID, String path, ORB orb){
+    private Mat describe(String path, ORB orb){
         Mat img = imread(path, IMREAD_GRAYSCALE);
         if (img.empty()){
             System.out.println("Something went wrong when trying to load round 2 image: "+path);
@@ -254,8 +265,9 @@ public class CardIndex{
                     }
                     pairCount++;
                     System.out.print("\033[1A\033[J");
-                    String percent = String.format("%.0f", ((double)i/hashed.size())*100);
-                    System.out.println(""+percent+"\n"+ timer(startTime));
+                    double percent = ((double)i/hashed.size())*100;
+                    //String percent = String.format("%.0f", ((double)i/hashed.size())*100);
+                    System.out.println(""+percent+"\t"+ timer(startTime)+"\t"+i);
                     
                 }
                 if (i % 500 == 0) {
