@@ -161,8 +161,8 @@ public class CardIndex{
         }
         System.out.println("Now looking through "+args.toString()+" for images to compare...\n");
         try(Stream <Path> stream = Files.walk(args);){
-            stream.
-            filter(path -> {
+            stream
+            .filter(path -> {
                 String s = path.toString().toLowerCase();
                 return s.endsWith(".jpg") || s.endsWith(".png");
             })
@@ -173,6 +173,7 @@ public class CardIndex{
                     Hash test = hasher.hash(victim);
                     double record = Double.MAX_VALUE;
                     String recordHolder = "";
+                    String recordHolder2 = "";
                     for(int i = 0; i < hashed.size(); i++){
                         double comp = test.normalizedHammingDistance(hashed.get(i).getBinaryHash());
                         if (comp < record) {
@@ -181,18 +182,21 @@ public class CardIndex{
                             }
                         }
                     System.out.println("\nUploaded image "+victim.toString()+" appears to be closest to "+recordHolder+". (pHash)");
+                    System.out.println(record);
                     ORB orb = ORB.create();
                     Mat test2 = describe(path.toString(), orb);
+                    int record2 = 0;
                     for(int i = 0; i<hashed.size(); i++){
                         int comp = goodMatches(test2, hashed.get(i).getMatData());
-                        if (comp < record) {
-                            record = comp;
-                            recordHolder = hashed.get(i).toString();
+                        if (comp > record2) {
+                            record2 = comp;
+                            recordHolder2 = hashed.get(i).toString();
+                            System.out.println(record2);
                             }
                     }
                     System.out.println("\nUploaded image "+victim.toString()+" appears to be closest to "+recordHolder+". (ORB)");
                     
-                    System.out.println(record);
+                    
                     }catch(IOException e){
                         System.out.println("File no worky :(");
                     }
