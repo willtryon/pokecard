@@ -76,7 +76,7 @@ public class CardIndex{
                                     passed, failed, corrupt, percent, timer(startTime), line, size);
                             passed++;
                         } catch (IllegalArgumentException e) {
-                            pw.println("File " + cardId + " apeears to he corrupt.");
+                            pw.println("File " + cardId + " appears to be corrupt (found at " + address + " but could not be decoded).");
                             corrupt++;
                         }
                     } catch (IOException e){
@@ -84,10 +84,12 @@ public class CardIndex{
                         failed++;
                     }
                 } else{
+                    // NOTE: larp for the log. The real lookup happens in resolveImage();
+                    // the file may actually exist under a different number format. 
                     Path expected = imagesDir
                             .resolve(expName == null ? "" : expName.replace(" ", "-"))
                             .resolve(cardId.replace("/", "-") + ".jpg");
-                    pw.println("File " + cardId + " cannot be found by the program.\nLocation: " + expected);
+                    pw.println("File " + cardId + " cannot be found by the program.\nLocation searched (folder): " + expected.getParent());
                     cardDB[line] = new CardSignature(cardId, img == null ? expected : img, null, null);
                     failed++;
                 }
@@ -100,10 +102,12 @@ public class CardIndex{
         pw.close();
     }
 
+
     private Path resolveImage(Path imagesDir, String expName, String cardId, String expCardNumber){
         String folder = (expName == null ? "" : expName.replace(" ", "-"));
         Path dir = imagesDir.resolve(folder);
 
+       //bail out if normal file path is correct (about 77% chance it is)
         Path exact = dir.resolve(cardId.replace("/", "-") + ".jpg");
         if (Files.exists(exact)){
             return exact;
@@ -112,26 +116,10 @@ public class CardIndex{
         if (!Files.isDirectory(dir)){
             return null;
         }
-    
-        String wantStem = normalizeForMatch(cardId.replace("/", "-"));
 
-        String num = (expCardNumber == null ? "" : expCardNumber.trim());
-        if (num.contains("/")){
-            num = num.substring(0, num.indexOf('/'));
-        }
-        String paddedNum = "";
-        if (num.matches("\\d+")){
-            paddedNum = String.format("%03d", Integer.parseInt(num));
-        }
-        final String wantNum = paddedNum;
+        final String wantName = nameKey(cardId);
+        final Integer wantNum = collectorNumber(expCardNumber, cardId); 
 
-        String nameNoNum = cardId;
-        int lastDash = nameNoNum.lastIndexOf('-');
-        if (lastDash > 0){
-            nameNoNum = nameNoNum.substring(0, lastDash);
-        }
-        final String wantName = normalizeForMatch(nameNoNum.replace("/", "-"));
-    
         try (Stream<Path> stream = Files.list(dir)){
             List<Path> candidates = stream
                     .filter(p -> {
@@ -139,37 +127,91 @@ public class CardIndex{
                         return s.endsWith(".jpg") || s.endsWith(".jpeg") || s.endsWith(".png");
                     })
                     .collect(java.util.stream.Collectors.toList());
-    
-            // a. exact normalized stem
+
+            // 1) Exact normalized stem
+            String wantStemFull = normalizeForMatch(cardId.replace("/", "-"));
             for (Path p : candidates){
-                if (normalizeForMatch(stripExt(p)).equals(wantStem)) {
+                if (normalizeForMatch(stripExt(p)).equals(wantStemFull)) {
                     return p;
                 }
             }
-            // b. filename starts with the expected stem (trailing qualifiers)
-            for (Path p : candidates){
-                if (normalizeForMatch(stripExt(p)).startsWith(wantStem)) {
-                    return p;
-                }
-            }
-            /* c. contains the card name AND ends with the padded number.
-               This is the last resort.*/
-            if (!wantNum.isEmpty() && !wantName.isEmpty()){
+
+            // 2)compares int collector key
+            if (wantNum != null && !wantName.isEmpty()){
                 List<Path> hits = new ArrayList<>();
-                for (Path p : candidates) {
-                    String norm = normalizeForMatch(stripExt(p));
-                    if (norm.contains(wantName) && norm.endsWith(wantNum)) {
+                for (Path p : candidates){
+                    String stem = stripExt(p);
+                    Integer fileNum = trailingNumber(stem);
+                    if (fileNum != null && fileNum.intValue() == wantNum.intValue()
+                            && nameKey(stem).equals(wantName)){
                         hits.add(p);
                     }
                 }
                 if (hits.size() == 1){
                     return hits.get(0);
                 }
+
+                if (hits.isEmpty()){
+                    for (Path p : candidates){
+                        String stem = stripExt(p);
+                        Integer fileNum = trailingNumber(stem);
+                        if (fileNum != null && fileNum.intValue() == wantNum.intValue()
+                                && !nameKey(stem).isEmpty()
+                                && (nameKey(stem).contains(wantName) || wantName.contains(nameKey(stem)))){
+                            hits.add(p);
+                        }
+                    }
+                    if (hits.size() == 1){
+                        return hits.get(0);
+                    }
+                }
+            }
+
+            // 3) Last resort: normalized prefix match (kept from the original behaviour).
+            for (Path p : candidates){
+                if (normalizeForMatch(stripExt(p)).startsWith(wantStemFull)) {
+                    return p;
+                }
             }
         } catch (IOException e){
             return null;
         }
         return null;
+    }
+
+    private Integer collectorNumber(String expCardNumber, String cardId){
+        Integer n = parseLeadingInt(expCardNumber);
+        if (n != null) return n;
+        return trailingNumber(cardId);
+    }
+
+    private Integer parseLeadingInt(String s){
+        if (s == null) return null;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\d+").matcher(s);
+        return m.find() ? Integer.valueOf(Integer.parseInt(m.group())) : null;
+    }
+
+    //pulls int at the end of a '-' char
+    private Integer trailingNumber(String stem){
+        if (stem == null) return null;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(\\d+)$").matcher(stem);
+        return m.find() ? Integer.valueOf(Integer.parseInt(m.group(1))) : null;
+    }
+
+    //bye bye number slop
+    private String nameKey(String cardId){
+        if (cardId == null) return "";
+        String s = cardId;
+        int jj = s.indexOf("---");
+        if (jj >= 0){
+            s = s.substring(0, jj);
+        } else {
+            int dash = s.lastIndexOf('-');
+            if (dash > 0 && s.substring(dash + 1).matches("[A-Za-z]*\\d+")){
+                s = s.substring(0, dash);
+            }
+        }
+        return normalizeForMatch(s);
     }
 
     private String stripExt(Path p){

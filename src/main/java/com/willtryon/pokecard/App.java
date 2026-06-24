@@ -39,7 +39,7 @@ public class App {
 
                     //cardDB.test(size);
                     //cardDB.testHash();
-                    //cardDB.compareImage(compareDir, outputDir);
+                    cardDB.compareImage(compareDir, outputDir);
                 }
             }
         }
