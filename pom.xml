@@ -8,7 +8,7 @@
          change it to whatever you like. artifactId is the project name. -->
     <groupId>com.willtryon</groupId>
     <artifactId>pokecard</artifactId>
-    <version>0.1.1</version>
+    <version>0.2.0</version>
     <packaging>jar</packaging>
 
     <properties>

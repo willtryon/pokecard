@@ -22,7 +22,7 @@ import static org.bytedeco.opencv.global.opencv_core.NORM_HAMMING;
 
 public class CardIndex{
     private CardSignature [] cardDB;
-    private Path imagesDir;
+    //private Path imagesDir;
     /*Approach so far is the query sql db and dump it's contents for every hit to a new Card obj, wiich is stored
     in an array of cards...*/
     public CardIndex(int size, String url, Path imagesDir) throws SQLException, FileNotFoundException{
@@ -30,7 +30,7 @@ public class CardIndex{
         int failed = 0;
         int passed = 0;
         int corrupt = 0;
-        this.imagesDir = imagesDir;
+        //this.imagesDir = imagesDir;
         File file = new File("log.txt"); 
         PrintWriter pw = new PrintWriter(file);
         try{
@@ -191,10 +191,11 @@ public class CardIndex{
                         if (comp > record2) {
                             record2 = comp;
                             recordHolder2 = hashed.get(i).toString();
-                            System.out.println(record2);
+                            //System.out.println("\033[0F\033[K"+record2);
                             }
                     }
-                    System.out.println("\nUploaded image "+victim.toString()+" appears to be closest to "+recordHolder+". (ORB)");
+                    System.out.println("\nUploaded image "+victim.toString()+" appears to be closest to "+recordHolder2+". (ORB)");
+                    System.out.println(record2);
                     
                     
                     }catch(IOException e){
@@ -238,6 +239,7 @@ public class CardIndex{
                 }
             }
         }
+        matcher.close();
         return good;
 
     }
@@ -282,8 +284,6 @@ public class CardIndex{
     long ms = System.currentTimeMillis() - startTime;
     System.out.println("\nDone: " + pairCount + " comparisons in " + ms + " ms");
     System.out.println("\nClosest pair: " + recordHolderA + " vs " + recordHolderB + " @ " + record);
-
-
     }
 
     private String timer(long args){
