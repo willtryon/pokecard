@@ -1,5 +1,6 @@
 package com.willtryon.pokecard;
 import java.util.*;
+import java.util.stream.Stream;
 import dev.brachtendorf.jimagehash.hash.Hash;
 import dev.brachtendorf.jimagehash.hashAlgorithms.HashingAlgorithm;
 import dev.brachtendorf.jimagehash.hashAlgorithms.PerceptiveHash;
@@ -7,16 +8,29 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.*;
+import org.bytedeco.opencv.opencv_core.Mat;
+import org.bytedeco.opencv.opencv_core.KeyPointVector;
+import org.bytedeco.opencv.opencv_core.DMatchVector;
+import org.bytedeco.opencv.opencv_core.DMatchVectorVector;
+import org.bytedeco.opencv.opencv_core.DMatch;
+import org.bytedeco.opencv.opencv_features2d.ORB;
+import org.bytedeco.opencv.opencv_features2d.BFMatcher;
+import static org.bytedeco.opencv.global.opencv_imgcodecs.imread;
+import static org.bytedeco.opencv.global.opencv_imgcodecs.IMREAD_GRAYSCALE;
+import static org.bytedeco.opencv.global.opencv_core.NORM_HAMMING;
+
+
 public class CardIndex{
-    private Card [] cardDB;
+    private CardSignature [] cardDB;
+    //private Path imagesDir;
     /*Approach so far is the query sql db and dump it's contents for every hit to a new Card obj, wiich is stored
     in an array of cards...*/
-    public CardIndex(int size, String url) throws SQLException, FileNotFoundException{
+    public CardIndex(int size, String url, Path imagesDir) throws SQLException, FileNotFoundException{
         int line = 0;
-        double order = 0;
         int failed = 0;
         int passed = 0;
         int corrupt = 0;
+        //this.imagesDir = imagesDir;
         File file = new File("log.txt"); 
         PrintWriter pw = new PrintWriter(file);
         try{
@@ -30,31 +44,35 @@ public class CardIndex{
             System.out.println("IO exception. Try again.");
         }
         HashingAlgorithm hasher = new PerceptiveHash(64);
-        cardDB = new Card[size];
+        cardDB = new CardSignature[size];
         try(Connection conn = DriverManager.getConnection(url);
             Statement st = conn.createStatement(); 
             ResultSet rs = st.executeQuery("SELECT cardId, name, expName, expCardNumber, rarity FROM cards");){
             long startTime = System.currentTimeMillis();
             System.out.println("Now generating hashes for the database...");
+            System.out.println("\n\n");
             while (rs.next()){
                 String cardId = rs.getString("cardId");
                 String folder = rs.getString("expName").replace(" ", "-");
-                Path img = Path.of("/config","projects","pokedata","images", "cards", folder, cardId.replace("/", "-")+".jpg");
-                System.out.print("\033[2A\033[K");
-                System.out.println("Now generating hash for "+cardId+"...");
-                long elapsed = System.currentTimeMillis()- startTime;
-                long hours = elapsed/3600000;
-                long minutes = (elapsed%3600000)/60000;
-                long seconds = (elapsed%60000)/1000;
-                String clock = String.format("%02d:%02d:%02d", hours, minutes, seconds);
-                String percent = String.format("%.0f", order = ((double)line/size)*100);
-                System.out.println("\033[KPassed: " +passed+"\tFailed: "+failed+"\tCorrupt: "+corrupt+"\t"+percent+"%\t"+clock+"\t("+line+"/"+size+")");
+                Path img = imagesDir.resolve(folder).resolve(cardId.replace("/", "-") + ".jpg");
+                String percent = String.format("%.0f", ((double)line/size)*100);
+                System.out.print("\033[3A\033[J"); // move up 3 lines, clear everything below
+                System.out.println("Hashing:  " + cardId + "...");
+                System.out.println("ORB map:  generating...");
+                System.out.printf("Passed: %d\tFailed: %d\tCorrupt: %d\t%s%%\t%s\t(%d/%d)%n",
+                passed, failed, corrupt, percent, timer(startTime), line, size);
+                ORB orb = ORB.create();
                 if (Files.exists(img)){
                     String address = img.toString();
                     try{
                         File victim = new File(address);
                         try{
-                            cardDB[line] = new Card(cardId, img, hasher.hash(victim));
+                            cardDB[line] = new CardSignature(cardId, img, hasher.hash(victim), describe(address, orb));
+                            System.out.print("\033[3A\033[J");
+                            System.out.println("Hashing:  " + cardId + " ✓");
+                            System.out.println("ORB map:  " + cardId + " ✓");
+                            System.out.printf("Passed: %d\tFailed: %d\tCorrupt: %d\t%s%%\t%s\t(%d/%d)%n",
+                            passed, failed, corrupt, percent, timer(startTime), line, size);
                             passed++;
                         }catch(IllegalArgumentException e){
 							//System.out.println("this file is corrupt."); corrupt++;
@@ -69,7 +87,7 @@ public class CardIndex{
                 }
                 else{
                     pw.println("File "+cardId+" cannot be found by the program.\nLocation: "+img);
-                    cardDB[line] = new Card(cardId, img, null);
+                    cardDB[line] = new CardSignature(cardId, img, null, null);
                     failed++;
                 }
                 line++;
@@ -92,12 +110,12 @@ public class CardIndex{
         }
     }
 
-    public void compareHash() throws IOException {
+    public void testHash() throws IOException {
         /*Some card objects will have null hash vars if a file is not found or not accepted by the program,
         or will not even exist in the cardDB at all if the image is corrupt, which leads to a null value
         @ cardDB[index]. This for block checks for null values and adds them to an array list that only parses
         hashes so the program doesn't crash when it finds a null Card obj.*/
-        List<Card> hashed = new ArrayList<>();
+        List<CardSignature> hashed = new ArrayList<>();
         for (int c = 0; c < cardDB.length; c++){
             if (cardDB[c] != null && cardDB[c].getBinaryHash() != null) {
                 hashed.add(cardDB[c]);
@@ -131,18 +149,148 @@ public class CardIndex{
     long ms = System.currentTimeMillis() - startTime;
     System.out.println("\nDone: " + pairCount + " comparisons in " + ms + " ms");
     System.out.println("\nClosest pair: " + recordHolderA + " vs " + recordHolderB + " @ " + record);
-    //VERY basic hash comp test for image outside of db...
-    record = Double.MAX_VALUE;
-    File image = new File("/config/projects/pokecard/src/main/resources/image.jpg");
-    HashingAlgorithm hasher = new PerceptiveHash(64);
-    Hash test = hasher.hash(image);
-    for(int i = 0; i < hashed.size(); i++){
-        double comp = test.normalizedHammingDistance(hashed.get(i).getBinaryHash());
-        if (comp < record) {
-            record = comp;
-            recordHolderA = hashed.get(i).toString();
-        }
     }
-    System.out.println("\nUploaded image appears to be closest to "+recordHolderA+".");
+
+    public void compareImage(Path args){
+    //VERY basic hash comp test for image outside of db...
+        List<CardSignature> hashed = new ArrayList<>();
+        for (int c = 0; c < cardDB.length; c++){
+            if (cardDB[c] != null && cardDB[c].getBinaryHash() != null) {
+                hashed.add(cardDB[c]);
+            }
+        }
+        System.out.println("Now looking through "+args.toString()+" for images to compare...\n");
+        try(Stream <Path> stream = Files.walk(args);){
+            stream
+            .filter(path -> {
+                String s = path.toString().toLowerCase();
+                return s.endsWith(".jpg") || s.endsWith(".png");
+            })
+            .forEach(path ->{
+                HashingAlgorithm hasher = new PerceptiveHash(64);
+                File victim = new File(path.toString());
+                try{
+                    Hash test = hasher.hash(victim);
+                    double record = Double.MAX_VALUE;
+                    String recordHolder = "";
+                    String recordHolder2 = "";
+                    for(int i = 0; i < hashed.size(); i++){
+                        double comp = test.normalizedHammingDistance(hashed.get(i).getBinaryHash());
+                        if (comp < record) {
+                            record = comp;
+                            recordHolder = hashed.get(i).toString();
+                            }
+                        }
+                    System.out.println("\nUploaded image "+victim.toString()+" appears to be closest to "+recordHolder+". (pHash)");
+                    System.out.println(record);
+                    ORB orb = ORB.create();
+                    Mat test2 = describe(path.toString(), orb);
+                    int record2 = 0;
+                    for(int i = 0; i<hashed.size(); i++){
+                        int comp = goodMatches(test2, hashed.get(i).getMatData());
+                        if (comp > record2) {
+                            record2 = comp;
+                            recordHolder2 = hashed.get(i).toString();
+                            //System.out.println("\033[0F\033[K"+record2);
+                            }
+                    }
+                    System.out.println("\nUploaded image "+victim.toString()+" appears to be closest to "+recordHolder2+". (ORB)");
+                    System.out.println(record2);
+                    
+                    
+                    }catch(IOException e){
+                        System.out.println("File no worky :(");
+                    }
+                //stream.close();
+            });
+        }catch(IOException e){
+            e.printStackTrace();
+            }
+    }
+    
+    private Mat describe(String path, ORB orb){
+        Mat img = imread(path, IMREAD_GRAYSCALE);
+        if (img.empty()){
+            System.out.println("Something went wrong when trying to load round 2 image: "+path);
+        }
+        KeyPointVector keypoints = new KeyPointVector();
+        Mat descriptiors = new Mat();
+        //System.out.println("Now generating ORB vectors for "+cardID);
+        orb.detectAndCompute(img, new Mat(), keypoints, descriptiors);
+        return descriptiors;
+    }
+
+    private int goodMatches(Mat canidateA, Mat canidateB){
+        if (canidateA.empty() || canidateB.empty()) return 0;
+
+        BFMatcher matcher = new BFMatcher(NORM_HAMMING, false);
+
+        DMatchVectorVector knn = new DMatchVectorVector();
+        matcher.knnMatch(canidateA, canidateB, knn, 2);
+
+        int good = 0;
+        for (long i = 0; i < knn.size(); i++) {
+            DMatchVector pair = knn.get(i);
+            if (pair.size() >= 2) {
+                DMatch best   = pair.get(0);
+                DMatch second = pair.get(1);
+                if (best.distance() < 0.75f * second.distance()) {
+                    good++;
+                }
+            }
+        }
+        matcher.close();
+        return good;
+
+    }
+
+    public void goodMatchesTest()throws IOException{
+        List<CardSignature> hashed = new ArrayList<>();
+        for (int c = 0; c < cardDB.length; c++){
+            if (cardDB[c] != null && cardDB[c].getBinaryHash() != null) {
+                hashed.add(cardDB[c]);
+            }
+        }
+        System.out.println("\n\nComparing " + hashed.size() + " ORB maps...\n");
+
+        long pairCount = 0;
+        int record = 0;
+        String recordHolderA = "", recordHolderB = "";
+        long startTime = System.currentTimeMillis();
+        //Won't be much use for this porgram's purpose, but nice way to test all valid orbs work.
+        try (PrintWriter pw = new PrintWriter("orbs.txt")) {
+            for (int i = 0; i < hashed.size(); i++) {
+                Mat first = hashed.get(i).getMatData();
+                for (int j = i + 1; j < hashed.size(); j++) {
+                    int comp = goodMatches(first, hashed.get(j).getMatData());
+                    if (comp < record) {
+                        record = comp;
+                        recordHolderA = hashed.get(i).getCardID();
+                        recordHolderB = hashed.get(j).getCardID();
+                        pw.println(record + "\t" + recordHolderA + " vs " + recordHolderB);
+                    }
+                    pairCount++;
+                    System.out.print("\033[1A\033[J");
+                    double percent = ((double)i/hashed.size())*100;
+                    //String percent = String.format("%.0f", ((double)i/hashed.size())*100);
+                    System.out.println(""+percent+"\t"+ timer(startTime)+"\t"+i);
+                    
+                }
+                if (i % 500 == 0) {
+                    System.out.println(i + "/" + hashed.size() + "  (" + pairCount + " comparisons...)");
+                }   
+            }
+        }
+    long ms = System.currentTimeMillis() - startTime;
+    System.out.println("\nDone: " + pairCount + " comparisons in " + ms + " ms");
+    System.out.println("\nClosest pair: " + recordHolderA + " vs " + recordHolderB + " @ " + record);
+    }
+
+    private String timer(long args){
+        long elapsed = System.currentTimeMillis()- args;
+        long hours = elapsed/3600000;
+        long minutes = (elapsed%3600000)/60000;
+        long seconds = (elapsed%60000)/1000;
+        return String.format("%02d:%02d:%02d", hours, minutes, seconds);
     }
 }
