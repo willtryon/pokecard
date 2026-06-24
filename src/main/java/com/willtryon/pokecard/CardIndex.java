@@ -27,79 +27,171 @@ public class CardIndex{
     //private Path imagesDir;
     /*Approach so far is the query sql db and dump it's contents for every hit to a new Card obj, wiich is stored
     in an array of cards...*/
-    public CardIndex(int size, String url, Path imagesDir) throws SQLException, FileNotFoundException{
+    public CardIndex(int size, String url, Path imagesDir) throws SQLException, FileNotFoundException {
         int line = 0;
         int failed = 0;
         int passed = 0;
         int corrupt = 0;
-        //this.imagesDir = imagesDir;
-        File file = new File("log.txt"); 
+        File file = new File("log.txt");
         PrintWriter pw = new PrintWriter(file);
-        try{
-            if(file.createNewFile()){
+        try {
+            if (file.createNewFile()) {
                 System.out.println("log.txt created.\n\n");
-            }
-            else{
+            } else {
                 System.out.println("File exists, skipping...\n\n");
             }
-        }catch(IOException e){
+        } catch (IOException e) {
             System.out.println("IO exception. Try again.");
         }
         HashingAlgorithm hasher = new PerceptiveHash(64);
         cardDB = new CardSignature[size];
-        try(Connection conn = DriverManager.getConnection(url);
-            Statement st = conn.createStatement(); 
-            ResultSet rs = st.executeQuery("SELECT cardId, name, expName, expCardNumber, rarity FROM cards");){
+        try (Connection conn = DriverManager.getConnection(url);
+             Statement st = conn.createStatement();
+            ResultSet rs = st.executeQuery("SELECT cardId, name, expName, expCardNumber, rarity FROM cards");) {
             long startTime = System.currentTimeMillis();
             System.out.println("Now generating hashes for the database...");
             System.out.println("\n\n");
-            while (rs.next()){
-                String cardId = rs.getString("cardId");
-                String folder = rs.getString("expName").replace(" ", "-");
-                Path img = imagesDir.resolve(folder).resolve(cardId.replace("/", "-") + ".jpg");
-                String percent = String.format("%.0f", ((double)line/size)*100);
-                System.out.print("\033[3A\033[J"); // move up 3 lines, clear everything below
+            while (rs.next()) {
+                String cardId  = rs.getString("cardId");
+                String expName = rs.getString("expName");
+                String expCardNumber = rs.getString("expCardNumber");
+                Path img = resolveImage(imagesDir, expName, cardId, expCardNumber);
+                String percent = String.format("%.0f", ((double) line / size) * 100);
+                System.out.print("\033[3A\033[J");
                 System.out.println("Hashing:  " + cardId + "...");
                 System.out.println("ORB map:  generating...");
                 System.out.printf("Passed: %d\tFailed: %d\tCorrupt: %d\t%s%%\t%s\t(%d/%d)%n",
-                passed, failed, corrupt, percent, timer(startTime), line, size);
+                    passed, failed, corrupt, percent, timer(startTime), line, size);
                 ORB orb = ORB.create();
-                if (Files.exists(img)){
+                if (img != null && Files.exists(img)) {
                     String address = img.toString();
-                    try{
+                    try {
                         File victim = new File(address);
-                        try{
+                        try {
                             cardDB[line] = new CardSignature(cardId, img, hasher.hash(victim), describe(address, orb));
                             System.out.print("\033[3A\033[J");
-                            System.out.println("Hashing:  " + cardId + " ✓");
-                            System.out.println("ORB map:  " + cardId + " ✓");
+                            System.out.println("Hashing:  " + cardId + " \u2713");
+                            System.out.println("ORB map:  " + cardId + " \u2713");
                             System.out.printf("Passed: %d\tFailed: %d\tCorrupt: %d\t%s%%\t%s\t(%d/%d)%n",
-                            passed, failed, corrupt, percent, timer(startTime), line, size);
+                                    passed, failed, corrupt, percent, timer(startTime), line, size);
                             passed++;
-                        }catch(IllegalArgumentException e){
-							//System.out.println("this file is corrupt."); corrupt++;
-                            pw.println("File "+cardId+" apeears to he corrupt.");
+                        } catch (IllegalArgumentException e) {
+                            pw.println("File " + cardId + " apeears to he corrupt.");
                             corrupt++;
                         }
-                    }catch(IOException e){
-                        //System.out.println("An exception has occured.");
-                        pw.println("An unknown exception occured when hashing "+cardId);
+                    } catch (IOException e){
+                        pw.println("An unknown exception occured when hashing " + cardId);
                         failed++;
                     }
-                }
-                else{
-                    pw.println("File "+cardId+" cannot be found by the program.\nLocation: "+img);
-                    cardDB[line] = new CardSignature(cardId, img, null, null);
+                } else{
+                    Path expected = imagesDir
+                            .resolve(expName == null ? "" : expName.replace(" ", "-"))
+                            .resolve(cardId.replace("/", "-") + ".jpg");
+                    pw.println("File " + cardId + " cannot be found by the program.\nLocation: " + expected);
+                    cardDB[line] = new CardSignature(cardId, img == null ? expected : img, null, null);
                     failed++;
                 }
                 line++;
+                }
             }
-        }
-        System.out.println("\n\nPassed: " +passed+"\nFailed: "+failed+"\nCorrupt: "+corrupt+"\nOut of: "+line+"");
-        double result = ((double) passed / size)*100;
-        System.out.println(result+"% passed.\n\n");
+        System.out.println("\n\nPassed: " + passed + "\nFailed: " + failed + "\nCorrupt: " + corrupt + "\nOut of: " + line + "");
+        double result = ((double) passed / size) * 100;
+        System.out.println(result + "% passed.\n\n");
         pw.close();
     }
+
+    private Path resolveImage(Path imagesDir, String expName, String cardId, String expCardNumber){
+        String folder = (expName == null ? "" : expName.replace(" ", "-"));
+        Path dir = imagesDir.resolve(folder);
+
+        Path exact = dir.resolve(cardId.replace("/", "-") + ".jpg");
+        if (Files.exists(exact)){
+            return exact;
+        }
+
+        if (!Files.isDirectory(dir)){
+            return null;
+        }
+    
+        String wantStem = normalizeForMatch(cardId.replace("/", "-"));
+
+        String num = (expCardNumber == null ? "" : expCardNumber.trim());
+        if (num.contains("/")){
+            num = num.substring(0, num.indexOf('/'));
+        }
+        String paddedNum = "";
+        if (num.matches("\\d+")){
+            paddedNum = String.format("%03d", Integer.parseInt(num));
+        }
+        final String wantNum = paddedNum;
+
+        String nameNoNum = cardId;
+        int lastDash = nameNoNum.lastIndexOf('-');
+        if (lastDash > 0){
+            nameNoNum = nameNoNum.substring(0, lastDash);
+        }
+        final String wantName = normalizeForMatch(nameNoNum.replace("/", "-"));
+    
+        try (Stream<Path> stream = Files.list(dir)){
+            List<Path> candidates = stream
+                    .filter(p -> {
+                        String s = p.getFileName().toString().toLowerCase(Locale.ROOT);
+                        return s.endsWith(".jpg") || s.endsWith(".jpeg") || s.endsWith(".png");
+                    })
+                    .collect(java.util.stream.Collectors.toList());
+    
+            // a. exact normalized stem
+            for (Path p : candidates){
+                if (normalizeForMatch(stripExt(p)).equals(wantStem)) {
+                    return p;
+                }
+            }
+            // b. filename starts with the expected stem (trailing qualifiers)
+            for (Path p : candidates){
+                if (normalizeForMatch(stripExt(p)).startsWith(wantStem)) {
+                    return p;
+                }
+            }
+            /* c. contains the card name AND ends with the padded number.
+               This is the last resort.*/
+            if (!wantNum.isEmpty() && !wantName.isEmpty()){
+                List<Path> hits = new ArrayList<>();
+                for (Path p : candidates) {
+                    String norm = normalizeForMatch(stripExt(p));
+                    if (norm.contains(wantName) && norm.endsWith(wantNum)) {
+                        hits.add(p);
+                    }
+                }
+                if (hits.size() == 1){
+                    return hits.get(0);
+                }
+            }
+        } catch (IOException e){
+            return null;
+        }
+        return null;
+    }
+
+    private String stripExt(Path p){
+        String s = p.getFileName().toString();
+        int dot = s.lastIndexOf('.');
+        if (dot > 0){
+            return s.substring(0,dot);
+        }
+        else{
+            return s;
+        }
+    }
+
+    //gets rid of the slop...
+    private String normalizeForMatch(String s){
+        if (s == null) return "";
+        String n = java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "");
+        return n.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
+    }
+
+
     //shallow test of Card & cardIndex init..
     public void test(int args)throws NullPointerException{
         int factor = args/10;
@@ -194,17 +286,20 @@ public class CardIndex{
                     ORB orb = ORB.create();
                     Mat test2 = describe(path.toString(), orb);
                     int record2 = 0;
+                    long startTime = System.currentTimeMillis();
                     for(int i = 0; i<hashed.size(); i++){
                         int comp = goodMatches(test2, hashed.get(i).getMatData());
+                        double percent = (((double)i/hashed.size())*100);
+                        System.out.println("\033[0F\033[K"+percent+"% "+timer(startTime));
                         if (comp > record2) {
                             record2 = comp;
                             recordHolderName2 = hashed.get(i).getCardID();
-                            recordHolderPath2 = hashed.get(i).getStringImgPath();
-                            //System.out.println("\033[0F\033[K"+record2);
+                            recordHolderPath2 = hashed.get(i).getStringImgPath(); 
                             }
                     }
                     System.out.println("\nUploaded image "+victim.toString()+" appears to be closest to "+recordHolderPath2+". (ORB)");
                     data.add(new String[]{victim.toString(), recordHolderName2,recordHolderPath2,Integer.toString(record2)});
+                    data.add(new String[]{"","","",""});
                     System.out.println(record2);
                     
                     

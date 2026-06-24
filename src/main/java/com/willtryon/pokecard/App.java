@@ -37,9 +37,9 @@ public class App {
                     System.out.println("Cards in database: " + size);
                     CardIndex cardDB = new CardIndex(size, url, imagesDir);
 
-                    cardDB.test(size);
-                    cardDB.testHash();
-                    cardDB.compareImage(compareDir, outputDir);
+                    //cardDB.test(size);
+                    //cardDB.testHash();
+                    //cardDB.compareImage(compareDir, outputDir);
                 }
             }
         }
