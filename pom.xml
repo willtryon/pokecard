@@ -3,51 +3,43 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-
-    <!-- Identifies YOUR project. groupId is usually a reverse-domain you control;
-         change it to whatever you like. artifactId is the project name. -->
     <groupId>com.willtryon</groupId>
     <artifactId>pokecard</artifactId>
     <version>0.2.0</version>
     <packaging>jar</packaging>
 
     <properties>
-        <!-- Compile against Java 21 (the JDK in your container). -->
         <maven.compiler.release>21</maven.compiler.release>
-        <maven.compiler.source>22</maven.compiler.source>
-        <maven.compiler.target>22</maven.compiler.target>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <!-- The class `mvn exec:java` will run. -->
         <exec.mainClass>com.willtryon.pokecard.App</exec.mainClass>
     </properties>
 
     <dependencies>
-        <!-- Read the pokedata SQLite database over JDBC.
-             Bundles its own native SQLite, so no apt package is needed. -->
         <dependency>
             <groupId>org.xerial</groupId>
             <artifactId>sqlite-jdbc</artifactId>
             <version>3.53.2.0</version>
         </dependency>
-
-        <!-- Perceptual image hashing for the Phase 1 matcher. Pure Java. -->
         <dependency>
             <groupId>dev.brachtendorf</groupId>
             <artifactId>JImageHash</artifactId>
             <version>1.0.0</version>
         </dependency>
-
-
+        <dependency>
+            <groupId>com.opencsv</groupId>
+            <artifactId>opencsv</artifactId>
+            <version>5.9</version>
+        </dependency>
         <dependency>
             <groupId>org.bytedeco</groupId>
             <artifactId>opencv-platform</artifactId>
             <version>4.13.0-1.5.13</version>
         </dependency>
     </dependencies>
-
     <build>
         <plugins>
-            <!-- Lets you run the program with:  mvn exec:java -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>

@@ -13,6 +13,7 @@ public class Config {
     public static final String DB_PATH    = "db.path";
     public static final String IMAGES_DIR = "images.dir";
     public static final String COMPARE_DIR  = "compare.dir";
+    public static final String OUTPUT_DIR = "output.dir";
 
     private final Path file;
     private final Properties props = new Properties();

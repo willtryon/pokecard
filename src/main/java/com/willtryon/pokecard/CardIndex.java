@@ -1,13 +1,15 @@
 package com.willtryon.pokecard;
 import java.util.*;
 import java.util.stream.Stream;
-import dev.brachtendorf.jimagehash.hash.Hash;
-import dev.brachtendorf.jimagehash.hashAlgorithms.HashingAlgorithm;
-import dev.brachtendorf.jimagehash.hashAlgorithms.PerceptiveHash;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.*;
+import com.opencsv.*;
+import dev.brachtendorf.jimagehash.hash.Hash;
+import dev.brachtendorf.jimagehash.hashAlgorithms.HashingAlgorithm;
+import dev.brachtendorf.jimagehash.hashAlgorithms.PerceptiveHash;
 import org.bytedeco.opencv.opencv_core.Mat;
 import org.bytedeco.opencv.opencv_core.KeyPointVector;
 import org.bytedeco.opencv.opencv_core.DMatchVector;
@@ -151,16 +153,18 @@ public class CardIndex{
     System.out.println("\nClosest pair: " + recordHolderA + " vs " + recordHolderB + " @ " + record);
     }
 
-    public void compareImage(Path args){
+    public void compareImage(Path compareDir, Path outputDir){
     //VERY basic hash comp test for image outside of db...
+        String csvFile = "imageComparisonOutput.csv";
         List<CardSignature> hashed = new ArrayList<>();
         for (int c = 0; c < cardDB.length; c++){
             if (cardDB[c] != null && cardDB[c].getBinaryHash() != null) {
                 hashed.add(cardDB[c]);
             }
         }
-        System.out.println("Now looking through "+args.toString()+" for images to compare...\n");
-        try(Stream <Path> stream = Files.walk(args);){
+        List<String[]> data = new ArrayList<>();
+        System.out.println("Now looking through "+compareDir.toString()+" for images to compare...\n");
+        try(Stream <Path> stream = Files.walk(compareDir);){
             stream
             .filter(path -> {
                 String s = path.toString().toLowerCase();
@@ -172,16 +176,20 @@ public class CardIndex{
                 try{
                     Hash test = hasher.hash(victim);
                     double record = Double.MAX_VALUE;
-                    String recordHolder = "";
-                    String recordHolder2 = "";
+                    String recordHolderName = "";
+                    String recordHolderPath = "";
+                    String recordHolderName2 = "";
+                    String recordHolderPath2 = "";
                     for(int i = 0; i < hashed.size(); i++){
                         double comp = test.normalizedHammingDistance(hashed.get(i).getBinaryHash());
                         if (comp < record) {
                             record = comp;
-                            recordHolder = hashed.get(i).toString();
+                            recordHolderName = hashed.get(i).getCardID();
+                            recordHolderPath = hashed.get(i).getStringImgPath();
                             }
                         }
-                    System.out.println("\nUploaded image "+victim.toString()+" appears to be closest to "+recordHolder+". (pHash)");
+                    System.out.println("\nUploaded image "+victim.toString()+" appears to be closest to "+recordHolderPath+". (pHash)");
+                    data.add(new String[]{victim.toString(), recordHolderName,recordHolderPath,Double.toString(record)});
                     System.out.println(record);
                     ORB orb = ORB.create();
                     Mat test2 = describe(path.toString(), orb);
@@ -190,11 +198,13 @@ public class CardIndex{
                         int comp = goodMatches(test2, hashed.get(i).getMatData());
                         if (comp > record2) {
                             record2 = comp;
-                            recordHolder2 = hashed.get(i).toString();
+                            recordHolderName2 = hashed.get(i).getCardID();
+                            recordHolderPath2 = hashed.get(i).getStringImgPath();
                             //System.out.println("\033[0F\033[K"+record2);
                             }
                     }
-                    System.out.println("\nUploaded image "+victim.toString()+" appears to be closest to "+recordHolder2+". (ORB)");
+                    System.out.println("\nUploaded image "+victim.toString()+" appears to be closest to "+recordHolderPath2+". (ORB)");
+                    data.add(new String[]{victim.toString(), recordHolderName2,recordHolderPath2,Integer.toString(record2)});
                     System.out.println(record2);
                     
                     
@@ -206,6 +216,7 @@ public class CardIndex{
         }catch(IOException e){
             e.printStackTrace();
             }
+        csvOutput(csvFile, outputDir, data);
     }
     
     private Mat describe(String path, ORB orb){
@@ -284,6 +295,15 @@ public class CardIndex{
     long ms = System.currentTimeMillis() - startTime;
     System.out.println("\nDone: " + pairCount + " comparisons in " + ms + " ms");
     System.out.println("\nClosest pair: " + recordHolderA + " vs " + recordHolderB + " @ " + record);
+    }
+
+    private void csvOutput(String args, Path outputDir, List<String[]> data){
+        Path dir = outputDir.resolve(args);
+        try(CSVWriter writer = new CSVWriter(new FileWriter(dir.toFile()))){
+            writer.writeAll(data);
+        }catch(IOException e){
+            System.out.println("Sorry, couldn't write to the file."+e.getMessage());
+        }
     }
 
     private String timer(long args){
