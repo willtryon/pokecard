@@ -2,7 +2,7 @@
 pokecard
 by willtryon
 version 0.2.0
-this build is from june 21th, 2026.
+this build is from june 24th, 2026.
 */
 
 package com.willtryon.pokecard;
