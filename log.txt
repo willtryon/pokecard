@@ -1,0 +1,984 @@
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Eevee-TG11 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Vaporeon-TG02 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Flareon-TG01 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Oranguru-TG12 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Zekrom-TG05 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Jolteon-TG04 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Houndoom-TG10 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Ariados-TG09 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Dedenne-TG07 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Alcremie-TG08 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Dusknoir-TG06 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Octillery-TG03 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Rapid-Strike-Urshifu-VMAX-(Secret)-TG30 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Single-Strike-Urshifu-VMAX-(Secret)-TG29 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Rapid-Strike-Urshifu-V-TG20 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Single-Strike-Urshifu-V-TG18 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Gloria-TG26 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Mimikyu-V-TG16 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Boltund-V-TG13 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Acerola's-Premonition-TG24 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Single-Strike-Urshifu-VMAX-TG19 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Umbreon-V-TG22 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Rapid-Strike-Urshifu-VMAX-TG21 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Umbreon-VMAX-TG23 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Mimikyu-VMAX-TG17 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Sylveon-V-TG14 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Sylveon-VMAX-TG15 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Cafe-Master-TG25 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Single-Strike-Style-Mustard-TG28 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File SWSH09-Brilliant-Stars-Trainer-Gallery-Rapid-Strike-Style-Mustard-TG27 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Brilliant-Stars
+File McDonalds-25th-Anniversary-Promos-Chimchar---12/25-012 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-25th-Anniversary
+File McDonalds-25th-Anniversary-Promos-Fennekin---14/25-014 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-25th-Anniversary
+File McDonalds-25th-Anniversary-Promos-Bulbasaur---1/25-001 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-25th-Anniversary
+File McDonalds-25th-Anniversary-Promos-Charmander---9/25-009 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-25th-Anniversary
+File McDonalds-25th-Anniversary-Promos-Pikachu---25/25-025 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-25th-Anniversary
+File McDonalds-25th-Anniversary-Promos-Froakie---22/25-022 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-25th-Anniversary
+File McDonalds-25th-Anniversary-Promos-Mudkip---19/25-019 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-25th-Anniversary
+File McDonalds-25th-Anniversary-Promos-Squirtle---17/25-017 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-25th-Anniversary
+File McDonalds-25th-Anniversary-Promos-Rowlet---7/25-007 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-25th-Anniversary
+File McDonalds-25th-Anniversary-Promos-Piplup---20/25-020 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-25th-Anniversary
+File McDonalds-25th-Anniversary-Promos-Cyndaquil---10/25-010 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-25th-Anniversary
+File McDonalds-25th-Anniversary-Promos-Chespin---6/25-006 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-25th-Anniversary
+File McDonalds-25th-Anniversary-Promos-Treecko---3/25-003 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-25th-Anniversary
+File McDonalds-25th-Anniversary-Promos-Scorbunny---16/25-016 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-25th-Anniversary
+File McDonalds-25th-Anniversary-Promos-Grookey---8/25-008 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-25th-Anniversary
+File McDonalds-25th-Anniversary-Promos-Chikorita---2/25-002 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-25th-Anniversary
+File McDonalds-25th-Anniversary-Promos-Popplio---23/25-023 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-25th-Anniversary
+File McDonalds-25th-Anniversary-Promos-Snivy---5/25-005 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-25th-Anniversary
+File McDonalds-25th-Anniversary-Promos-Torchic---11/25-011 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-25th-Anniversary
+File McDonalds-25th-Anniversary-Promos-Oshawott---21/25-021 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-25th-Anniversary
+File McDonalds-25th-Anniversary-Promos-Turtwig---4/25-004 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-25th-Anniversary
+File McDonalds-25th-Anniversary-Promos-Tepig---13/25-013 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-25th-Anniversary
+File McDonalds-25th-Anniversary-Promos-Sobble---24/25-024 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-25th-Anniversary
+File McDonalds-25th-Anniversary-Promos-Totodile---18/25-018 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-25th-Anniversary
+File McDonalds-25th-Anniversary-Promos-Litten---15/25-015 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-25th-Anniversary
+File SWSH02-Rebel-Clash-Cinderace-V-(Full-Art)-178 appears to be corrupt (found at /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Rebel-Clash/SWSH02-Rebel-Clash-Cinderace-V-(Full-Art)-178.jpg but could not be decoded).
+File SWSH-Sword-and-Shield-Promo-Cards-Pikachu---267/S-P- cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Sword-&-Shield-Promos
+File SWSH-Sword-and-Shield-Promo-Cards-Cramorant---226/S-P- cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Sword-&-Shield-Promos
+File SWSH-Sword-and-Shield-Promo-Cards-Morpeko-V-Union---SWSH287-SWSH287 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Sword-&-Shield-Promos
+File SWSH-Sword-and-Shield-Promo-Cards-Morpeko-V-Union---SWSH288-SWSH288 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Sword-&-Shield-Promos
+File SWSH-Sword-and-Shield-Promo-Cards-Zacian-V-(Shiny)---SWSH292-SWSH292 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Sword-&-Shield-Promos
+File SWSH-Sword-and-Shield-Promo-Cards-Zamazenta-V-(Shiny)---SWSH293-SWSH293 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Sword-&-Shield-Promos
+File SWSH-Sword-and-Shield-Promo-Cards-Morpeko-V-Union---SWSH290-SWSH290 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Sword-&-Shield-Promos
+File SWSH-Sword-and-Shield-Promo-Cards-Morpeko-V-Union---SWSH289-SWSH289 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Sword-&-Shield-Promos
+File SM-Cosmic-Eclipse-Eevee---167/236-167 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Cosmic-Eclipse
+File SM-Cosmic-Eclipse-Eevee---166/236-166 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Cosmic-Eclipse
+File SM-Cosmic-Eclipse-Cosmog---99/236-99 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Cosmic-Eclipse
+File SM-Cosmic-Eclipse-Trapinch---108/236-108 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Cosmic-Eclipse
+File SM-Cosmic-Eclipse-Rowlet---17/236-17 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Cosmic-Eclipse
+File SM-Cosmic-Eclipse-Flabebe---149/236-149 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Cosmic-Eclipse
+File SM-Cosmic-Eclipse-Flabebe---150/236-150 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Cosmic-Eclipse
+File SM-Cosmic-Eclipse-Spheal---49/236-49 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Cosmic-Eclipse
+File SM-Cosmic-Eclipse-Cosmog---100/236-100 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Cosmic-Eclipse
+File SM-Cosmic-Eclipse-Trapinch---107/236-107 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Cosmic-Eclipse
+File SM-Cosmic-Eclipse-Rowlet---18/236-18 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Cosmic-Eclipse
+File SM-Cosmic-Eclipse-Togedemaru---73/236-73 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Cosmic-Eclipse
+File SM-Cosmic-Eclipse-Jangmo-o---161/236-161 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Cosmic-Eclipse
+File SM-Cosmic-Eclipse-Spheal---50/236-50 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Cosmic-Eclipse
+File SM-Cosmic-Eclipse-Jangmo-o---160/236-160 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Cosmic-Eclipse
+File SM-Cosmic-Eclipse-Togedemaru---74/236-74 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Cosmic-Eclipse
+File McDonalds-Promos-2019-Mankey---8/12-008 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2019-FR)
+File McDonalds-Promos-2019-Pikachu---6/12-006 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2019-FR)
+File McDonalds-Promos-2019-Alolan-Meowth---10/12-010 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2019-FR)
+File McDonalds-Promos-2019-Onix---9/12-009 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2019-FR)
+File McDonalds-Promos-2019-Eevee---12/12-012 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2019-FR)
+File McDonalds-Promos-2019-Gastly---7/12-007 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2019-FR)
+File McDonalds-Promos-2019-Caterpie---1/12-001 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2019-FR)
+File McDonalds-Promos-2019-Alolan-Sandshrew---4/12-004 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2019-FR)
+File McDonalds-Promos-2019-Magmar---3/12-003 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2019-FR)
+File McDonalds-Promos-2019-Alolan-Dugtrio---11/12-011 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2019-FR)
+File McDonalds-Promos-2019-Lapras---5/12-005 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2019-FR)
+File McDonalds-Promos-2019-Alolan-Exeggutor---2/12-002 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2019-FR)
+File McDonalds-Promos-2018-Dratini---9/12-009 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2018)
+File McDonalds-Promos-2018-Pikachu---4/12-004 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2018)
+File McDonalds-Promos-2018-Psyduck---2/12-002 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2018)
+File McDonalds-Promos-2018-Horsea---3/12-003 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2018)
+File McDonalds-Promos-2018-Growlithe---1/12-001 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2018)
+File McDonalds-Promos-2018-Machop---6/12-006 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2018)
+File McDonalds-Promos-2018-Eevee---11/12-011 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2018)
+File McDonalds-Promos-2018-Cubone---7/12-007 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2018)
+File McDonalds-Promos-2018-Magnemite---8/12-008 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2018)
+File McDonalds-Promos-2018-Chansey---10/12-010 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2018)
+File McDonalds-Promos-2018-Slowpoke---5/12-005 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2018)
+File McDonalds-Promos-2018-Porygon---12/12-012 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2018)
+File McDonalds-Promos-2017-Pikipek---11/12-011 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2017)
+File McDonalds-Promos-2017-Pikachu---5/12-005 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2017)
+File McDonalds-Promos-2017-Cosmog---6/12-006 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2017)
+File McDonalds-Promos-2017-Alolan-Diglett---9/12-009 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2017)
+File McDonalds-Promos-2017-Alolan-Meowth---8/12-008 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2017)
+File McDonalds-Promos-2017-Crabrawler---7/12-007 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2017)
+File McDonalds-Promos-2017-Litten---3/12-003 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2017)
+File McDonalds-Promos-2017-Cutiefly---10/12-010 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2017)
+File McDonalds-Promos-2017-Popplio---4/12-004 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2017)
+File McDonalds-Promos-2017-Grubbin---2/12-002 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2017)
+File McDonalds-Promos-2017-Yungoos---12/12-012 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2017)
+File McDonalds-Promos-2017-Rowlet---1/12-001 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2017)
+File SM-Promos-Pretend-Comedian-Pikachu---407/SM-P-(JP-Pokemon-Center-Osaka-DX-Opening)-407 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Sun-&-Moon-Promos
+File SM-Promos-Registeel---68/111-(Cosmos-Holo)-68 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Sun-&-Moon-Promos
+File SM-Promos-Poncho-wearing-Pikachu---37/SM-P-37 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Sun-&-Moon-Promos
+File SM-Promos-Regice---28/111-(Cosmos-Holo)-28 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Sun-&-Moon-Promos
+File SM-Promos-Poncho-wearing-Pikachu---38/SM-P-38 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Sun-&-Moon-Promos
+File SM-Promos-Regirock---53/111-(Cosmos-Holo)-53 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Sun-&-Moon-Promos
+File SM-Promos-Champions-Festival---SM148-(World-Championships-2018)-[Top-Sixteen]-SM148 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Sun-&-Moon-Promos
+File SM-Promos-Champions-Festival---SM78-(World-Championships-2017)-[Champion]-SM78 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Sun-&-Moon-Promos
+File SM-Promos-Tohoku's-Pikachu---88/SM-P-88 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Sun-&-Moon-Promos
+File SM-Promos-Champions-Festival---SM148-(World-Championships-2018)-[Semi-Finalist]-SM148 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Sun-&-Moon-Promos
+File SM-Promos-Champions-Festival---SM148-(World-Championships-2018)-[Top-Thirty-Two]-SM148 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Sun-&-Moon-Promos
+File SM-Promos-Champions-Festival---SM148-(World-Championships-2018)-[Finalist]-SM148 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Sun-&-Moon-Promos
+File SM-Promos-Clefairy---381/SM-P-(Dream-League)-381 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Sun-&-Moon-Promos
+File SM-Promos-Champions-Festival---SM148-(World-Championships-2018)-[Quarter-Finalist]-SM148 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Sun-&-Moon-Promos
+File SM-Promos-Champions-Festival---SM148-(World-Championships-2018)-[Champion]-SM148 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Sun-&-Moon-Promos
+File SM-Promos-Champions-Festival---SM78-(World-Championships-2017)-[Quarter-Finalist]-SM78 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Sun-&-Moon-Promos
+File Generations-Imakuni?-63 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Generations
+File McDonalds-Promos-2015-Skitty---12/12-012 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2015)
+File McDonalds-Promos-2015-Zigzagoon---11/12-011 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2015)
+File McDonalds-Promos-2015-Mudkip---5/12-005 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2015)
+File McDonalds-Promos-2015-Marill---10/12-010 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2015)
+File McDonalds-Promos-2015-Treecko---1/12-001 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2015)
+File McDonalds-Promos-2015-Rhyhorn---8/12-008 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2015)
+File McDonalds-Promos-2015-Lotad---2/12-002 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2015)
+File McDonalds-Promos-2015-Torchic---3/12-003 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2015)
+File McDonalds-Promos-2015-Meditite---9/12-009 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2015)
+File McDonalds-Promos-2015-Staryu---4/12-004 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2015)
+File McDonalds-Promos-2015-Pikachu---6/12-006 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2015)
+File McDonalds-Promos-2015-Electrike---7/12-007 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2015)
+File McDonalds-Promos-2014-Pikachu---5/12-005 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2014)
+File McDonalds-Promos-2014-Weedle---1/12-001 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2014)
+File McDonalds-Promos-2014-Fennekin---3/12-003 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2014)
+File McDonalds-Promos-2014-Swirlix---9/12-009 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2014)
+File McDonalds-Promos-2014-Fletchling---11/12-011 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2014)
+File McDonalds-Promos-2014-Furfrou---12/12-012 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2014)
+File McDonalds-Promos-2014-Honedge---7/12-007 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2014)
+File McDonalds-Promos-2014-Snubbull---8/12-008 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2014)
+File McDonalds-Promos-2014-Chespin---2/12-002 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2014)
+File McDonalds-Promos-2014-Froakie---4/12-004 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2014)
+File McDonalds-Promos-2014-Inkay---6/12-006 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2014)
+File McDonalds-Promos-2014-Bunnelby---10/12-010 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2014)
+File XY-Promos-Poncho-wearing-Pikachu---208/XY-P-208 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/XY-Promos
+File XY-Promos-Clawitzer-(XY-Steam-Siege-Staff-Prerelease)-XY146 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/XY-Promos
+File XY-Promos-Volcanion-(XY-Steam-Siege-Staff-Prerelease)-XY145 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/XY-Promos
+File XY-Promos-Hoopa-(XY-Steam-Siege-Staff-Prerelease)-XY147 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/XY-Promos
+File XY-Promos-Charizard-EX---276/XY-P-(JP-Pokemon-Card-Game-Art-Collection)-276 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/XY-Promos
+File XY-Promos-Rayquaza---232/XY-P-(JP-Pokemon-Center-Skytree-Town-Opening)-232 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/XY-Promos
+File XY-Promos-Yanmega-(XY-Steam-Siege-Staff-Prerelease)-XY144 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/XY-Promos
+File XY-Promos-Poncho-wearing-Pikachu---231/XY-P-231 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/XY-Promos
+File XY-Promos-Poncho-wearing-Pikachu---230/XY-P-230 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/XY-Promos
+File XY-Promos-Mega-Tokyo's-Pikachu---204/XY-P-204 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/XY-Promos
+File XY-Promos-Poncho-wearing-Pikachu---275/XY-P-275 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/XY-Promos
+File XY-Promos-Poncho-wearing-Pikachu---274/XY-P-274 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/XY-Promos
+File McDonalds-Promos-2012-Pignite---4/12-004 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2012)
+File McDonalds-Promos-2012-Drilbur---8/12-008 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2012)
+File McDonalds-Promos-2012-Dewott---5/12-005 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2012)
+File McDonalds-Promos-2012-Klang---11/12-011 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2012)
+File McDonalds-Promos-2012-Emolga---6/12-006 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2012)
+File McDonalds-Promos-2012-Woobat---7/12-007 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2012)
+File McDonalds-Promos-2012-Servine---1/12-001 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2012)
+File McDonalds-Promos-2012-Purrloin---9/12-009 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2012)
+File McDonalds-Promos-2012-Scraggy---10/12-010 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2012)
+File McDonalds-Promos-2012-Axew---12/12-012 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2012)
+File McDonalds-Promos-2012-Pansage---2/12-002 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2012)
+File McDonalds-Promos-2012-Dwebble---3/12-003 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2012)
+File McDonalds-Promos-2011-Pidove---11/12-011 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2011)
+File McDonalds-Promos-2011-Oshawott---4/12-004 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2011)
+File McDonalds-Promos-2011-Klink---10/12-010 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2011)
+File McDonalds-Promos-2011-Zorua---9/12-009 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2011)
+File McDonalds-Promos-2011-Sandile---8/12-008 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2011)
+File McDonalds-Promos-2011-Munna---7/12-007 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2011)
+File McDonalds-Promos-2011-Tepig---3/12-003 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2011)
+File McDonalds-Promos-2011-Alomomola---5/12-005 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2011)
+File McDonalds-Promos-2011-Snivy---1/12-001 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2011)
+File McDonalds-Promos-2011-Maractus---2/12-002 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2011)
+File McDonalds-Promos-2011-Audino---12/12-012 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2011)
+File McDonalds-Promos-2011-Blitzle---6/12-006 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/McDonald's-Collection-(2011)
+File HGSS-Promos-Electivire---20/102-(Prerelease)-20 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/HeartGold-SoulSilver-Promos
+File HGSS-Promos-Electivire---20/102-(Prerelease)-[Staff]-20 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/HeartGold-SoulSilver-Promos
+File HGSS-Promos-Blastoise---13/95-(Prerelease)-13 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/HeartGold-SoulSilver-Promos
+File HGSS-Promos-Blastoise---13/95-(Prerelease)-[Staff]-13 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/HeartGold-SoulSilver-Promos
+File HGSS-Promos-Leafeon---17/90-(Prerelease)-17 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/HeartGold-SoulSilver-Promos
+File HGSS-Promos-Tropical-Tidal-Wave---HGSS18-(Worlds-10)-[Finalist]-HGSS18 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/HeartGold-SoulSilver-Promos
+File Platinum-Giratina-(10)-010 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Platinum
+File Platinum-Giratina-(27)-027 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Platinum
+File Platinum-Giratina-(28)-028 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Platinum
+File Platinum-Giratina-(9)-009 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Platinum
+File Platinum-Dialga-(5)-005 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Platinum
+File Platinum-Dialga-(23)-023 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Platinum
+File Platinum-Dialga-(6)-006 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Platinum
+File Nintendo-Promos-Shinx---098/130-(City-Championships)-098 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Tropius---052/111-(Prerelease)-052 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Treecko---16/40-(EX-Deck-Tin)-16 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Mudkip---18/40-(EX-Deck-Tin)-18 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Snorlax---33/95-(Prerelease)-33 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Whismur---19/40-(EX-Deck-Tin)-19 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Torchic---17/40-(EX-Deck-Tin)-17 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Mudkip---18/40-(Target-Promo)-18 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Piloswine---046/100-(Prerelease)-[Staff]-046 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Dragonair-(Delta-Species)---028/101-(Prerelease)-028 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Whismur----19/40-(Target-Promo)-19 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Piloswine---046/100-(Prerelease)-046 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Swalot---050/101-(Prerelease)-050 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Treecko---16/40-(Target-Promo)-16 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Bayleef---035/115-(Prerelease)-035 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Bagon---50/97-(Scrye-Magazine)-50 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Bagon---50/97-(InQuest-Gamer)-50 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Metang-(Delta-Species)---049/113-(Prerelease)-049 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Salamence---19/97-(e-League)-19 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Tentacruel---45/92-(Prerelease)-45 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Ditto---061/113-(Origins-International-Game-Expo-2007)-061 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Milotic---070/147-(Prerelease)-070 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Flygon---25/40-(e-League)-25 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Pichu---028/123-(Prerelease)-028 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Torchic---17/40-(Target-Promo)-17 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Grumpig---029/106-(Prerelease)-029 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Ivysaur---035/100-(Prerelease)-035 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Luxio---052/130-(Prerelease)-052 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Tropius---052/111-(Prerelease)-[Staff]-052 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Pichu---028/123-(Prerelease)-[Staff]-028 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Dark-Houndoom---037/109-(Prerelease)-037 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Chimecho---24/40-(e-League)-24 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Snorlax---33/95-(Prerelease)-[Staff]-33 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Chimecho---24/40-(e-League)-[Winner]-24 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Gyarados---32/97-(Prerelease)-32 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Manectric---038/107-(Prerelease)-038 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Salamence---19/97-(e-League)-[Winner]-19 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Raichu---27/99-(Prerelease)-27 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Shellos-East-Sea---106/132-(Origins-Game-Fair-2008)-106 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Luxio---052/130-(Prerelease)-[Staff]-052 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Exeggutor-(Delta-Species)---041/110-(Prerelease)-041 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Flygon---25/40-(e-League)-[Winner]-25 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Milotic---070/147-(Prerelease)-[Staff]-070 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Bagon---50/97-(Black-Star)-50 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Leafeon---17/90-(Prerelease)-[Staff]-17 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Shellos-East-Sea---106/132-(Origins-Game-Fair-2008)-[Staff]-106 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Shinx---098/130-(City-Championships)-[Staff]-098 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Raichu---27/99-(Prerelease)-[Staff]-27 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Nintendo-Promos-Bagon---50/97-(GenCon-2004-Promo)-50 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Nintendo-Promos
+File Legends-Awakened-Seadra-071 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Legends-Awakened
+File Legends-Awakened-Unown-(?)-082 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Legends-Awakened
+File Diamond-and-Pearl-Promos-Gabite---48/124-(Prerelease)-48 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/DP-Black-Star-Promos
+File Diamond-and-Pearl-Promos-Kirlia---53/132-(Prerelease)-53 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/DP-Black-Star-Promos
+File Diamond-and-Pearl-Promos-Porygon2---49/106-(Prerelease)-49 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/DP-Black-Star-Promos
+File Diamond-and-Pearl-Promos-Porygon2---49/106-(Prerelease-Promo)-[Staff]-49 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/DP-Black-Star-Promos
+File Diamond-and-Pearl-Promos-Mothim---42/100-(Prerelease)-42 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/DP-Black-Star-Promos
+File Diamond-and-Pearl-Promos-Lucario---53/127-(Prerelease)-[Staff]-53 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/DP-Black-Star-Promos
+File Diamond-and-Pearl-Promos-Lucario---53/127-(Prerelease)-53 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/DP-Black-Star-Promos
+File Diamond-and-Pearl-Promos-Gabite---48/124-(Prerelease)-[Staff]-48 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/DP-Black-Star-Promos
+File Diamond-and-Pearl-Roselia-093 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Diamond-&-Pearl
+File Delta-Species-Eevee---069/113-069 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Delta-Species
+File Delta-Species-Eevee---068/113-068 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Delta-Species
+File Deoxys-Electrike---059/107-059 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Deoxys
+File Deoxys-Ludicolo---019/107-019 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Deoxys
+File Deoxys-Magcargo---020/107-020 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Deoxys
+File Deoxys-Lotad---063/107-063 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Deoxys
+File Deoxys-Slugma---074/107-074 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Deoxys
+File Deoxys-Ludicolo---010/107-010 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Deoxys
+File Deoxys-Lombre---034/107-034 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Deoxys
+File Deoxys-Electrike---060/107-060 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Deoxys
+File Deoxys-Lotad---035/107-035 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Deoxys
+File Deoxys-Slugma---075/107-075 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Deoxys
+File Deoxys-Magcargo---037/107-037 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Deoxys
+File Deoxys-Lombre---033/107-033 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Deoxys
+File Team-Rocket-Returns-Dark-Tyranitar---019/109-019 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Rocket-Returns
+File Team-Rocket-Returns-Rattata---071/109-071 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Rocket-Returns
+File Team-Rocket-Returns-Dark-Tyranitar---020/109-020 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Rocket-Returns
+File Team-Rocket-Returns-Houndour---059/109-059 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Rocket-Returns
+File Team-Rocket-Returns-Dark-Pupitar---040/109-040 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Rocket-Returns
+File Team-Rocket-Returns-Dratini---052/109-052 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Rocket-Returns
+File Team-Rocket-Returns-Dark-Houndoom---037/109-037 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Rocket-Returns
+File Team-Rocket-Returns-Dratini---053/109-053 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Rocket-Returns
+File Team-Rocket-Returns-Dark-Houndoom---005/109-005 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Rocket-Returns
+File Team-Rocket-Returns-Larvitar---063/109-063 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Rocket-Returns
+File Team-Rocket-Returns-Dark-Dragonair---031/109-031 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Rocket-Returns
+File Team-Rocket-Returns-Rattata---072/109-072 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Rocket-Returns
+File Team-Rocket-Returns-Larvitar---062/109-062 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Rocket-Returns
+File Team-Rocket-Returns-Dark-Dragonair---032/109-032 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Rocket-Returns
+File Team-Rocket-Returns-Houndour---060/109-060 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Rocket-Returns
+File Team-Rocket-Returns-Dark-Pupitar---041/109-041 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Rocket-Returns
+File FireRed-and-LeafGreen-Squirtle---083/112-083 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-FireRed-&-LeafGreen
+File FireRed-and-LeafGreen-Bulbasaur---055/112-055 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-FireRed-&-LeafGreen
+File FireRed-and-LeafGreen-Charmander---058/112-058 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-FireRed-&-LeafGreen
+File FireRed-and-LeafGreen-Squirtle---082/112-082 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-FireRed-&-LeafGreen
+File FireRed-and-LeafGreen-Bulbasaur---054/112-054 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-FireRed-&-LeafGreen
+File FireRed-and-LeafGreen-Charmander---113/112-113 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-FireRed-&-LeafGreen
+File FireRed-and-LeafGreen-Charmander---057/112-057 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-FireRed-&-LeafGreen
+File FireRed-and-LeafGreen-Mr.-Mime-ex---111/112-111 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-FireRed-&-LeafGreen
+File FireRed-and-LeafGreen-Mr.-Mime-ex---110/112-110 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-FireRed-&-LeafGreen
+File Hidden-Legends-Beldum---054/101-054 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Hidden-Legends
+File Hidden-Legends-Metang---021/101-021 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Hidden-Legends
+File Hidden-Legends-Baltoy---052/101-052 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Hidden-Legends
+File Hidden-Legends-Medicham---042/101-042 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Hidden-Legends
+File Hidden-Legends-Beldum---028/101-028 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Hidden-Legends
+File Hidden-Legends-Chinchou---057/101-057 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Hidden-Legends
+File Hidden-Legends-Baltoy---053/101-053 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Hidden-Legends
+File Hidden-Legends-Beldum---029/101-029 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Hidden-Legends
+File Hidden-Legends-Meditite---065/101-065 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Hidden-Legends
+File Hidden-Legends-Medicham---010/101-010 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Hidden-Legends
+File Hidden-Legends-Claydol---031/101-031 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Hidden-Legends
+File Hidden-Legends-Claydol---002/101-002 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Hidden-Legends
+File Hidden-Legends-Metang---043/101-043 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Hidden-Legends
+File Hidden-Legends-Metang---044/101-044 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Hidden-Legends
+File Hidden-Legends-Chinchou---056/101-056 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Hidden-Legends
+File Hidden-Legends-Meditite---066/101-066 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Hidden-Legends
+File Team-Magma-vs-Team-Aqua-Team-Magma's-Houndoom---10/95-10 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Magma's-Claydol---08/95-08 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Magma's-Houndoom---34/95-34 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Magma's-Rhydon---11/95-11 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Magma's-Houndour---62/95-62 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Aqua's-Spheal---57/95-57 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Aqua's-Poochyena---55/95-55 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Aqua's-Manectric---04/95-04 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Aqua's-Mightyena---30/95-30 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Magma's-Rhyhorn---68/95-68 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Magma's-Baltoy---60/95-60 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Aqua's-Spheal---56/95-56 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Aqua's-Poochyena---54/95-54 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Magma's-Rhyhorn---67/95-67 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Magma's-Houndour---63/95-63 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Aqua's-Electrike---27/95-27 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Aqua's-Carvanha---48/95-48 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Aqua's-Electrike---53/95-53 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Magma's-Aron---59/95-59 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Magma's-Poochyena---66/95-66 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Magma's-Rhydon---22/95-22 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Magma's-Mightyena---21/95-21 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Magma's-Aron---58/95-58 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Magma's-Poochyena---65/95-65 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Magma's-Rhyhorn---38/95-38 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Aqua's-Sealeo---31/95-31 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Aqua's-Crawdaunt---02/95-02 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Magma's-Baltoy---61/95-61 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Magma's-Lairon---20/95-20 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Magma's-Mightyena---37/95-37 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Aqua's-Crawdaunt---14/95-14 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Magma's-Claydol---33/95-33 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Magma's-Houndour---35/95-35 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Aqua's-Carvanha---25/95-25 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Aqua's-Cacnea---24/95-24 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Magma's-Baltoy---32/95-32 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Aqua's-Sharpedo---05/95-05 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Magma's-Lairon---36/95-36 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Aqua's-Sealeo---16/95-16 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Aqua's-Mightyena---15/95-15 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Aqua's-Electrike---52/95-52 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Aqua's-Carvanha---47/95-47 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Aqua's-Corphish---50/95-50 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Aqua's-Sharpedo---18/95-18 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Aqua's-Manectric---29/95-29 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Aqua's-Corphish---51/95-51 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Team-Magma-vs-Team-Aqua-Team-Aqua's-Corphish---26/95-26 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Team-Magma-vs-Team-Aqua
+File Dragon-Salamence---019/097-019 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Crawdaunt---003/097-003 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Corphish---052/097-052 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Dragonair---014/097-014 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Crawdaunt---013/097-013 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Flygon---015/097-015 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Bagon---050/097-050 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Magnemite---061/097-061 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Magneton---017/097-017 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Bagon---049/097-049 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Geodude---055/097-055 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Geodude---056/097-056 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Shelgon---020/097-020 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Flygon---004/097-004 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Shelgon---041/097-041 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Nincada---067/097-067 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Vibrava---022/097-022 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Shelgon---042/097-042 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Graveler---029/097-029 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Numel---069/097-069 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Spoink---074/097-074 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Vibrava---047/097-047 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Seadra---039/097-039 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Bagon---023/097-023 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Magnemite---063/097-063 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Ninjask---018/097-018 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Trapinch---079/097-079 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Magnemite---062/097-062 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Graveler---030/097-030 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Spoink---073/097-073 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Corphish---053/097-053 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Nincada---066/097-066 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Salamence---010/097-010 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Ninjask---038/097-038 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Nincada---068/097-068 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Horsea---058/097-058 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Magneton---035/097-035 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Horsea---033/097-033 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Trapinch---078/097-078 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Corphish---054/097-054 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Seadra---040/097-040 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Dragon-Vibrava---046/097-046 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Dragon
+File Sandstorm-Lotad---066/100-066 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Sandstorm
+File Sandstorm-Lombre---045/100-045 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Sandstorm
+File Sandstorm-Cacnea---057/100-057 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Sandstorm
+File Sandstorm-Shiftry---012/100-012 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Sandstorm
+File Sandstorm-Seedot---076/100-076 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Sandstorm
+File Sandstorm-Shiftry---022/100-022 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Sandstorm
+File Sandstorm-Lileep---043/100-043 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Sandstorm
+File Sandstorm-Duskull---061/100-061 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Sandstorm
+File Sandstorm-Lotad---067/100-067 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Sandstorm
+File Sandstorm-Nuzleaf---049/100-049 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Sandstorm
+File Sandstorm-Anorith---027/100-027 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Sandstorm
+File Sandstorm-Nuzleaf---048/100-048 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Sandstorm
+File Sandstorm-Lombre---046/100-046 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Sandstorm
+File Sandstorm-Duskull---062/100-062 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Sandstorm
+File Sandstorm-Anorith---028/100-028 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Sandstorm
+File Sandstorm-Lileep---042/100-042 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Sandstorm
+File Sandstorm-Seedot---077/100-077 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Sandstorm
+File Sandstorm-Cacnea---058/100-058 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Sandstorm
+File Ruby-and-Sapphire-Treecko---076/109-076 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Treecko---075/109-075 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Blaziken---015/109-015 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Torchic---073/109-073 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Mudkip---060/109-060 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Marshtomp---040/109-040 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Skitty---071/109-071 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Skitty---044/109-044 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Blaziken---003/109-003 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Grovyle---031/109-031 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Mightyena---010/109-010 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Hariyama---008/109-008 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Manectric---009/109-009 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Ralts---066/109-066 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Grovyle---032/109-032 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Poochyena---065/109-065 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Makuhita---058/109-058 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Sceptile---011/109-011 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Hariyama---033/109-033 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Electrike---053/109-053 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Swampert---013/109-013 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Swampert---023/109-023 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Skitty---070/109-070 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Torchic---074/109-074 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Kirlia---034/109-034 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Combusken---028/109-028 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Makuhita---057/109-057 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Aron---050/109-050 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Sceptile---020/109-020 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Poochyena---064/109-064 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Mightyena---042/109-042 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Makuhita---056109-056 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Electrike---052/109-052 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Combusken---027/109-027 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Delcatty---005/109-005 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Marshtomp---041/109-041 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Mudkip---059/109-059 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Lairon---037/109-037 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Poochyena---063/109-063 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Manectric---039/109-039 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Ralts---068/109-068 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Aron---049/109-049 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Lairon---036/109-036 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Delcatty---029/109-029 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Kirlia---035/109-035 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Electrike---030/109-030 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Ralts---067/109-067 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Ruby-and-Sapphire-Aron---025/109-025 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/EX-Ruby-&-Sapphire
+File Aquapolis-Mr.-Mime-(95b)-095b cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Aquapolis
+File Aquapolis-Drowzee-(74a)-074a cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Aquapolis
+File Aquapolis-Golduck-(50b)-050b cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Aquapolis
+File Aquapolis-Mr.-Mime-(95a)-095a cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Aquapolis
+File Aquapolis-Drowzee-(74b)-074b cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Aquapolis
+File Aquapolis-Golduck-(50a)-050a cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Aquapolis
+File Gym-Challenge-Blaine's-Quiz-#2-111 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Gym-Challenge
+File Gym-Challenge-Blaine's-Quiz-#3-112 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Gym-Challenge
+File Gym-Heroes-Blaine's-Quiz-#1-097 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Gym-Heroes
+File WoTC-Promo-Mew-(9)-09 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Wizards-of-the-Coast-Promos
+File WoTC-Promo-Ho-oh-[Pokemon-Center-NY]-52 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Wizards-of-the-Coast-Promos
+File XY-Promos-Gyarados---XY60-XY060 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/XY-Promos
+File XY-Promos-Dragalge---XY10-XY010 cannot be found by the program.
+Location searched (folder): /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/XY-Promos
+File Scarlet-&-Violet-Promos-Bulbasaur---166 appears to be corrupt (found at /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Scarlet-&-Violet-Promos/Scarlet-&-Violet-Promos-Bulbasaur---166.jpg but could not be decoded).
+File Twilight-Masquerade-Luminous-Energy-226 appears to be corrupt (found at /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Twilight-Masquerade/Twilight-Masquerade-Luminous-Energy-226.jpg but could not be decoded).
+File Scarlet-&-Violet-Promos-Bloodmoon-Ursaluna-ex-177 appears to be corrupt (found at /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Scarlet-&-Violet-Promos/Scarlet-&-Violet-Promos-Bloodmoon-Ursaluna-ex-177.jpg but could not be decoded).
+File XY-Promos-Teal-Mask-Ogerpon-ex-166 appears to be corrupt (found at /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/XY-Promos/XY-Promos-Teal-Mask-Ogerpon-ex-166.jpg but could not be decoded).
+File White-Flare-Reshiram-ex---174 appears to be corrupt (found at /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/White-Flare/White-Flare-Reshiram-ex---174.jpg but could not be decoded).
+File Black-Bolt-N's-Plot---173 appears to be corrupt (found at /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Black-Bolt/Black-Bolt-N's-Plot---173.jpg but could not be decoded).
+File Black-Bolt-Zekrom-ex---174 appears to be corrupt (found at /Users/willtryon/VSCode/PokeImageComp/pokedata/images/cards/Black-Bolt/Black-Bolt-Zekrom-ex---174.jpg but could not be decoded).

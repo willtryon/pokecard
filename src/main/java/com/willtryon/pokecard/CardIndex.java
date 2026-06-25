@@ -11,15 +11,27 @@ import dev.brachtendorf.jimagehash.hash.Hash;
 import dev.brachtendorf.jimagehash.hashAlgorithms.HashingAlgorithm;
 import dev.brachtendorf.jimagehash.hashAlgorithms.PerceptiveHash;
 import org.bytedeco.opencv.opencv_core.Mat;
+import org.bytedeco.opencv.opencv_core.Point2f;
 import org.bytedeco.opencv.opencv_core.KeyPointVector;
 import org.bytedeco.opencv.opencv_core.DMatchVector;
 import org.bytedeco.opencv.opencv_core.DMatchVectorVector;
+import org.bytedeco.javacpp.indexer.FloatIndexer;
+import org.bytedeco.javacpp.indexer.UByteIndexer;
 import org.bytedeco.opencv.opencv_core.DMatch;
 import org.bytedeco.opencv.opencv_features2d.ORB;
 import org.bytedeco.opencv.opencv_features2d.BFMatcher;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.imread;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.IMREAD_GRAYSCALE;
+import static org.bytedeco.opencv.global.opencv_core.CV_32FC2;
 import static org.bytedeco.opencv.global.opencv_core.NORM_HAMMING;
+import static org.bytedeco.opencv.global.opencv_calib3d.findHomography;
+import static org.bytedeco.opencv.global.opencv_calib3d.RANSAC;
+import static org.bytedeco.opencv.global.opencv_core.CV_32FC2;
+import org.bytedeco.opencv.opencv_core.Point2f;
+import org.bytedeco.javacpp.indexer.FloatIndexer;
+import org.bytedeco.javacpp.indexer.UByteIndexer;
+
+
 
 
 public class CardIndex{
@@ -68,7 +80,8 @@ public class CardIndex{
                     try {
                         File victim = new File(address);
                         try {
-                            cardDB[line] = new CardSignature(cardId, img, hasher.hash(victim), describe(address, orb));
+                            Features f = describe(address, orb);
+                            cardDB[line] = new CardSignature(cardId, img, hasher.hash(victim), f.desciptors, f.keypoints);
                             System.out.print("\033[3A\033[J");
                             System.out.println("Hashing:  " + cardId + " \u2713");
                             System.out.println("ORB map:  " + cardId + " \u2713");
@@ -90,7 +103,7 @@ public class CardIndex{
                             .resolve(expName == null ? "" : expName.replace(" ", "-"))
                             .resolve(cardId.replace("/", "-") + ".jpg");
                     pw.println("File " + cardId + " cannot be found by the program.\nLocation searched (folder): " + expected.getParent());
-                    cardDB[line] = new CardSignature(cardId, img == null ? expected : img, null, null);
+                    cardDB[line] = new CardSignature(cardId, img == null ? expected : img, null, null, null);
                     failed++;
                 }
                 line++;
@@ -326,12 +339,13 @@ public class CardIndex{
                     data.add(new String[]{victim.toString(), recordHolderName,recordHolderPath,Double.toString(record)});
                     System.out.println(record);
                     ORB orb = ORB.create();
-                    Mat test2 = describe(path.toString(), orb);
+                    Features test2 = describe(path.toString(), orb);
                     int record2 = 0;
                     long startTime = System.currentTimeMillis();
                     for(int i = 0; i<hashed.size(); i++){
-                        int comp = goodMatches(test2, hashed.get(i).getMatData());
-                        double percent = (((double)i/hashed.size())*100);
+                        int comp = geometricMatches(test2.desciptors, test2.keypoints, hashed.get(i).getMatData(), hashed.get(i).getKeypoints());
+                        //double percent = (((double)i/hashed.size())*100);
+                        String percent = String.format("%.0f", ((double) i / hashed.size()) * 100);
                         System.out.println("\033[0F\033[K"+percent+"% "+timer(startTime));
                         if (comp > record2) {
                             record2 = comp;
@@ -356,7 +370,16 @@ public class CardIndex{
         csvOutput(csvFile, outputDir, data);
     }
     
-    private Mat describe(String path, ORB orb){
+    private static final class Features{
+        final KeyPointVector keypoints;
+        final Mat desciptors;
+        Features(KeyPointVector k, Mat d){
+            this.keypoints = k;
+            this.desciptors = d;
+        }
+    }
+
+    private Features describe(String path, ORB orb){
         Mat img = imread(path, IMREAD_GRAYSCALE);
         if (img.empty()){
             System.out.println("Something went wrong when trying to load round 2 image: "+path);
@@ -365,33 +388,73 @@ public class CardIndex{
         Mat descriptiors = new Mat();
         //System.out.println("Now generating ORB vectors for "+cardID);
         orb.detectAndCompute(img, new Mat(), keypoints, descriptiors);
-        return descriptiors;
+        img.release();
+        return new Features(keypoints, descriptiors);
     }
 
-    private int goodMatches(Mat canidateA, Mat canidateB){
-        if (canidateA.empty() || canidateB.empty()) return 0;
+    private int geometricMatches(Mat descA, KeyPointVector kpA, Mat descB, KeyPointVector kpB){
+        if (descA == null || descB == null || kpA == null || kpB == null
+                || descA.empty() || descB.empty()) return 0;
 
+        // 1. putative matches: KNN + Lowe ratio test (same as before)
         BFMatcher matcher = new BFMatcher(NORM_HAMMING, false);
-
         DMatchVectorVector knn = new DMatchVectorVector();
-        matcher.knnMatch(canidateA, canidateB, knn, 2);
+        matcher.knnMatch(descA, descB, knn, 2);
 
-        int good = 0;
-        for (long i = 0; i < knn.size(); i++) {
+        // store indices as ints NOW — the DMatch objects are views into knn's
+        // native memory and go dangling once knn is closed.
+        List<int[]> good = new ArrayList<>();
+        for (long i = 0; i < knn.size(); i++){
             DMatchVector pair = knn.get(i);
-            if (pair.size() >= 2) {
-                DMatch best   = pair.get(0);
+            if (pair.size() >= 2){
+                DMatch best = pair.get(0);
                 DMatch second = pair.get(1);
-                if (best.distance() < 0.75f * second.distance()) {
-                    good++;
+                if (best.distance() < 0.75f * second.distance()){
+                    good.add(new int[]{ best.queryIdx(), best.trainIdx() });
                 }
             }
         }
         matcher.close();
-        return good;
+        knn.close();
 
+        // a homography needs at least 4 correspondences
+        if (good.size() < 4) return 0;
+
+        // 2. build matched-point Mats (CV_32FC2: N rows, 1 col, 2 channels)
+        int n = good.size();
+        Mat srcPoints = new Mat(n, 1, CV_32FC2);
+        Mat dstPoints = new Mat(n, 1, CV_32FC2);
+        FloatIndexer srcIdx = srcPoints.createIndexer();
+        FloatIndexer dstIdx = dstPoints.createIndexer();
+        for (int i = 0; i < n; i++){
+            int[] m = good.get(i);
+            Point2f a = kpA.get(m[0]).pt();
+            Point2f b = kpB.get(m[1]).pt();
+            srcIdx.put(i, 0, 0, a.x()); srcIdx.put(i, 0, 1, a.y());
+            dstIdx.put(i, 0, 0, b.x()); dstIdx.put(i, 0, 1, b.y());
+        }
+        srcIdx.release();   // commit the buffered writes before use
+        dstIdx.release();
+
+        // 3. RANSAC homography; mask marks which matches are inliers
+        Mat mask = new Mat();
+        Mat H = findHomography(srcPoints, dstPoints, mask, RANSAC, 5.0);
+
+        int inliers = 0;
+        if (H != null && !H.empty() && !mask.empty()){
+            UByteIndexer mi = mask.createIndexer();
+            long rows = mask.rows();
+            for (long i = 0; i < rows; i++){
+                if (mi.get(i, 0) != 0) inliers++;
+            }
+            mi.release();
+        }
+
+        srcPoints.release(); dstPoints.release(); mask.release();
+        if (H != null) H.release();
+        return inliers;
     }
-
+    /*
     public void goodMatchesTest()throws IOException{
         List<CardSignature> hashed = new ArrayList<>();
         for (int c = 0; c < cardDB.length; c++){
@@ -410,7 +473,7 @@ public class CardIndex{
             for (int i = 0; i < hashed.size(); i++) {
                 Mat first = hashed.get(i).getMatData();
                 for (int j = i + 1; j < hashed.size(); j++) {
-                    int comp = goodMatches(first, hashed.get(j).getMatData());
+                    int comp = geometricMatches(test2.desciptors, test2.keypoints, hashed.get(i).getMatData(), hashed.get(i).getKeypoints());
                     if (comp < record) {
                         record = comp;
                         recordHolderA = hashed.get(i).getCardID();
@@ -433,6 +496,7 @@ public class CardIndex{
     System.out.println("\nDone: " + pairCount + " comparisons in " + ms + " ms");
     System.out.println("\nClosest pair: " + recordHolderA + " vs " + recordHolderB + " @ " + record);
     }
+    */
 
     private void csvOutput(String args, Path outputDir, List<String[]> data){
         Path dir = outputDir.resolve(args);
@@ -442,6 +506,7 @@ public class CardIndex{
             System.out.println("Sorry, couldn't write to the file."+e.getMessage());
         }
     }
+ 
 
     private String timer(long args){
         long elapsed = System.currentTimeMillis()- args;
