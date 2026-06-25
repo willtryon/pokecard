@@ -12,6 +12,8 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Scanner;
 //import org.bytedeco.opencv.opencv_core.Mat;
 //import static org.bytedeco.opencv.global.opencv_imgcodecs.imread;
@@ -35,14 +37,25 @@ public class App {
                 if (rs.next()) {
                     size = rs.getInt("n");
                     System.out.println("Cards in database: " + size);
-                    CardIndex cardDB = new CardIndex(size, url, imagesDir);
-
-                    //cardDB.test(size);
+                    //getTime();
+                    CardIndex cardDB = new CardIndex(size, url, imagesDir, outputDir);
+                    //cardDB.getTime();
+                    cardDB.test(size);
                     //cardDB.testHash();
-                    cardDB.compareImage(compareDir, outputDir);
+                    //cardDB.compareImage(compareDir, outputDir);
+                    
                 }
             }
         }
         System.out.println("Done.");
     }
+
+    public static void getTime(){
+        LocalDateTime currentDateTime = LocalDateTime.now();
+        System.out.println("Raw System Date/Time: " + currentDateTime);
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-HH:mm:ss");
+        String formattedDateTime = currentDateTime.format(formatter);
+        System.out.println("Formatted Date/Time: " + formattedDateTime);
+    }
+
 }
