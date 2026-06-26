@@ -4,7 +4,6 @@ import java.util.stream.Stream;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -28,37 +27,28 @@ import static org.bytedeco.opencv.global.opencv_imgcodecs.imread;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.IMREAD_GRAYSCALE;
 import static org.bytedeco.opencv.global.opencv_core.CV_32FC2;
 import static org.bytedeco.opencv.global.opencv_core.NORM_HAMMING;
+import static org.bytedeco.opencv.global.opencv_core.write;
 import static org.bytedeco.opencv.global.opencv_calib3d.findHomography;
 import static org.bytedeco.opencv.global.opencv_calib3d.RANSAC;
-import org.bytedeco.opencv.opencv_core.Point2f;
-import org.bytedeco.javacpp.indexer.FloatIndexer;
-import org.bytedeco.javacpp.indexer.UByteIndexer;
 
 
 
 
 public class CardIndex{
     private CardSignature [] cardDB;
-    //private Path imagesDir;
+    private Path imagesDir;
+    private Path outputDir;
+    private Path cacheDir;
     /*Approach so far is the query sql db and dump it's contents for every hit to a new Card obj, wiich is stored
     in an array of cards...*/
-    public CardIndex(int size, String url, Path imagesDir, Path outputDir) throws SQLException, FileNotFoundException {
+    public CardIndex(int size, String url, Path imagesDir, Path outputDir, Path cacheDir) throws SQLException, FileNotFoundException {
         int line = 0;
         int failed = 0;
         int passed = 0;
         int corrupt = 0;
-        /*File file = new File("log.txt");
-        PrintWriter pw = new PrintWriter(file);
-        try {
-            if (file.createNewFile()) {
-                System.out.println("log.txt created.\n\n");
-            } else {
-                System.out.println("File exists, skipping...\n\n");
-            }
-        } catch (IOException e) {
-            System.out.println("IO exception. Try again.");
-        }
-            */
+        this.imagesDir = imagesDir;
+        this.outputDir = outputDir;
+        this.cacheDir = cacheDir;
         List<String[]> data = new ArrayList<>();
         HashingAlgorithm hasher = new PerceptiveHash(64);
         cardDB = new CardSignature[size];
@@ -94,12 +84,10 @@ public class CardIndex{
                                     passed, failed, corrupt, percent, timer(startTime), line, size);
                             passed++;
                         } catch (IllegalArgumentException e) {
-                            //pw.println("File " + cardId + " appears to be corrupt (found at " + address + " but could not be decoded).");
                             data.add(new String[]{"File "+cardId+" appears to be corrupt (found at "+address+" but could not be decoded)."});
                             corrupt++;
                         }
                     } catch (IOException e){
-                        //pw.println("An unknown exception occured when hashing " + cardId);
                         data.add(new String[]{"An unknown exception occured when hashing " + cardId});
                         failed++;
                     }
@@ -109,7 +97,6 @@ public class CardIndex{
                     Path expected = imagesDir
                             .resolve(expName == null ? "" : expName.replace(" ", "-"))
                             .resolve(cardId.replace("/", "-") + ".jpg");
-                    //pw.println("File " + cardId + " cannot be found by the program.\nLocation searched (folder): " + expected.getParent());
                     data.add(new String[]{"File " + cardId + " cannot be found by the program.\nLocation searched (folder): " + expected.getParent()});
                     cardDB[line] = new CardSignature(cardId, img == null ? expected : img, null, null, null);
                     failed++;
@@ -120,10 +107,10 @@ public class CardIndex{
         System.out.println("\n\nPassed: " + passed + "\nFailed: " + failed + "\nCorrupt: " + corrupt + "\nOut of: " + line + "");
         double result = ((double) passed / size) * 100;
         System.out.println(result + "% passed.\n\n");
-        writeToTxt("log.txt", outputDir, data);
-        //pw.close();
+        writeToTxt("log.txt", data);
+        System.out.println("Writing cache to the disk...");
+        writeToDisk(cacheDir);
     }
-
 
     private Path resolveImage(Path imagesDir, String expName, String cardId, String expCardNumber){
         String folder = (expName == null ? "" : expName.replace(" ", "-"));
@@ -382,7 +369,7 @@ public class CardIndex{
         return inliers;
     }
 
-    public void compareImage(Path compareDir, Path outputDir){
+    public void compareImage(Path compareDir){
     //VERY basic hash comp test for image outside of db...
         String csvFile = "ImageComparisonOutput.csv";
         List<CardSignature> hashed = new ArrayList<>();
@@ -426,7 +413,6 @@ public class CardIndex{
                     long startTime = System.currentTimeMillis();
                     for(int i = 0; i<hashed.size(); i++){
                         int comp = geometricMatches(test2.desciptors, test2.keypoints, hashed.get(i).getMatData(), hashed.get(i).getKeypoints());
-                        //double percent = (((double)i/hashed.size())*100);
                         String percent = String.format("%.0f", ((double) i / hashed.size()) * 100);
                         System.out.println("\033[0F\033[K"+percent+"% "+timer(startTime));
                         if (comp > record2) {
@@ -444,7 +430,6 @@ public class CardIndex{
                     }catch(IOException e){
                         System.out.println("File no worky :(");
                     }
-                //stream.close();
             });
         }catch(IOException e){
             e.printStackTrace();
@@ -461,12 +446,9 @@ public class CardIndex{
         }
     }
  
-    private void writeToTxt(String args, Path outputDir, List<String[]> data){
+    private void writeToTxt(String args, List<String[]> data){
         Path dir = outputDir.resolve("logs/"+getTime()+args);
         try(PrintWriter pw = new PrintWriter(new FileWriter(dir.toFile()))){
-            /*for (int i = 0; i<data.size(); i++){
-                pw.println(data.get(i));
-            }*/
            data.forEach(i -> pw.println(Arrays.toString(i)));
         }catch(IOException e){
             System.out.println("Sorry, this file cannot be written to. Do you have permission?");
@@ -483,13 +465,32 @@ public class CardIndex{
 
     private String getTime(){
         LocalDateTime currentDateTime = LocalDateTime.now();
-        //System.out.println("Raw System Date/Time: " + currentDateTime);
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-HH:mm:ss");
         String formattedDateTime = currentDateTime.format(formatter);
         return formattedDateTime;
     }
 
-    private void writeToDisk(){
-        FileStorage fs = new FileStorage();
+    private void writeToDisk(Path cacheDir){
+        Path dir = cacheDir.resolve("cache.xml.gz");
+        FileStorage fs = new FileStorage(dir.toString(), FileStorage.WRITE);
+        try{
+            for(int i = 0; i < cardDB.length; i++){
+                try{
+                    write(fs,"descriptors_" +i, cardDB[i].getMatData());   
+                    write(fs,"keypoints_"+i, cardDB[i].getKeypoints());
+                }catch(NullPointerException e){
+                    write(fs, "descriptors_"+i,"");
+                    write (fs, "keypoints_"+i,"");
+                    continue;
+                }
+            }
+            write(fs, "count",cardDB.length);
+        }catch(NullPointerException e){
+            e.printStackTrace();
+        }
+        finally{
+            fs.release();
+        }
+        
     }
 }

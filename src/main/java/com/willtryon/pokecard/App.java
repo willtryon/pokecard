@@ -29,6 +29,7 @@ public class App {
             Path imagesDir = config.require(Config.IMAGES_DIR, "Path to images/cards folder", Files::isDirectory,   in);
             Path compareDir = config.require(Config.COMPARE_DIR, "Path to images to compare to", Files::isDirectory, in);
             Path outputDir = config.require(Config.OUTPUT_DIR, "Path to output log files", Files::isDirectory, in);
+            Path cacheDir = config.require(Config.CACHE_DIR, "Path to cache directory", Files::isDirectory, in);
             String url = "jdbc:sqlite:" + dbPath;
             try (Connection conn = DriverManager.getConnection(url);
                 Statement st = conn.createStatement();
@@ -38,11 +39,11 @@ public class App {
                     size = rs.getInt("n");
                     System.out.println("Cards in database: " + size);
                     //getTime();
-                    CardIndex cardDB = new CardIndex(size, url, imagesDir, outputDir);
+                    CardIndex cardDB = new CardIndex(size, url, imagesDir, outputDir, cacheDir);
                     //cardDB.getTime();
-                    cardDB.test(size);
+                    //cardDB.test(size);
                     //cardDB.testHash();
-                    //cardDB.compareImage(compareDir, outputDir);
+                    //cardDB.compareImage(compareDir);
                     
                 }
             }
