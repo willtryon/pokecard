@@ -2,7 +2,7 @@
 pokecard
 by willtryon
 version 0.3.0
-this build is from june 26th, 2026.
+this build is from june 27th, 2026.
 */
 
 package com.willtryon.pokecard;
@@ -36,7 +36,7 @@ public class App {
                 if (rs.next()) {
                     size = rs.getInt("n");
                     System.out.println("Cards in database: " + size);
-                    Path cacheFile = cacheDir.resolve("cache.xml.gz");
+                    Path cacheFile = cacheDir.resolve("cache.xml");
                     CardIndex cardDB;
                     if(Files.isRegularFile(cacheFile)){
                         System.out.println("Loading database...");
@@ -45,9 +45,9 @@ public class App {
                         System.out.println("Computing new database, please wait...");
                         cardDB = new CardIndex(size, url, imagesDir, outputDir, cacheDir);
                     }
-                    //cardDB.test(size);
+                    cardDB.test(size);
                     //cardDB.testHash();
-                    cardDB.compareImage(compareDir);
+                    //cardDB.compareImage(compareDir);
                     
                 }
             }

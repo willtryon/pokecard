@@ -64,7 +64,7 @@ public class CardIndex{
         try (Connection conn = DriverManager.getConnection(url);
              Statement st = conn.createStatement();
             ResultSet rs = st.executeQuery("SELECT cardId, name, expName, expCardNumber, rarity FROM cards");) {
-            Path cacheXML = cacheDir.resolve("cache.xml.gx");
+            //Path cacheXML = cacheDir.resolve("cache.xml.gx");
 
             long startTime = System.currentTimeMillis();
             System.out.println("Now generating hashes for the database...");
@@ -81,10 +81,10 @@ public class CardIndex{
                 System.out.printf("Passed: %d\tFailed: %d\tCorrupt: %d\t%s%%\t%s\t(%d/%d)%n",
                     passed, failed, corrupt, percent, timer(startTime), line, size);
                 ORB orb = ORB.create();
-                if(Files.exists(cacheXML)){
+                /*if(Files.exists(cacheXML)){
                     //cardDB[line] = new CardSignature(cardId, img, hasher.hash(victim), f.desciptors, f.keypoints);
                     //continue;
-                }
+                }*/
                 if (img != null && Files.exists(img)) {
                     String address = img.toString();
                     try {
@@ -492,7 +492,7 @@ public class CardIndex{
     }
 
     private void writeToDisk(Path cacheDir){
-        Path dir = cacheDir.resolve("cache.xml.gz");
+        Path dir = cacheDir.resolve("cache.xml");
         FileStorage fs = new FileStorage(dir.toString(), FileStorage.WRITE);
         try{
             int bitRes = 0, algId = 0;
@@ -514,8 +514,9 @@ public class CardIndex{
                     write(fs,"descriptors_" +i, cardDB[i].getMatData());   
                     write(fs,"keypoints_"+i, cardDB[i].getKeypoints());
                 }catch(NullPointerException e){
+                    write(fs, "hash_"+i, 0);
                     write(fs, "descriptors_"+i,0);
-                    write (fs, "keypoints_"+i,0);
+                    write(fs, "keypoints_"+i,0);
                     continue;
                 }
             }
@@ -526,7 +527,7 @@ public class CardIndex{
     }
 
     private CardSignature[] readFromDisk(Path cacheDir){
-        Path dir = cacheDir.resolve("cache.xml.gz");
+        Path dir = cacheDir.resolve("cache.xml");
         FileStorage fs = new FileStorage(dir.toString(), FileStorage.READ);
         if(!fs.isOpened()){
             System.out.println("Sorry, the program can't open the cache.");
@@ -541,13 +542,13 @@ public class CardIndex{
             }
             int count = (int) cNode.real();
             int bitRes = (int) fs.get("hash_bits").real();
-            int algId = (int) fs.get("hash_algo").real();
+            int algId = (int) fs.get("hash_alog").real();
             CardSignature[] db = new CardSignature[count];
             for(int i = 0; i < count;i++){
                 Path img;
                 Hash hash;
                 Mat desc;
-                String cardID = nodeToString(fs.get("card_Id"+i));
+                String cardID = nodeToString(fs.get("card_ID"+i));
                 String pathStr = nodeToString(fs.get("path_"+i));
                 String hex = nodeToString(fs.get("hash_"+i));
                 if(pathStr.isEmpty()){
@@ -560,7 +561,7 @@ public class CardIndex{
                 }else{
                     hash = new Hash(new BigInteger(hex, 16),bitRes, algId);
                 }
-                FileNode dNode = fs.get("descriptiors_"+i);
+                FileNode dNode = fs.get("descriptors_"+i);
                 if(dNode.isNone() || dNode.isString()){
                     desc = null;
                 }else{
