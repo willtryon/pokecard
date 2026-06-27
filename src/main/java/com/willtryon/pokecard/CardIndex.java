@@ -548,7 +548,7 @@ public class CardIndex{
                 Path img;
                 Hash hash;
                 Mat desc;
-                String cardID = nodeToString(fs.get("card_ID"+i));
+                String cardID = nodeToString(fs.get("cardID_"+i));
                 String pathStr = nodeToString(fs.get("path_"+i));
                 String hex = nodeToString(fs.get("hash_"+i));
                 if(pathStr.isEmpty()){
