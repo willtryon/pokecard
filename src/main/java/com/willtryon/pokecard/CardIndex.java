@@ -491,97 +491,161 @@ public class CardIndex{
         return formattedDateTime;
     }
 
-    private void writeToDisk(Path cacheDir){
-        Path dir = cacheDir.resolve("cache.xml");
-        FileStorage fs = new FileStorage(dir.toString(), FileStorage.WRITE);
-        try{
-            int bitRes = 0, algId = 0;
-            for(CardSignature c : cardDB){
-                if(c != null&& c.getBinaryHash() != null){
-                    bitRes = c.getBinaryHash().getBitResolution();
-                    algId = c.getBinaryHash().getAlgorithmId();
+    private void writeToDisk(Path cacheDir) {
+        Path xmlPath = cacheDir.resolve("cache.xml");
+        Path orbPath = cacheDir.resolve("cache_orb.dat");
+
+        // Write ORB binary data first — if this fails, skip the XML
+        try (DataOutputStream dos = new DataOutputStream(
+                new BufferedOutputStream(new FileOutputStream(orbPath.toFile())))) {
+            dos.writeInt(cardDB.length);
+            for (int i = 0; i < cardDB.length; i++) {
+                CardSignature c = cardDB[i];
+                Mat desc = (c != null) ? c.getMatData() : null;
+                KeyPointVector kp = (c != null) ? c.getKeypoints() : null;
+                boolean hasData = desc != null && !desc.empty() && kp != null && kp.size() > 0;
+                dos.writeBoolean(hasData);
+                if (hasData) {
+                    dos.writeInt(desc.rows());
+                    dos.writeInt(desc.cols());
+                    dos.writeInt(desc.type());
+                    UByteIndexer idx = desc.createIndexer();
+                    for (int r = 0; r < desc.rows(); r++)
+                        for (int col = 0; col < desc.cols(); col++)
+                            dos.writeByte(idx.get(r, col));
+                    idx.release();
+                    long n = kp.size();
+                    dos.writeLong(n);
+                    for (long k = 0; k < n; k++) {
+                        dos.writeFloat(kp.get(k).pt().x());
+                        dos.writeFloat(kp.get(k).pt().y());
+                        dos.writeFloat(kp.get(k).size());
+                        dos.writeFloat(kp.get(k).angle());
+                        dos.writeFloat(kp.get(k).response());
+                        dos.writeInt(kp.get(k).octave());
+                        dos.writeInt(kp.get(k).class_id());
+                    }
                 }
             }
-            write(fs, "count",cardDB.length);
+        } catch (IOException e) {
+            System.out.println("Failed to write ORB binary cache: " + e.getMessage());
+            return;
+        }
+
+        // Write XML — metadata only, no Mats
+        FileStorage fs = new FileStorage(xmlPath.toString(), FileStorage.WRITE);
+        try {
+            int bitRes = 0, algId = 0;
+            for (CardSignature c : cardDB) {
+                if (c != null && c.getBinaryHash() != null) {
+                    bitRes = c.getBinaryHash().getBitResolution();
+                    algId  = c.getBinaryHash().getAlgorithmId();
+                    break;
+                }
+            }
+            write(fs, "count",     cardDB.length);
             write(fs, "hash_bits", bitRes);
-            write(fs, "hash_alog", algId);
-            for(int i = 0; i < cardDB.length; i++){
-                try{
-                    write(fs, "cardID_"+i, cardDB[i].getCardID());
-                    write(fs, "path_"+i, cardDB[i].getStringImgPath());
-                    Hash h = cardDB[i].getBinaryHash();
-                    write(fs, "hash_"+i, h.getHashValue().toString(16));
-                    write(fs,"descriptors_" +i, cardDB[i].getMatData());   
-                    write(fs,"keypoints_"+i, cardDB[i].getKeypoints());
-                }catch(NullPointerException e){
-                    write(fs, "hash_"+i, 0);
-                    write(fs, "descriptors_"+i,0);
-                    write(fs, "keypoints_"+i,0);
+            write(fs, "hash_algo", algId);
+            for (int i = 0; i < cardDB.length; i++) {
+                CardSignature c = cardDB[i];
+                if (c == null) {
+                    write(fs, "cardID_" + i, "");
+                    write(fs, "path_"   + i, "");
+                    write(fs, "hash_"   + i, "");
                     continue;
                 }
+                String id = c.getCardID();
+                write(fs, "cardID_" + i, id != null ? id : "");
+                String p = c.getStringImgPath();
+                write(fs, "path_" + i, p != null ? p : "");
+                Hash h = c.getBinaryHash();
+                write(fs, "hash_" + i, h != null ? h.getHashValue().toString(16) : "");
             }
-
-        }finally{
+        } finally {
             fs.release();
         }
     }
 
-    private CardSignature[] readFromDisk(Path cacheDir){
-        Path dir = cacheDir.resolve("cache.xml");
-        FileStorage fs = new FileStorage(dir.toString(), FileStorage.READ);
-        if(!fs.isOpened()){
+    private CardSignature[] readFromDisk(Path cacheDir) {
+        Path xmlPath = cacheDir.resolve("cache.xml");
+        Path orbPath = cacheDir.resolve("cache_orb.dat");
+
+        // Read XML metadata
+        FileStorage fs = new FileStorage(xmlPath.toString(), FileStorage.READ);
+        if (!fs.isOpened()) {
             System.out.println("Sorry, the program can't open the cache.");
             fs.release();
             return new CardSignature[0];
         }
-        try{
+        CardSignature[] db;
+        try {
             FileNode cNode = fs.get("count");
-            if(cNode.isNone()){
+            if (cNode.isNone()) {
                 System.out.println("Sorry, the program can't open the cache. (invalid index)");
-                fs.release();
+                return new CardSignature[0];  // finally still calls fs.release()
             }
-            int count = (int) cNode.real();
+            int count  = (int) cNode.real();
             int bitRes = (int) fs.get("hash_bits").real();
-            int algId = (int) fs.get("hash_alog").real();
-            CardSignature[] db = new CardSignature[count];
-            for(int i = 0; i < count;i++){
-                Path img;
-                Hash hash;
-                Mat desc;
-                String cardID = nodeToString(fs.get("cardID_"+i));
-                String pathStr = nodeToString(fs.get("path_"+i));
-                String hex = nodeToString(fs.get("hash_"+i));
-                if(pathStr.isEmpty()){
-                    img = null;
-                }else{
-                    img = Path.of(pathStr);
-                }
-                if(hex.isEmpty()){
-                    hash = null;
-                }else{
-                    hash = new Hash(new BigInteger(hex, 16),bitRes, algId);
-                }
-                FileNode dNode = fs.get("descriptors_"+i);
-                if(dNode.isNone() || dNode.isString()){
-                    desc = null;
-                }else{
-                    desc = dNode.mat();
-                }
-                FileNode kNode = fs.get("keypoints_"+i);
-                KeyPointVector kp = null;
-                if(!kNode.isNone() && !kNode.isString()){
-                    kp = new KeyPointVector();
-                    read(kNode, kp);
-                }
-                if(cardID.isEmpty()){
-                    db[i] = null;
-                }else{
-                    db[i] = new CardSignature(cardID, img, hash, desc, kp);
-                }
-            }return db;
-        }finally{
-            fs.release();
+            int algId  = (int) fs.get("hash_algo").real();
+            db = new CardSignature[count];
+            for (int i = 0; i < count; i++) {
+                String cardID = nodeToString(fs.get("cardID_" + i));
+                if (cardID.isEmpty()) { db[i] = null; continue; }
+                String pathStr = nodeToString(fs.get("path_" + i));
+                String hex     = nodeToString(fs.get("hash_" + i));
+                Path img   = pathStr.isEmpty() ? null : Path.of(pathStr);
+                Hash hash  = hex.isEmpty()     ? null : new Hash(new BigInteger(hex, 16), bitRes, algId);
+                db[i] = new CardSignature(cardID, img, hash, null, null);
+            }
+        } finally {
+            fs.release();  // single release point
         }
+
+        // Read ORB binary data
+        if (!Files.exists(orbPath)) {
+            System.out.println("Warning: ORB cache not found; ORB matching unavailable.");
+            return db;
+        }
+        try (DataInputStream dis = new DataInputStream(
+                new BufferedInputStream(new FileInputStream(orbPath.toFile())))) {
+            int count = dis.readInt();
+            if (count != db.length) {
+                System.out.println("Warning: ORB cache count mismatch; ORB matching unavailable.");
+                return db;
+            }
+            for (int i = 0; i < count; i++) {
+                boolean hasData = dis.readBoolean();
+                if (!hasData) continue;
+                int rows = dis.readInt();
+                int cols = dis.readInt();
+                int type = dis.readInt();
+                Mat desc = new Mat(rows, cols, type);
+                UByteIndexer idx = desc.createIndexer();
+                for (int r = 0; r < rows; r++)
+                    for (int c = 0; c < cols; c++)
+                        idx.put(r, c, dis.readByte() & 0xFF);
+                idx.release();
+                long n = dis.readLong();
+                KeyPointVector kp = new KeyPointVector(n);
+                for (long k = 0; k < n; k++) {
+                    kp.get(k).pt().x(dis.readFloat());
+                    kp.get(k).pt().y(dis.readFloat());
+                    kp.get(k).size(dis.readFloat());
+                    kp.get(k).angle(dis.readFloat());
+                    kp.get(k).response(dis.readFloat());
+                    kp.get(k).octave(dis.readInt());
+                    kp.get(k).class_id(dis.readInt());
+                }
+                if (db[i] != null) {
+                    String pStr = db[i].getStringImgPath();
+                    Path imgP = (pStr != null && !pStr.isEmpty()) ? Path.of(pStr) : null;
+                    db[i] = new CardSignature(db[i].getCardID(), imgP, db[i].getBinaryHash(), desc, kp);
+                }
+            }
+        } catch (IOException e) {
+            System.out.println("Warning: Failed to load ORB cache: " + e.getMessage());
+        }
+        return db;
     }
 
     private String nodeToString(FileNode n) {
