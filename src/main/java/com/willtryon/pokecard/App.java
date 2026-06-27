@@ -1,8 +1,8 @@
 /*
 pokecard
 by willtryon
-version 0.2.0
-this build is from june 24th, 2026.
+version 0.3.0
+this build is from june 26th, 2026.
 */
 
 package com.willtryon.pokecard;
@@ -15,8 +15,6 @@ import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Scanner;
-//import org.bytedeco.opencv.opencv_core.Mat;
-//import static org.bytedeco.opencv.global.opencv_imgcodecs.imread;
 
 public class App {
     public static int size = 0;
@@ -38,25 +36,23 @@ public class App {
                 if (rs.next()) {
                     size = rs.getInt("n");
                     System.out.println("Cards in database: " + size);
-                    //getTime();
-                    CardIndex cardDB = new CardIndex(size, url, imagesDir, outputDir, cacheDir);
-                    //cardDB.getTime();
+                    Path cacheFile = cacheDir.resolve("cache.xml.gz");
+                    CardIndex cardDB;
+                    if(Files.isRegularFile(cacheFile)){
+                        System.out.println("Loading database...");
+                        cardDB = new CardIndex(cacheDir);
+                    }else{
+                        System.out.println("Computing new database, please wait...");
+                        cardDB = new CardIndex(size, url, imagesDir, outputDir, cacheDir);
+                    }
                     //cardDB.test(size);
                     //cardDB.testHash();
-                    //cardDB.compareImage(compareDir);
+                    cardDB.compareImage(compareDir);
                     
                 }
             }
         }
         System.out.println("Done.");
-    }
-
-    public static void getTime(){
-        LocalDateTime currentDateTime = LocalDateTime.now();
-        System.out.println("Raw System Date/Time: " + currentDateTime);
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-HH:mm:ss");
-        String formattedDateTime = currentDateTime.format(formatter);
-        System.out.println("Formatted Date/Time: " + formattedDateTime);
     }
 
 }

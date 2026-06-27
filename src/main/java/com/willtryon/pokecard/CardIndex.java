@@ -1,6 +1,9 @@
 package com.willtryon.pokecard;
 import java.util.*;
 import java.util.stream.Stream;
+
+import javax.smartcardio.Card;
+
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -17,6 +20,7 @@ import org.bytedeco.opencv.opencv_core.Point2f;
 import org.bytedeco.opencv.opencv_core.KeyPointVector;
 import org.bytedeco.opencv.opencv_core.DMatchVector;
 import org.bytedeco.opencv.opencv_core.DMatchVectorVector;
+import org.bytedeco.opencv.opencv_core.FileNode;
 import org.bytedeco.opencv.opencv_core.FileStorage;
 import org.bytedeco.javacpp.indexer.FloatIndexer;
 import org.bytedeco.javacpp.indexer.UByteIndexer;
@@ -27,9 +31,14 @@ import static org.bytedeco.opencv.global.opencv_imgcodecs.imread;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.IMREAD_GRAYSCALE;
 import static org.bytedeco.opencv.global.opencv_core.CV_32FC2;
 import static org.bytedeco.opencv.global.opencv_core.NORM_HAMMING;
+import static org.bytedeco.opencv.global.opencv_core.intRand;
+import static org.bytedeco.opencv.global.opencv_core.read;
 import static org.bytedeco.opencv.global.opencv_core.write;
 import static org.bytedeco.opencv.global.opencv_calib3d.findHomography;
 import static org.bytedeco.opencv.global.opencv_calib3d.RANSAC;
+import java.math.BigInteger;
+import org.bytedeco.opencv.opencv_core.FileNode;
+import static org.bytedeco.opencv.global.opencv_core.read;
 
 
 
@@ -55,6 +64,8 @@ public class CardIndex{
         try (Connection conn = DriverManager.getConnection(url);
              Statement st = conn.createStatement();
             ResultSet rs = st.executeQuery("SELECT cardId, name, expName, expCardNumber, rarity FROM cards");) {
+            Path cacheXML = cacheDir.resolve("cache.xml.gx");
+
             long startTime = System.currentTimeMillis();
             System.out.println("Now generating hashes for the database...");
             System.out.println("\n\n");
@@ -70,6 +81,10 @@ public class CardIndex{
                 System.out.printf("Passed: %d\tFailed: %d\tCorrupt: %d\t%s%%\t%s\t(%d/%d)%n",
                     passed, failed, corrupt, percent, timer(startTime), line, size);
                 ORB orb = ORB.create();
+                if(Files.exists(cacheXML)){
+                    //cardDB[line] = new CardSignature(cardId, img, hasher.hash(victim), f.desciptors, f.keypoints);
+                    //continue;
+                }
                 if (img != null && Files.exists(img)) {
                     String address = img.toString();
                     try {
@@ -110,6 +125,12 @@ public class CardIndex{
         writeToTxt("log.txt", data);
         System.out.println("Writing cache to the disk...");
         writeToDisk(cacheDir);
+    }
+
+    public CardIndex(Path cacheDir){
+        this.cacheDir = cacheDir;
+        this.cardDB = readFromDisk(cacheDir);
+
     }
 
     private Path resolveImage(Path imagesDir, String expName, String cardId, String expCardNumber){
@@ -474,23 +495,96 @@ public class CardIndex{
         Path dir = cacheDir.resolve("cache.xml.gz");
         FileStorage fs = new FileStorage(dir.toString(), FileStorage.WRITE);
         try{
-            for(int i = 0; i < cardDB.length; i++){
-                try{
-                    write(fs,"descriptors_" +i, cardDB[i].getMatData());   
-                    write(fs,"keypoints_"+i, cardDB[i].getKeypoints());
-                }catch(NullPointerException e){
-                    write(fs, "descriptors_"+i,"");
-                    write (fs, "keypoints_"+i,"");
-                    continue;
+            int bitRes = 0, algId = 0;
+            for(CardSignature c : cardDB){
+                if(c != null&& c.getBinaryHash() != null){
+                    bitRes = c.getBinaryHash().getBitResolution();
+                    algId = c.getBinaryHash().getAlgorithmId();
                 }
             }
             write(fs, "count",cardDB.length);
-        }catch(NullPointerException e){
-            e.printStackTrace();
-        }
-        finally{
+            write(fs, "hash_bits", bitRes);
+            write(fs, "hash_alog", algId);
+            for(int i = 0; i < cardDB.length; i++){
+                try{
+                    write(fs, "cardID_"+i, cardDB[i].getCardID());
+                    write(fs, "path_"+i, cardDB[i].getStringImgPath());
+                    Hash h = cardDB[i].getBinaryHash();
+                    write(fs, "hash_"+i, h.getHashValue().toString(16));
+                    write(fs,"descriptors_" +i, cardDB[i].getMatData());   
+                    write(fs,"keypoints_"+i, cardDB[i].getKeypoints());
+                }catch(NullPointerException e){
+                    write(fs, "descriptors_"+i,0);
+                    write (fs, "keypoints_"+i,0);
+                    continue;
+                }
+            }
+
+        }finally{
             fs.release();
         }
-        
+    }
+
+    private CardSignature[] readFromDisk(Path cacheDir){
+        Path dir = cacheDir.resolve("cache.xml.gz");
+        FileStorage fs = new FileStorage(dir.toString(), FileStorage.READ);
+        if(!fs.isOpened()){
+            System.out.println("Sorry, the program can't open the cache.");
+            fs.release();
+            return new CardSignature[0];
+        }
+        try{
+            FileNode cNode = fs.get("count");
+            if(cNode.isNone()){
+                System.out.println("Sorry, the program can't open the cache. (invalid index)");
+                fs.release();
+            }
+            int count = (int) cNode.real();
+            int bitRes = (int) fs.get("hash_bits").real();
+            int algId = (int) fs.get("hash_algo").real();
+            CardSignature[] db = new CardSignature[count];
+            for(int i = 0; i < count;i++){
+                Path img;
+                Hash hash;
+                Mat desc;
+                String cardID = nodeToString(fs.get("card_Id"+i));
+                String pathStr = nodeToString(fs.get("path_"+i));
+                String hex = nodeToString(fs.get("hash_"+i));
+                if(pathStr.isEmpty()){
+                    img = null;
+                }else{
+                    img = Path.of(pathStr);
+                }
+                if(hex.isEmpty()){
+                    hash = null;
+                }else{
+                    hash = new Hash(new BigInteger(hex, 16),bitRes, algId);
+                }
+                FileNode dNode = fs.get("descriptiors_"+i);
+                if(dNode.isNone() || dNode.isString()){
+                    desc = null;
+                }else{
+                    desc = dNode.mat();
+                }
+                FileNode kNode = fs.get("keypoints_"+i);
+                KeyPointVector kp = null;
+                if(!kNode.isNone() && !kNode.isString()){
+                    kp = new KeyPointVector();
+                    read(kNode, kp);
+                }
+                if(cardID.isEmpty()){
+                    db[i] = null;
+                }else{
+                    db[i] = new CardSignature(cardID, img, hash, desc, kp);
+                }
+            }return db;
+        }finally{
+            fs.release();
+        }
+    }
+
+    private String nodeToString(FileNode n) {
+        if (n == null || n.isNone() || !n.isString()) return "";
+        return n.string().getString();
     }
 }
