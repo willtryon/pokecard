@@ -39,6 +39,7 @@ import static org.bytedeco.opencv.global.opencv_calib3d.RANSAC;
 import java.math.BigInteger;
 import org.bytedeco.opencv.opencv_core.FileNode;
 import static org.bytedeco.opencv.global.opencv_core.read;
+import org.bytedeco.javacpp.BytePointer;
 
 
 
@@ -127,10 +128,11 @@ public class CardIndex{
         writeToDisk(cacheDir);
     }
 
-    public CardIndex(Path cacheDir){
+   public CardIndex(Path imagesDir, Path outputDir, Path cacheDir) {
+        this.imagesDir = imagesDir;
+        this.outputDir = outputDir;
         this.cacheDir = cacheDir;
         this.cardDB = readFromDisk(cacheDir);
-
     }
 
     private Path resolveImage(Path imagesDir, String expName, String cardId, String expCardNumber){
@@ -260,6 +262,7 @@ public class CardIndex{
 
     //shallow test of Card & cardIndex init..
     public void test(int args)throws NullPointerException{
+        System.out.println("\n"+cardDB.length);
         int factor = args/10;
         System.out.println(factor);
         for(int i = 0; i < cardDB.length; i += 3000){
@@ -458,39 +461,7 @@ public class CardIndex{
         csvOutput(csvFile, outputDir, data);
     }
 
-    private void csvOutput(String args, Path outputDir, List<String[]> data){
-        Path dir = outputDir.resolve("csv/"+getTime()+args);
-        try(CSVWriter writer = new CSVWriter(new FileWriter(dir.toFile()))){
-            writer.writeAll(data);
-        }catch(IOException e){
-            System.out.println("Sorry, couldn't write to the file."+e.getMessage());
-        }
-    }
- 
-    private void writeToTxt(String args, List<String[]> data){
-        Path dir = outputDir.resolve("logs/"+getTime()+args);
-        try(PrintWriter pw = new PrintWriter(new FileWriter(dir.toFile()))){
-           data.forEach(i -> pw.println(Arrays.toString(i)));
-        }catch(IOException e){
-            System.out.println("Sorry, this file cannot be written to. Do you have permission?");
-        }
-    }
-
-    private String timer(long args){
-        long elapsed = System.currentTimeMillis()- args;
-        long hours = elapsed/3600000;
-        long minutes = (elapsed%3600000)/60000;
-        long seconds = (elapsed%60000)/1000;
-        return String.format("%02d:%02d:%02d", hours, minutes, seconds);
-    }
-
-    private String getTime(){
-        LocalDateTime currentDateTime = LocalDateTime.now();
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-HH:mm:ss");
-        String formattedDateTime = currentDateTime.format(formatter);
-        return formattedDateTime;
-    }
-
+   
     private void writeToDisk(Path cacheDir) {
         Path xmlPath = cacheDir.resolve("cache.xml");
         Path orbPath = cacheDir.resolve("cache_orb.dat");
@@ -580,40 +551,45 @@ public class CardIndex{
         CardSignature[] db;
         try {
             FileNode cNode = fs.get("count");
-            if (cNode.isNone()) {
+            if (cNode.isNone()){
                 System.out.println("Sorry, the program can't open the cache. (invalid index)");
-                return new CardSignature[0];  // finally still calls fs.release()
+                return new CardSignature[0];
             }
             int count  = (int) cNode.real();
             int bitRes = (int) fs.get("hash_bits").real();
             int algId  = (int) fs.get("hash_algo").real();
             db = new CardSignature[count];
-            for (int i = 0; i < count; i++) {
+            for (int i = 0; i < count; i++){
+                String percent = String.format("%.0f", ((double) i / count) * 100);
+                System.out.print("\033[0F\033[J");
+                System.out.printf("\nLoading metadata...%s%%",percent);
                 String cardID = nodeToString(fs.get("cardID_" + i));
                 if (cardID.isEmpty()) { db[i] = null; continue; }
                 String pathStr = nodeToString(fs.get("path_" + i));
-                String hex     = nodeToString(fs.get("hash_" + i));
-                Path img   = pathStr.isEmpty() ? null : Path.of(pathStr);
+                String hex = nodeToString(fs.get("hash_" + i));
+                Path img= pathStr.isEmpty() ? null : Path.of(pathStr);
                 Hash hash  = hex.isEmpty()     ? null : new Hash(new BigInteger(hex, 16), bitRes, algId);
                 db[i] = new CardSignature(cardID, img, hash, null, null);
             }
         } finally {
-            fs.release();  // single release point
+            fs.release();
         }
 
-        // Read ORB binary data
+        // Now read ORB objects...
         if (!Files.exists(orbPath)) {
             System.out.println("Warning: ORB cache not found; ORB matching unavailable.");
             return db;
         }
-        try (DataInputStream dis = new DataInputStream(
-                new BufferedInputStream(new FileInputStream(orbPath.toFile())))) {
+        try (DataInputStream dis = new DataInputStream(new BufferedInputStream(new FileInputStream(orbPath.toFile())))) {
             int count = dis.readInt();
             if (count != db.length) {
                 System.out.println("Warning: ORB cache count mismatch; ORB matching unavailable.");
                 return db;
             }
             for (int i = 0; i < count; i++) {
+                String percent = String.format("%.0f", ((double) i / count) * 100);
+                System.out.print("\033[0F\033[J");
+                System.out.printf("\nLoading ORB objects...%s%%",percent);
                 boolean hasData = dis.readBoolean();
                 if (!hasData) continue;
                 int rows = dis.readInt();
@@ -642,14 +618,49 @@ public class CardIndex{
                     db[i] = new CardSignature(db[i].getCardID(), imgP, db[i].getBinaryHash(), desc, kp);
                 }
             }
-        } catch (IOException e) {
+        } catch (IOException e){
             System.out.println("Warning: Failed to load ORB cache: " + e.getMessage());
         }
         return db;
     }
 
-    private String nodeToString(FileNode n) {
+    private String nodeToString(FileNode n){
         if (n == null || n.isNone() || !n.isString()) return "";
-        return n.string().getString();
+        BytePointer bp = n.string();
+        return bp != null ? bp.getString() : "";
     }
+
+    private void csvOutput(String args, Path outputDir, List<String[]> data){
+        Path dir = outputDir.resolve("csv/"+getTime()+args);
+        try(CSVWriter writer = new CSVWriter(new FileWriter(dir.toFile()))){
+            writer.writeAll(data);
+        }catch(IOException e){
+            System.out.println("Sorry, couldn't write to the file."+e.getMessage());
+        }
+    }
+ 
+    private void writeToTxt(String args, List<String[]> data){
+        Path dir = outputDir.resolve("logs/"+getTime()+args);
+        try(PrintWriter pw = new PrintWriter(new FileWriter(dir.toFile()))){
+           data.forEach(i -> pw.println(Arrays.toString(i)));
+        }catch(IOException e){
+            System.out.println("Sorry, this file cannot be written to. Do you have permission?");
+        }
+    }
+
+    private String timer(long args){
+        long elapsed = System.currentTimeMillis()- args;
+        long hours = elapsed/3600000;
+        long minutes = (elapsed%3600000)/60000;
+        long seconds = (elapsed%60000)/1000;
+        return String.format("%02d:%02d:%02d", hours, minutes, seconds);
+    }
+
+    private String getTime(){
+        LocalDateTime currentDateTime = LocalDateTime.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-HH:mm:ss");
+        String formattedDateTime = currentDateTime.format(formatter);
+        return formattedDateTime;
+    }
+
 }

@@ -40,7 +40,7 @@ public class App {
                     CardIndex cardDB;
                     if(Files.isRegularFile(cacheFile)){
                         System.out.println("Loading database...");
-                        cardDB = new CardIndex(cacheDir);
+                        cardDB = new CardIndex(imagesDir, outputDir, cacheDir);
                     }else{
                         System.out.println("Computing new database, please wait...");
                         cardDB = new CardIndex(size, url, imagesDir, outputDir, cacheDir);
