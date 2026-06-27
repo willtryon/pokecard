@@ -13,6 +13,8 @@ public class Config {
     public static final String DB_PATH    = "db.path";
     public static final String IMAGES_DIR = "images.dir";
     public static final String COMPARE_DIR  = "compare.dir";
+    public static final String OUTPUT_DIR = "output.dir";
+    public static final String CACHE_DIR =  "cache.dir";
 
     private final Path file;
     private final Properties props = new Properties();
@@ -32,7 +34,7 @@ public class Config {
             if (!value.isBlank()) {
                 System.out.println("  '" + value + "' isn't valid for " + key + ".");
             }
-            System.out.print(prompt + " Not found. Please enter the path now: ");
+            System.out.println(prompt + " not found. Please enter the path and press enter.");
             value = in.nextLine().trim();
         }
         props.setProperty(key, value);

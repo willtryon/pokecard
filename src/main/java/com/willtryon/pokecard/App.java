@@ -1,8 +1,8 @@
 /*
 pokecard
 by willtryon
-version 0.2.0
-this build is from june 24th, 2026.
+version 0.3.0
+this build is from june 27th, 2026.
 */
 
 package com.willtryon.pokecard;
@@ -12,9 +12,9 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Scanner;
-//import org.bytedeco.opencv.opencv_core.Mat;
-//import static org.bytedeco.opencv.global.opencv_imgcodecs.imread;
 
 public class App {
     public static int size = 0;
@@ -22,10 +22,12 @@ public class App {
     //code paths to dirs and files manually.
     public static void main(String[] args) throws Exception {
         try (Scanner in = new Scanner(System.in)) {
-            Config config = new Config(Path.of("/config/projects/pokecard/pokecard.properties"));
+            Config config = new Config(Path.of("/Users/willtryon/VSCode/PokeImageComp/pokecard/pokecard.properties"));
             Path dbPath    = config.require(Config.DB_PATH,    "Path to data.sqlite",         Files::isRegularFile, in);
             Path imagesDir = config.require(Config.IMAGES_DIR, "Path to images/cards folder", Files::isDirectory,   in);
             Path compareDir = config.require(Config.COMPARE_DIR, "Path to images to compare to", Files::isDirectory, in);
+            Path outputDir = config.require(Config.OUTPUT_DIR, "Path to output log files", Files::isDirectory, in);
+            Path cacheDir = config.require(Config.CACHE_DIR, "Path to cache directory", Files::isDirectory, in);
             String url = "jdbc:sqlite:" + dbPath;
             try (Connection conn = DriverManager.getConnection(url);
                 Statement st = conn.createStatement();
@@ -34,14 +36,23 @@ public class App {
                 if (rs.next()) {
                     size = rs.getInt("n");
                     System.out.println("Cards in database: " + size);
-                    CardIndex cardDB = new CardIndex(size, url, imagesDir);
-
+                    Path cacheFile = cacheDir.resolve("cache.xml");
+                    CardIndex cardDB;
+                    if(Files.isRegularFile(cacheFile)){
+                        System.out.println("Loading database...");
+                        cardDB = new CardIndex(imagesDir, outputDir, cacheDir);
+                    }else{
+                        System.out.println("Computing new database, please wait...");
+                        cardDB = new CardIndex(size, url, imagesDir, outputDir, cacheDir);
+                    }
                     cardDB.test(size);
-                    cardDB.testHash();
-                    cardDB.compareImage(compareDir);
+                    //cardDB.testHash();
+                    //cardDB.compareImage(compareDir);
+                    
                 }
             }
         }
         System.out.println("Done.");
     }
+
 }
