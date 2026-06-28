@@ -75,8 +75,11 @@ public class CardImports {
     public String[][] toCsvRows() {
         String q = img.toString();
         return new String[][]{
-            { q, hashMatch.cardID(), hashMatch.img(), Double.toString(hashMatch.winner()) },
-            { q, orbMatch.cardID(),  orbMatch.img(),  Double.toString(orbMatch.winner()) },
+            { q, hashMatch.cardID(), hashMatch.img(), Double.toString(hashMatch.winner())},
+            {},
+            { q, orbMatch.cardID(),  orbMatch.img(),  Double.toString(orbMatch.winner())},
+            {recordRecord2.get(1).getCardID(), recordRecord2.get(1).getStringImgPath(), Double.toString(recordScore2.get(1))},
+            {recordRecord2.get(2).getCardID(), recordRecord2.get(2).getStringImgPath(), Double.toString(recordScore2.get(2))},
             {}
         };
     }
