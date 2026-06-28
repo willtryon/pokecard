@@ -32,20 +32,35 @@ public class App {
             try (Connection conn = DriverManager.getConnection(url);
                 Statement st = conn.createStatement();
                 ResultSet rs = st.executeQuery("SELECT COUNT(*) AS n FROM cards")) {
-                System.out.println("Connected to Database.");
+                System.out.println("Connected to SQL Database.");
                 if (rs.next()) {
                     size = rs.getInt("n");
                     System.out.println("Cards in database: " + size);
                     Path cacheFile = cacheDir.resolve("cache.xml");
                     CardIndex cardDB;
                     if(Files.isRegularFile(cacheFile)){
-                        System.out.println("Loading database...");
+                        System.out.println("Loading cache, please wait...\n");
                         cardDB = new CardIndex(imagesDir, outputDir, cacheDir);
                     }else{
-                        System.out.println("Computing new database, please wait...");
+                        System.out.println("Calculating image data, please wait...");
                         cardDB = new CardIndex(size, url, imagesDir, outputDir, cacheDir);
                     }
-                    cardDB.test(size);
+                    int choice = 0;
+                    do{
+                        System.out.println("\n\nReady. What would you like to do?"+
+                                            "\n1. compare images in "+compareDir.toString()+
+                                            "\n2. Test pokedata array"+
+                                            "\n3. Test hashes (joke)"+
+                                            "\n99. Quit");
+                        switch(choice = in.nextInt()){
+                            case 1 -> cardDB.compareImage(compareDir);
+                            case 2 -> cardDB.test(size);
+                            case 3 -> cardDB.testHash();
+                            case 99 -> System.out.println("Exiting...");
+                            default -> System.out.println("Sorry, try again.");
+                        }
+
+                    }while (choice != 99);
                     //cardDB.testHash();
                     //cardDB.compareImage(compareDir);
                     

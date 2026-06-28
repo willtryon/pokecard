@@ -1,9 +1,6 @@
 package com.willtryon.pokecard;
 import java.util.*;
 import java.util.stream.Stream;
-
-import javax.smartcardio.Card;
-
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -31,18 +28,11 @@ import static org.bytedeco.opencv.global.opencv_imgcodecs.imread;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.IMREAD_GRAYSCALE;
 import static org.bytedeco.opencv.global.opencv_core.CV_32FC2;
 import static org.bytedeco.opencv.global.opencv_core.NORM_HAMMING;
-import static org.bytedeco.opencv.global.opencv_core.intRand;
-import static org.bytedeco.opencv.global.opencv_core.read;
 import static org.bytedeco.opencv.global.opencv_core.write;
 import static org.bytedeco.opencv.global.opencv_calib3d.findHomography;
 import static org.bytedeco.opencv.global.opencv_calib3d.RANSAC;
 import java.math.BigInteger;
-import org.bytedeco.opencv.opencv_core.FileNode;
-import static org.bytedeco.opencv.global.opencv_core.read;
 import org.bytedeco.javacpp.BytePointer;
-
-
-
 
 public class CardIndex{
     private CardSignature [] cardDB;
@@ -61,12 +51,11 @@ public class CardIndex{
         this.cacheDir = cacheDir;
         List<String[]> data = new ArrayList<>();
         HashingAlgorithm hasher = new PerceptiveHash(64);
+        Scanner scan = new Scanner(System.in);
         cardDB = new CardSignature[size];
         try (Connection conn = DriverManager.getConnection(url);
              Statement st = conn.createStatement();
             ResultSet rs = st.executeQuery("SELECT cardId, name, expName, expCardNumber, rarity FROM cards");) {
-            //Path cacheXML = cacheDir.resolve("cache.xml.gx");
-
             long startTime = System.currentTimeMillis();
             System.out.println("Now generating hashes for the database...");
             System.out.println("\n\n");
@@ -82,10 +71,6 @@ public class CardIndex{
                 System.out.printf("Passed: %d\tFailed: %d\tCorrupt: %d\t%s%%\t%s\t(%d/%d)%n",
                     passed, failed, corrupt, percent, timer(startTime), line, size);
                 ORB orb = ORB.create();
-                /*if(Files.exists(cacheXML)){
-                    //cardDB[line] = new CardSignature(cardId, img, hasher.hash(victim), f.desciptors, f.keypoints);
-                    //continue;
-                }*/
                 if (img != null && Files.exists(img)) {
                     String address = img.toString();
                     try {
@@ -121,11 +106,18 @@ public class CardIndex{
                 }
             }
         System.out.println("\n\nPassed: " + passed + "\nFailed: " + failed + "\nCorrupt: " + corrupt + "\nOut of: " + line + "");
-        double result = ((double) passed / size) * 100;
+        String result = String.format("%.0f", ((double) line / size) * 100);
         System.out.println(result + "% passed.\n\n");
         writeToTxt("log.txt", data);
-        System.out.println("Writing cache to the disk...");
-        writeToDisk(cacheDir);
+        System.out.println("Done calculating image data. Writing the data to the disk will take about 620MB. Do you want save the data?(y/n)");
+        String check = scan.nextLine();
+        if(check.matches("y|Y")){
+            System.out.println("Writing cache to the disk...");
+            writeToDisk(cacheDir);
+        }else{
+            return;
+        }
+
     }
 
    public CardIndex(Path imagesDir, Path outputDir, Path cacheDir) {
@@ -143,14 +135,11 @@ public class CardIndex{
         if (Files.exists(exact)){
             return exact;
         }
-
         if (!Files.isDirectory(dir)){
             return null;
         }
-
         final String wantName = nameKey(cardId);
         final Integer wantNum = collectorNumber(expCardNumber, cardId); 
-
         try (Stream<Path> stream = Files.list(dir)){
             List<Path> candidates = stream
                     .filter(p -> {
@@ -158,7 +147,6 @@ public class CardIndex{
                         return s.endsWith(".jpg") || s.endsWith(".jpeg") || s.endsWith(".png");
                     })
                     .collect(java.util.stream.Collectors.toList());
-
             // 1) Exact normalized stem
             String wantStemFull = normalizeForMatch(cardId.replace("/", "-"));
             for (Path p : candidates){
