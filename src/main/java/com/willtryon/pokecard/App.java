@@ -1,8 +1,8 @@
 /*
 pokecard
 by willtryon
-version 0.3.0
-this build is from june 27th, 2026.
+version 0.4.0
+this build is from june 28th, 2026.
 */
 
 package com.willtryon.pokecard;
@@ -46,11 +46,14 @@ public class App {
                         cardDB = new CardIndex(size, url, imagesDir, outputDir, cacheDir);
                     }
                     int choice = 0;
+                    //1
+                    // 1CardImportsIndex importDB = new CardImportsIndex(compareDir, imagesDir, outputDir,cardDB);
                     do{
                         System.out.println("\n\nReady. What would you like to do?"+
                                             "\n1. compare images in "+compareDir.toString()+
                                             "\n2. Test pokedata array"+
                                             "\n3. Test hashes (joke)"+
+                                            "\n4. HELLLP"+
                                             "\n99. Quit");
                         switch(choice = in.nextInt()){
                             case 1 -> cardDB.compareImage(compareDir);

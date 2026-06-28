@@ -302,16 +302,24 @@ public class CardIndex{
     System.out.println("\nClosest pair: " + recordHolderA + " vs " + recordHolderB + " @ " + record);
     }
     
-    private static final class Features{
+    public static final class Features{
         final KeyPointVector keypoints;
         final Mat desciptors;
         Features(KeyPointVector k, Mat d){
             this.keypoints = k;
             this.desciptors = d;
         }
+        public KeyPointVector getKeyPointVector(){
+            return keypoints;
+        }
+
+        public Mat getDecriptors(){
+            return desciptors;
+        }
+
     }
 
-    private Features describe(String path, ORB orb){
+    public Features describe(String path, ORB orb){
         Mat img = imread(path, IMREAD_GRAYSCALE);
         if (img.empty()){
             System.out.println("Something went wrong when trying to load round 2 image: "+path);
@@ -324,7 +332,7 @@ public class CardIndex{
         return new Features(keypoints, descriptiors);
     }
 
-    private int geometricMatches(Mat descA, KeyPointVector kpA, Mat descB, KeyPointVector kpB){
+    public int geometricMatches(Mat descA, KeyPointVector kpA, Mat descB, KeyPointVector kpB){
         if (descA == null || descB == null || kpA == null || kpB == null
                 || descA.empty() || descB.empty()) return 0;
 
@@ -382,7 +390,6 @@ public class CardIndex{
     }
 
     public void compareImage(Path compareDir){
-    //VERY basic hash comp test for image outside of db...
         String csvFile = "ImageComparisonOutput.csv";
         List<CardSignature> hashed = new ArrayList<>();
         for (int c = 0; c < cardDB.length; c++){
@@ -390,63 +397,8 @@ public class CardIndex{
                 hashed.add(cardDB[c]);
             }
         }
-        List<String[]> data = new ArrayList<>();
-        System.out.println("Now looking through "+compareDir.toString()+" for images to compare...\n");
-        try(Stream <Path> stream = Files.walk(compareDir);){
-            stream
-            .filter(path -> {
-                String s = path.toString().toLowerCase();
-                return s.endsWith(".jpg") || s.endsWith(".png");
-            })
-            .forEach(path ->{
-                HashingAlgorithm hasher = new PerceptiveHash(64);
-                File victim = new File(path.toString());
-                try{
-                    Hash test = hasher.hash(victim);
-                    double record = Double.MAX_VALUE;
-                    String recordHolderName = "";
-                    String recordHolderPath = "";
-                    String recordHolderName2 = "";
-                    String recordHolderPath2 = "";
-                    for(int i = 0; i < hashed.size(); i++){
-                        double comp = test.normalizedHammingDistance(hashed.get(i).getBinaryHash());
-                        if (comp < record) {
-                            record = comp;
-                            recordHolderName = hashed.get(i).getCardID();
-                            recordHolderPath = hashed.get(i).getStringImgPath();
-                            }
-                        }
-                    System.out.println("\nUploaded image "+victim.toString()+" appears to be closest to "+recordHolderPath+". (pHash)");
-                    data.add(new String[]{victim.toString(), recordHolderName,recordHolderPath,Double.toString(record)});
-                    System.out.println(record);
-                    ORB orb = ORB.create();
-                    Features test2 = describe(path.toString(), orb);
-                    int record2 = 0;
-                    long startTime = System.currentTimeMillis();
-                    for(int i = 0; i<hashed.size(); i++){
-                        int comp = geometricMatches(test2.desciptors, test2.keypoints, hashed.get(i).getMatData(), hashed.get(i).getKeypoints());
-                        String percent = String.format("%.0f", ((double) i / hashed.size()) * 100);
-                        System.out.println("\033[0F\033[K"+percent+"% "+timer(startTime));
-                        if (comp > record2) {
-                            record2 = comp;
-                            recordHolderName2 = hashed.get(i).getCardID();
-                            recordHolderPath2 = hashed.get(i).getStringImgPath(); 
-                            }
-                    }
-                    System.out.println("\nUploaded image "+victim.toString()+" appears to be closest to "+recordHolderPath2+". (ORB)");
-                    data.add(new String[]{victim.toString(), recordHolderName2,recordHolderPath2,Integer.toString(record2)});
-                    data.add(new String[]{"","","",""});
-                    System.out.println(record2);
-                    
-                    
-                    }catch(IOException e){
-                        System.out.println("File no worky :(");
-                    }
-            });
-        }catch(IOException e){
-            e.printStackTrace();
-            }
-        csvOutput(csvFile, outputDir, data);
+        CardImportsIndex results = new CardImportsIndex(compareDir, hashed, this);
+        csvOutput(csvFile, outputDir, results.toCsvData());
     }
 
    
@@ -618,7 +570,7 @@ public class CardIndex{
         return bp != null ? bp.getString() : "";
     }
 
-    private void csvOutput(String args, Path outputDir, List<String[]> data){
+    public void csvOutput(String args, Path outputDir, List<String[]> data){
         Path dir = outputDir.resolve("csv/"+getTime()+args);
         try(CSVWriter writer = new CSVWriter(new FileWriter(dir.toFile()))){
             writer.writeAll(data);
@@ -636,7 +588,15 @@ public class CardIndex{
         }
     }
 
-    private String timer(long args){
+    public CardSignature getCardSignature(int args){
+        return cardDB[args];
+    }
+
+    public int getCardIndexSize(){
+        return cardDB.length;
+    }
+
+    public String timer(long args){
         long elapsed = System.currentTimeMillis()- args;
         long hours = elapsed/3600000;
         long minutes = (elapsed%3600000)/60000;
