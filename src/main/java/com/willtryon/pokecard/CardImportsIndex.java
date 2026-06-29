@@ -9,10 +9,11 @@ import java.util.List;
 import java.util.PriorityQueue;
 import java.util.stream.Stream;
 
+import org.bytedeco.opencv.opencv_features2d.ORB;
+
 import dev.brachtendorf.jimagehash.hash.Hash;
 import dev.brachtendorf.jimagehash.hashAlgorithms.HashingAlgorithm;
 import dev.brachtendorf.jimagehash.hashAlgorithms.PerceptiveHash;
-import org.bytedeco.opencv.opencv_features2d.ORB;
 
 public class CardImportsIndex {
     private final List<CardImports> imports = new ArrayList<>();
@@ -45,7 +46,7 @@ public class CardImportsIndex {
         try{
             Hash test = hasher.hash(victim);
             PriorityQueue<Scored> topHash = new PriorityQueue<>(Comparator.comparingDouble((Scored s) -> s.score()).reversed());
-            double record = Double.MAX_VALUE;
+            //double record = Double.MAX_VALUE;
             for (int i = 0; i < hashed.size(); i++) {
                 double comp = test.normalizedHammingDistance(hashed.get(i).getBinaryHash());
                 topHash.offer(new Scored(hashed.get(i), comp));
@@ -78,7 +79,7 @@ public class CardImportsIndex {
                 System.out.println("\033[0F\033[K" + percent + "% " + cardDB.timer(startTime));
             }
             List<Scored> orbSorted = new ArrayList<>(bottomOrb);
-            orbSorted.sort(Comparator.comparingDouble(Scored::score));
+            orbSorted.sort(Comparator.comparingDouble(Scored::score).reversed());
             Scored bestOrb = orbSorted.get(0);
             System.out.println("\nUploaded image " + victim + " appears to be closest to " + bestOrb.sig.getStringImgPath() + ". (ORB)");
             System.out.println(bestOrb.score());

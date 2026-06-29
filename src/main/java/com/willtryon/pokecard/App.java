@@ -12,8 +12,6 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.Scanner;
 
 public class App {
@@ -22,7 +20,7 @@ public class App {
     //code paths to dirs and files manually.
     public static void main(String[] args) throws Exception {
         try (Scanner in = new Scanner(System.in)) {
-            Config config = new Config(Path.of("/Users/willtryon/VSCode/PokeImageComp/pokecard/pokecard.properties"));
+            Config config = new Config(Path.of("/config/projects/pokecard/pokecard.properties"));
             Path dbPath    = config.require(Config.DB_PATH,    "Path to data.sqlite",         Files::isRegularFile, in);
             Path imagesDir = config.require(Config.IMAGES_DIR, "Path to images/cards folder", Files::isDirectory,   in);
             Path compareDir = config.require(Config.COMPARE_DIR, "Path to images to compare to", Files::isDirectory, in);
@@ -45,7 +43,7 @@ public class App {
                         System.out.println("Calculating image data, please wait...");
                         cardDB = new CardIndex(size, url, imagesDir, outputDir, cacheDir);
                     }
-                    int choice = 0;
+                    int choice;
                     //1
                     // 1CardImportsIndex importDB = new CardImportsIndex(compareDir, imagesDir, outputDir,cardDB);
                     do{
@@ -53,7 +51,6 @@ public class App {
                                             "\n1. compare images in "+compareDir.toString()+
                                             "\n2. Test pokedata array"+
                                             "\n3. Test hashes (joke)"+
-                                            "\n4. HELLLP"+
                                             "\n99. Quit");
                         switch(choice = in.nextInt()){
                             case 1 -> cardDB.compareImage(compareDir);
