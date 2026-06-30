@@ -7,30 +7,36 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.PriorityQueue;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import org.bytedeco.opencv.opencv_features2d.ORB;
 
 import dev.brachtendorf.jimagehash.hash.Hash;
 import dev.brachtendorf.jimagehash.hashAlgorithms.HashingAlgorithm;
 import dev.brachtendorf.jimagehash.hashAlgorithms.PerceptiveHash;
+import org.bytedeco.opencv.opencv_features2d.ORB;
 
 public class CardImportsIndex {
+    private static int loc;
     private final List<CardImports> imports = new ArrayList<>();
     private record Scored(CardSignature sig, double score){}
 
     // hashed = DB entries with a non-null hash; index = source of the shared helpers
     public CardImportsIndex(Path compareDir, List<CardSignature> hashed, CardIndex cardDB) {
         System.out.println("Now looking through " + compareDir.toString() + " for images to compare...\n");
-        try (Stream<Path> stream = Files.walk(compareDir);) {
-            stream
+        try (Stream<Path> stream = Files.walk(compareDir)) {
+            List<Path> imgList = stream
             .filter(path -> {
                 String s = path.toString().toLowerCase();
                 return s.endsWith(".jpg") || s.endsWith(".png");
             })
-            .forEach(path -> {
-                CardImports result = compareOne(path, hashed, cardDB);
-                System.out.println(result.getRecordSize());
+            .collect(Collectors.toList());
+            long count = imgList.size();
+            loc = 0;
+            System.out.println("Found "+ count + "images to process...");
+            imgList.forEach(path -> {
+                loc ++;
+                CardImports result = compareOne(path, hashed, cardDB, loc, count);
+                //System.out.println(result.getRecordSize());
                 System.out.println(result.getHashedRecordHistory());
                 System.out.println(result.getORBRecordHistory());
                 if (result != null) imports.add(result);
@@ -40,13 +46,13 @@ public class CardImportsIndex {
         }
     }
 
-    private CardImports compareOne(Path path, List<CardSignature> hashed, CardIndex cardDB) {
+    private CardImports compareOne(Path path, List<CardSignature> hashed, CardIndex cardDB, int loc, long count) {
         HashingAlgorithm hasher = new PerceptiveHash(64);
         File victim = new File(path.toString());
         try{
             Hash test = hasher.hash(victim);
             PriorityQueue<Scored> topHash = new PriorityQueue<>(Comparator.comparingDouble((Scored s) -> s.score()).reversed());
-            //double record = Double.MAX_VALUE;
+            double record = Double.MAX_VALUE;
             for (int i = 0; i < hashed.size(); i++) {
                 double comp = test.normalizedHammingDistance(hashed.get(i).getBinaryHash());
                 topHash.offer(new Scored(hashed.get(i), comp));
@@ -76,14 +82,14 @@ public class CardImportsIndex {
                 bottomOrb.offer(new Scored(hashed.get(i), comp));
                 if(bottomOrb.size()>10) bottomOrb.poll();
                 String percent = String.format("%.0f", ((double) i / hashed.size()) * 100);
-                System.out.println("\033[0F\033[K" + percent + "% " + cardDB.timer(startTime));
+                System.out.println("\033[0F\033[K" + percent + "% " + cardDB.timer(startTime) + loc+"/"+count);
             }
             List<Scored> orbSorted = new ArrayList<>(bottomOrb);
             orbSorted.sort(Comparator.comparingDouble(Scored::score).reversed());
             Scored bestOrb = orbSorted.get(0);
             System.out.println("\nUploaded image " + victim + " appears to be closest to " + bestOrb.sig.getStringImgPath() + ". (ORB)");
             System.out.println(bestOrb.score());
-            CardImports.Match orbMatch = new CardImports.Match(bestOrb.sig.getCardID(), bestOrb.sig.getStringImgPath(), record2);
+            CardImports.Match orbMatch = new CardImports.Match(bestOrb.sig.getCardID(), bestOrb.sig.getStringImgPath(), bestOrb.score());
             List<CardSignature> recordRecord2 = new ArrayList<>();
             List<Double> recordScore2 = new ArrayList<>();
             for(int s = 0; s<orbSorted.size(); s++){
