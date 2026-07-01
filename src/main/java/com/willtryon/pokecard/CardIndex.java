@@ -403,9 +403,9 @@ public class CardIndex{
         if (fresh.isEmpty()) return;
         List<String[]> rows = new ArrayList<>();
         for(CardImports ci : fresh){
-            for(String[]r : ci.toCsvRows()) rows.add(r);
-        csvOutput("ImageComparisonOutput.csv", outputDir, rows);
+            for(String[]r : ci.toCsvRows()) rows.add(r); 
         }
+        csvOutput("ImageComparisonOutput.csv", outputDir, rows);
     }
 
     private void writeToDisk(Path cacheDir) {
@@ -576,7 +576,7 @@ public class CardIndex{
         return bp != null ? bp.getString() : "";
     }
 
-    public void csvOutput(String args, Path outputDir, List<String[]> data){
+    private void csvOutput(String args, Path outputDir, List<String[]> data){
         Path dir = outputDir.resolve("csv/"+getTime()+args);
         try(CSVWriter writer = new CSVWriter(new FileWriter(dir.toFile()))){
             writer.writeAll(data);

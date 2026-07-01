@@ -57,6 +57,7 @@ public class CardImportsIndex {
                 }
                 CardImports result = compareOne(path, qHash, loc, count);
                 if (result != null){
+                    fresh.add(result);
                     seenHashes.add(qHash);
                     imports.add(result);
                     System.out.println(result.getHashedRecordHistory());

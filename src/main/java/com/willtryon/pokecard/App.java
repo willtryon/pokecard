@@ -2,7 +2,7 @@
 pokecard
 by willtryon
 version 0.4.0
-this build is from june 28th, 2026.
+this build is from june 30th, 2026.
 */
 
 package com.willtryon.pokecard;
@@ -64,7 +64,7 @@ public class App {
                             case 4 -> {
                                 long minutes = 5;
                                 scheduler.scheduleAtFixedRate(() -> {try{cardDB.scanImports(importDB);}catch(Exception e){e.printStackTrace();}}, 0, minutes, TimeUnit.MINUTES);
-                                System.out.println("Started auto scan every "+minutes+"minutes");
+                                System.out.println("Started auto scan every "+minutes+" minutes");
                             }
                             case 99 ->{ System.out.println("Exiting..."); scheduler.shutdownNow();}
                             default -> System.out.println("Sorry, try again.");
