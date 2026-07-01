@@ -39,6 +39,7 @@ public class CardIndex{
     private Path imagesDir;
     private Path outputDir;
     private Path cacheDir;
+
     /*Approach so far is the query sql db and dump it's contents for every hit to a new Card obj, wiich is stored
     in an array of cards...*/
     public CardIndex(int size, String url, Path imagesDir, Path outputDir, Path cacheDir) throws SQLException, FileNotFoundException {
@@ -389,19 +390,24 @@ public class CardIndex{
         return inliers;
     }
 
-    public void compareImage(Path compareDir){
-        String csvFile = "ImageComparisonOutput.csv";
+    public CardImportsIndex newImportsIndex(Path compareDir){
         List<CardSignature> hashed = new ArrayList<>();
-        for (int c = 0; c < cardDB.length; c++){
-            if (cardDB[c] != null && cardDB[c].getBinaryHash() != null) {
-                hashed.add(cardDB[c]);
-            }
+        for(int c = 0; c < cardDB.length; c++){
+            if(cardDB[c] != null && cardDB[c].getBinaryHash() != null) hashed.add(cardDB[c]);
         }
-        CardImportsIndex results = new CardImportsIndex(compareDir, hashed, this);
-        csvOutput(csvFile, outputDir, results.toCsvData());
+        return new CardImportsIndex(compareDir, hashed, this);
+    }   
+    
+    public void scanImports(CardImportsIndex importDB){
+        List<CardImports> fresh = importDB.scan();
+        if (fresh.isEmpty()) return;
+        List<String[]> rows = new ArrayList<>();
+        for(CardImports ci : fresh){
+            for(String[]r : ci.toCsvRows()) rows.add(r);
+        csvOutput("ImageComparisonOutput.csv", outputDir, rows);
+        }
     }
 
-   
     private void writeToDisk(Path cacheDir) {
         Path xmlPath = cacheDir.resolve("cache.xml");
         Path orbPath = cacheDir.resolve("cache_orb.dat");

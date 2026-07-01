@@ -13,9 +13,13 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.Scanner;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class App {
     public static int size = 0;
+    public static boolean firstRun = true;
     //uses config object to read info from pokeard.properties, so the program can run on different computers without having to mannually
     //code paths to dirs and files manually.
     public static void main(String[] args) throws Exception {
@@ -43,20 +47,26 @@ public class App {
                         System.out.println("Calculating image data, please wait...");
                         cardDB = new CardIndex(size, url, imagesDir, outputDir, cacheDir);
                     }
+                    CardImportsIndex importDB = cardDB.newImportsIndex(compareDir);
                     int choice;
-                    //1
-                    // 1CardImportsIndex importDB = new CardImportsIndex(compareDir, imagesDir, outputDir,cardDB);
+                    ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
                     do{
                         System.out.println("\n\nReady. What would you like to do?"+
                                             "\n1. compare images in "+compareDir.toString()+
                                             "\n2. Test pokedata array"+
                                             "\n3. Test hashes (joke)"+
+                                            "\n4. Start scheduled scanning for image imports"+
                                             "\n99. Quit");
                         switch(choice = in.nextInt()){
-                            case 1 -> cardDB.compareImage(compareDir);
+                            case 1 -> scheduler.submit(() -> cardDB.scanImports(importDB));
                             case 2 -> cardDB.test(size);
                             case 3 -> cardDB.testHash();
-                            case 99 -> System.out.println("Exiting...");
+                            case 4 -> {
+                                long minutes = 5;
+                                scheduler.scheduleAtFixedRate(() -> {try{cardDB.scanImports(importDB);}catch(Exception e){e.printStackTrace();}}, 0, minutes, TimeUnit.MINUTES);
+                                System.out.println("Started auto scan every "+minutes+"minutes");
+                            }
+                            case 99 ->{ System.out.println("Exiting..."); scheduler.shutdownNow();}
                             default -> System.out.println("Sorry, try again.");
                         }
 
