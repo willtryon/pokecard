@@ -19,7 +19,6 @@ import java.util.concurrent.TimeUnit;
 
 public class App {
     public static int size = 0;
-    public static boolean firstRun = true;
     //uses config object to read info from pokeard.properties, so the program can run on different computers without having to mannually
     //code paths to dirs and files manually.
     public static void main(String[] args) throws Exception {
