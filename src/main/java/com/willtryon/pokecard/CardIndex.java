@@ -1,5 +1,6 @@
 package com.willtryon.pokecard;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 import java.io.*;
 import java.nio.file.Files;
@@ -399,7 +400,11 @@ public class CardIndex{
     }   
     
     public void scanImports(CardImportsIndex importDB){
-        List<CardImports> fresh = importDB.scan();
+        scanImports(importDB, null);
+    }
+
+    public void scanImports(CardImportsIndex importDB, Consumer <String> progress){
+        List<CardImports> fresh = importDB.scan(progress);
         if (fresh.isEmpty()) return;
         List<String[]> rows = new ArrayList<>();
         for(CardImports ci : fresh){
@@ -407,6 +412,8 @@ public class CardIndex{
         }
         csvOutput("ImageComparisonOutput.csv", outputDir, rows);
     }
+
+
 
     private void writeToDisk(Path cacheDir) {
         Path xmlPath = cacheDir.resolve("cache.xml");

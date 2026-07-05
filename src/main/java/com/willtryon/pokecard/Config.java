@@ -42,9 +42,22 @@ public class Config {
         return Path.of(value);
     }
 
-    private void save() throws IOException {
+    public void save() throws IOException {
         try (OutputStream out = Files.newOutputStream(file)) {
             props.store(out, "pokecard configuration");
         }
+    }
+
+    public String get(String key){
+        return props.getProperty(key, "").trim();
+    }
+
+    public boolean isValid(String key, Predicate <Path> valid){
+        String v = get(key);
+        return !v.isBlank() && valid.test(Path.of(v));
+    }
+
+    public void set(String key, String value){
+        props.setProperty(key, value == null ? "" : value.trim());
     }
 }

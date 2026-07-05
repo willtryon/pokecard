@@ -17,7 +17,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-public class App {
+public class Main {
     public static int size = 0;
     //uses config object to read info from pokeard.properties, so the program can run on different computers without having to mannually
     //code paths to dirs and files manually.

@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.PriorityQueue;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -32,7 +33,9 @@ public class CardImportsIndex {
         this.cardDB = cardDB;
     }
 
-    public synchronized List<CardImports> scan(){
+    public List<CardImports> scan(){ return scan(null); }
+
+    public synchronized List<CardImports> scan(Consumer <String> progress){
         List<CardImports> fresh = new ArrayList<>();
         System.out.println("Scanning "+ compareDir+" for new images...");
         try (Stream<Path> stream = Files.walk(compareDir)){
@@ -46,6 +49,9 @@ public class CardImportsIndex {
             int loc = 0;
             for(Path path : imgList){
                 loc++;
+                if (progress != null){
+                    progress.accept("Scanning"+path.getFileName()+ "  (" + loc + "/" + count + ")");
+                }
                 Hash qHash;
                 try{
                     qHash = hasher.hash(new File(path.toString()));
@@ -78,6 +84,15 @@ public class CardImportsIndex {
             }
         }
         return false;
+    }
+
+    public synchronized CardImports scanOne(Path image, Consumer <String> progress) throws IOException{
+        if (!(progress == null)){
+            progress.accept("Scanning " + image.getFileName());
+        }
+        Hash qHash = hasher.hash(new File(image.toString()));
+        CardImports result = compareOne(image, qHash, 1, 1);
+        return result;
     }
 
     private CardImports compareOne(Path path, Hash test, int loc, long count) {
