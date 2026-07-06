@@ -412,7 +412,7 @@ public class CardIndex{
 
 
 
-    private void writeToDisk(Path cacheDir) {
+    public void writeToDisk(Path cacheDir) {
         Path xmlPath = cacheDir.resolve("cache.xml");
         Path orbPath = cacheDir.resolve("cache_orb.dat");
 

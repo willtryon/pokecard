@@ -9,10 +9,9 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import javafx.application.Application;
@@ -50,19 +49,19 @@ public class App extends Application{
     record Section(String name, List<Setting> settings){}
 
     static final List<Section> SECTIONS = List.of(
-        new Section("Paths", List.of(
-            new Setting(Config.DB_PATH,     "data.sqlite file",           Kind.FILE,      true),
-            new Setting(Config.IMAGES_DIR,  "images/cards folder",        Kind.DIRECTORY, true),
-            new Setting(Config.COMPARE_DIR, "folder of cards to compare", Kind.DIRECTORY, true)
-        )),
-        new Section("Advanced", List.of(
-            new Setting(Config.OUTPUT_DIR, "output / log folder", Kind.DIRECTORY, false),
-            new Setting(Config.CACHE_DIR,  "cache folder",        Kind.DIRECTORY, false)
-        )),
-        new Section("eBay API", List.of(
-            new Setting(Config.EBAY_API_KEY, "API key", Kind.SECRET, false)
-            // add more eBay fields here as you build that integration
-        ))
+            new Section("Paths", List.of(
+                    new Setting(Config.DB_PATH,     "data.sqlite file",           Kind.FILE,      true),
+                    new Setting(Config.IMAGES_DIR,  "images/cards folder",        Kind.DIRECTORY, true),
+                    new Setting(Config.COMPARE_DIR, "folder of cards to compare", Kind.DIRECTORY, true)
+            )),
+            new Section("Advanced", List.of(
+                    new Setting(Config.OUTPUT_DIR, "output / log folder", Kind.DIRECTORY, false),
+                    new Setting(Config.CACHE_DIR,  "cache folder",        Kind.DIRECTORY, false)
+            )),
+            new Section("eBay API", List.of(
+                    new Setting(Config.EBAY_API_KEY, "API key", Kind.SECRET, false)
+                    // add more eBay fields here as you build that integration
+            ))
     );
 
     /** OK if it's an allowed blank (optional) or passes its kind's check. */
@@ -85,9 +84,14 @@ public class App extends Application{
             // program-managed folders: default under ~/.pokecard if unset, and ensure they exist
             boolean changed = false;
             if (config.get(Config.CACHE_DIR).isBlank())  { config.set(Config.CACHE_DIR,  appHome.resolve("cache").toString());  changed = true; }
-            if (config.get(Config.OUTPUT_DIR).isBlank()) { config.set(Config.OUTPUT_DIR, appHome.resolve("output").toString()); changed = true; }
+            if (config.get(Config.OUTPUT_DIR).isBlank()){
+                config.set(Config.OUTPUT_DIR, appHome.resolve("output").toString());
+                changed = true;
+            }
             Files.createDirectories(Path.of(config.get(Config.CACHE_DIR)));
             Files.createDirectories(Path.of(config.get(Config.OUTPUT_DIR)));
+            Files.createDirectories(Path.of(config.get(Config.OUTPUT_DIR)+"/logs/"));
+            Files.createDirectories(Path.of(config.get(Config.OUTPUT_DIR)+"/csv/"));
             if (changed) config.save();
         }catch(IOException e){
             showError(e);
@@ -191,14 +195,14 @@ public class App extends Application{
                     });
                     return null;
                 }
-                };
-                runTask(scanTask, v -> {});
+            };
+            runTask(scanTask, v -> {});
         });
-        
+
         VBox center = new VBox(12, title, view, result, scan);
         center.setAlignment(Pos.CENTER);
         center.setPadding(new Insets(16));
-        
+
         //Menu bar operations...
 
         importItem.setOnAction(e ->{
@@ -328,6 +332,27 @@ class InitTask extends Task<App.AppContext>{
         } else {
             updateMessage("Computing image data for " + size + " cards...");
             cardDB = new CardIndex(size, url, imagesDir, outputDir, cacheDir);
+            final CardIndex finalCardDB = cardDB;
+            CountDownLatch latch = new CountDownLatch(1);
+            AtomicBoolean saveChoice = new AtomicBoolean(false);
+
+            Platform.runLater(() -> {
+                Alert alert = new Alert(
+                        Alert.AlertType.INFORMATION,
+                        "Done calculating image data. Writing the data to the disk will take about 620MB. Do you want to save the data?",
+                        ButtonType.YES, ButtonType.NO
+                );
+                alert.setHeaderText("Save image data");
+                Optional<ButtonType> result = alert.showAndWait();
+                saveChoice.set(result.isPresent() && result.get() == ButtonType.YES);
+                latch.countDown();
+            });
+
+            latch.await(); // block the background thread until the user answers
+
+            if (saveChoice.get()) {
+                cardDB.writeToDisk(cacheDir);
+            }
         }
         updateMessage("Indexing imports...");
         CardImportsIndex importDB = cardDB.newImportsIndex(compareDir);
@@ -423,7 +448,7 @@ class ConfigEditor{
         grid.setHgap(8); grid.setVgap(10);
         int row = 0;
         for(App.Setting s : sec.settings()){
-            TextInputControl field = (s.kind() == App.Kind.SECRET) ? new PasswordField() : new TextField();
+            TextField field = (s.kind() == App.Kind.SECRET) ? new PasswordField() : new TextField();
             field.setText(config.get(s.key()));
             field.setPrefColumnCount(30);
             inputs.put(s.key(), field);
