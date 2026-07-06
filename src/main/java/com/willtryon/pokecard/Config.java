@@ -15,6 +15,7 @@ public class Config {
     public static final String COMPARE_DIR  = "compare.dir";
     public static final String OUTPUT_DIR = "output.dir";
     public static final String CACHE_DIR =  "cache.dir";
+    public static final String EBAY_API_KEY = "ebay.apiKey";
 
     private final Path file;
     private final Properties props = new Properties();

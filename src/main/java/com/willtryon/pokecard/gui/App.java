@@ -9,16 +9,18 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
-import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
 
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
@@ -33,37 +35,83 @@ public class App extends Application{
     private Label statusBar;
     private ProgressBar statusProgress;
 
-    record RequiredPath(String key, String label, boolean isDir){
-        Predicate<Path> valid(){return isDir ? Files::isDirectory : Files::isRegularFile;}
+    // --- settings model: sidebar sections, each holding typed fields ---
+    enum Kind {
+        DIRECTORY, FILE, TEXT, SECRET;
+        boolean isValidValue(String v){
+            return switch (this){
+                case DIRECTORY -> Files.isDirectory(Path.of(v));
+                case FILE      -> Files.isRegularFile(Path.of(v));
+                case TEXT, SECRET -> !v.isBlank();
+            };
+        }
     }
+    record Setting(String key, String label, Kind kind, boolean required){}
+    record Section(String name, List<Setting> settings){}
 
-    static final List<RequiredPath> REQUIRED = List.of(
-        new RequiredPath(Config.DB_PATH,     "data.sqlite file",           false),
-        new RequiredPath(Config.IMAGES_DIR,  "images/cards folder",        true),
-        new RequiredPath(Config.COMPARE_DIR, "folder of cards to compare", true),
-        new RequiredPath(Config.OUTPUT_DIR,  "output / log folder",        true),
-        new RequiredPath(Config.CACHE_DIR,   "cache folder",               true)
+    static final List<Section> SECTIONS = List.of(
+        new Section("Paths", List.of(
+            new Setting(Config.DB_PATH,     "data.sqlite file",           Kind.FILE,      true),
+            new Setting(Config.IMAGES_DIR,  "images/cards folder",        Kind.DIRECTORY, true),
+            new Setting(Config.COMPARE_DIR, "folder of cards to compare", Kind.DIRECTORY, true)
+        )),
+        new Section("Advanced", List.of(
+            new Setting(Config.OUTPUT_DIR, "output / log folder", Kind.DIRECTORY, false),
+            new Setting(Config.CACHE_DIR,  "cache folder",        Kind.DIRECTORY, false)
+        )),
+        new Section("eBay API", List.of(
+            new Setting(Config.EBAY_API_KEY, "API key", Kind.SECRET, false)
+            // add more eBay fields here as you build that integration
+        ))
     );
+
+    /** OK if it's an allowed blank (optional) or passes its kind's check. */
+    static boolean satisfied(Setting s, String value){
+        if (value == null || value.isBlank()) return !s.required();
+        return s.kind().isValidValue(value);
+    }
 
     record AppContext(CardIndex cardDB, CardImportsIndex importDB, int size){}
 
     @Override
     public void start(Stage initStage){
-        Path propsPath = Path.of("/Users/willtryon/javaprojects/PokeImageComp/pokecard/pokecard.properties");
+        // Everything the program owns lives under ~/.pokecard (created on demand).
+        Path appHome   = Path.of(System.getProperty("user.home"), ".pokecard");
+        Path propsPath = appHome.resolve("pokecard.properties");
         try{
+            Files.createDirectories(appHome);
             config = new Config(propsPath);
+
+            // program-managed folders: default under ~/.pokecard if unset, and ensure they exist
+            boolean changed = false;
+            if (config.get(Config.CACHE_DIR).isBlank())  { config.set(Config.CACHE_DIR,  appHome.resolve("cache").toString());  changed = true; }
+            if (config.get(Config.OUTPUT_DIR).isBlank()) { config.set(Config.OUTPUT_DIR, appHome.resolve("output").toString()); changed = true; }
+            Files.createDirectories(Path.of(config.get(Config.CACHE_DIR)));
+            Files.createDirectories(Path.of(config.get(Config.OUTPUT_DIR)));
+            if (changed) config.save();
         }catch(IOException e){
             showError(e);
             Platform.exit();
             return;
         }
 
+        // Only the external inputs (DB, images, import) can block startup -- see SECTIONS.
         ConfigEditor editor = new ConfigEditor(config);
-        while(!allPathsValid()){
+        while(!allSettingsSatisfied()){
             if(!editor.showAndWait(null)){
                 Platform.exit();
                 return;
             }
+        }
+
+        // (re)create in case the user pointed cache/output somewhere new under Advanced
+        try{
+            Files.createDirectories(Path.of(config.get(Config.OUTPUT_DIR)));
+            Files.createDirectories(Path.of(config.get(Config.CACHE_DIR)));
+        }catch(IOException e){
+            showError(e);
+            Platform.exit();
+            return;
         }
 
         Path dbPath     = Path.of(config.get(Config.DB_PATH));
@@ -105,12 +153,10 @@ public class App extends Application{
         initThread.start();
     }
 
-    private boolean allPathsValid(){
-        for(RequiredPath r : REQUIRED){
-            if(!config.isValid(r.key(), r.valid())){
-                return false;
-            }
-        }
+    private boolean allSettingsSatisfied(){
+        for (Section sec : SECTIONS)
+            for (Setting s : sec.settings())
+                if (!satisfied(s, config.get(s.key()))) return false;
         return true;
     }
 
@@ -301,69 +347,111 @@ class ConfigEditor{
             dialog.initOwner(owner);
         }
         dialog.initModality(Modality.APPLICATION_MODAL);
-        dialog.setTitle("Settings: Pokecard paths");
+        dialog.setTitle("Settings");
 
-        GridPane grid = new GridPane();
-        grid.setHgap(8); grid.setVgap(10);
-        List<TextField> fields = new ArrayList<>();
-        for(int i = 0; i<App.REQUIRED.size(); i++){
-            App.RequiredPath r = App.REQUIRED.get(i);
-            TextField field = new TextField(config.get(r.key()));
-            field.setPrefColumnCount(32);
-            Button browse = new Button("Browse…");
-            browse.setOnAction(e -> {
-                File f;
-                if (r.isDir()) {
-                    DirectoryChooser dc = new DirectoryChooser();
-                    dc.setTitle("Choose " + r.label());
-                    f = dc.showDialog(dialog);
-                } else {
-                    FileChooser fc = new FileChooser();
-                    fc.setTitle("Choose " + r.label());
-                    f = fc.showOpenDialog(dialog);
-                }
-                if (f != null) field.setText(f.getAbsolutePath());
-            });
-            grid.addRow(i, new Label(r.label()), field, browse);
-            fields.add(field);
-        }
+        // one input control per key, built ONCE so edits survive switching sections
+        Map<String, TextInputControl> inputs = new HashMap<>();
+        Map<App.Section, Node> pages = new LinkedHashMap<>();
+        for(App.Section sec : App.SECTIONS) pages.put(sec, buildPage(sec, inputs, dialog));
+
+        // left: sidebar of section names
+        ListView<App.Section> sidebar = new ListView<>();
+        sidebar.getItems().addAll(App.SECTIONS);
+        sidebar.setPrefWidth(150);
+        sidebar.setCellFactory(lv -> new ListCell<App.Section>(){
+            @Override protected void updateItem(App.Section s, boolean empty){
+                super.updateItem(s, empty);
+                setText(empty || s == null ? null : s.name());
+            }
+        });
+
+        // right: detail pane, swapped on selection
+        StackPane detail = new StackPane();
+        sidebar.getSelectionModel().selectedItemProperty().addListener((obs, old, sel) -> {
+            if(sel != null) detail.getChildren().setAll(pages.get(sel));
+        });
+        sidebar.getSelectionModel().selectFirst();
 
         Label error = new Label();
         error.setStyle("-fx-text-fill: #c0392b");
         Button save = new Button("Save");
         Button cancel = new Button("Cancel");
         final boolean[] saved = {false};
-        save.setOnAction(e -> {
-            for(int i = 0; i < App.REQUIRED.size(); i++){
-                App.RequiredPath r = App.REQUIRED.get(i);
-                String v = fields.get(i).getText().trim();
-                if(v.isBlank() || !r.valid().test(Path.of(v))){
-                    error.setText("\u201C" + r.label() + "\u201D is missing or invalid.");
-                    return; //Allows user to fix mistake
-                }
 
+        save.setOnAction(e -> {
+            for(App.Section sec : App.SECTIONS){
+                for(App.Setting s : sec.settings()){
+                    String v = inputs.get(s.key()).getText().trim();
+                    if(!App.satisfied(s, v)){
+                        error.setText("\u201C" + s.label() + "\u201D in " + sec.name() + " is missing or invalid.");
+                        sidebar.getSelectionModel().select(sec);
+                        return;
+                    }
+                }
             }
             try{
-                for(int i = 0; i < App.REQUIRED.size(); i++){
-                    config.set(App.REQUIRED.get(i).key(), fields.get(i).getText().trim());
-                }
+                for(App.Section sec : App.SECTIONS)
+                    for(App.Setting s : sec.settings())
+                        config.set(s.key(), inputs.get(s.key()).getText().trim());
                 config.save();
                 saved[0] = true;
-            }catch(IOException ex){
-                error.setText("Couldn't save: "+ex.getMessage()+" Do you have permission?");
-            }finally{
                 dialog.close();
+            }catch(IOException ex){
+                error.setText("Couldn't save: " + ex.getMessage());
             }
         });
         cancel.setOnAction(e -> dialog.close());
 
         HBox buttons = new HBox(8, save, cancel);
-        buttons.setAlignment(Pos.BOTTOM_CENTER);
-        VBox rootBox = new VBox(12, grid, error, buttons);
+        buttons.setAlignment(Pos.CENTER_RIGHT);
+
+        BorderPane body = new BorderPane();
+        body.setLeft(sidebar);
+        body.setCenter(detail);
+        BorderPane.setMargin(detail, new Insets(0, 0, 0, 12));
+
+        VBox rootBox = new VBox(12, body, error, buttons);
         rootBox.setPadding(new Insets(16));
+        rootBox.setPrefSize(640, 380);
         dialog.setScene(new Scene(rootBox));
         dialog.showAndWait();
         return saved[0];
+    }
 
+    private Node buildPage(App.Section sec, Map<String, TextInputControl> inputs, Window owner){
+        GridPane grid = new GridPane();
+        grid.setHgap(8); grid.setVgap(10);
+        int row = 0;
+        for(App.Setting s : sec.settings()){
+            TextInputControl field = (s.kind() == App.Kind.SECRET) ? new PasswordField() : new TextField();
+            field.setText(config.get(s.key()));
+            field.setPrefColumnCount(30);
+            inputs.put(s.key(), field);
+
+            grid.add(new Label(s.label()), 0, row);
+            grid.add(field, 1, row);
+
+            if(s.kind() == App.Kind.DIRECTORY || s.kind() == App.Kind.FILE){
+                Button browse = new Button("Browse\u2026");
+                browse.setOnAction(e -> {
+                    File f;
+                    if(s.kind() == App.Kind.DIRECTORY){
+                        DirectoryChooser dc = new DirectoryChooser();
+                        dc.setTitle("Choose " + s.label());
+                        f = dc.showDialog(owner);
+                    } else {
+                        FileChooser fc = new FileChooser();
+                        fc.setTitle("Choose " + s.label());
+                        f = fc.showOpenDialog(owner);
+                    }
+                    if(f != null) field.setText(f.getAbsolutePath());
+                });
+                grid.add(browse, 2, row);
+            }
+            row++;
+        }
+        Label header = new Label(sec.name());
+        header.setStyle("-fx-font-size: 15px; -fx-font-weight: bold;");
+        return new VBox(12, header, grid);
     }
 }
