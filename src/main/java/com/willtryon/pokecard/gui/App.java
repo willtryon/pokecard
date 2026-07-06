@@ -1,6 +1,5 @@
 package com.willtryon.pokecard.gui;
 import com.willtryon.pokecard.*;
-import com.willtryon.pokecard.gui.App.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -12,7 +11,6 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Scanner;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -47,11 +45,11 @@ public class App extends Application{
         new RequiredPath(Config.CACHE_DIR,   "cache folder",               true)
     );
 
-    record AppContext(CardIndex cardDB, CardImportsIndex importDB, int size){};
+    record AppContext(CardIndex cardDB, CardImportsIndex importDB, int size){}
 
     @Override
     public void start(Stage initStage){
-        Path propsPath = Path.of("/Users/willtryon/VSCode/PokeImageComp/pokecard/pokecard.properties");
+        Path propsPath = Path.of("/Users/willtryon/javaprojects/PokeImageComp/pokecard/pokecard.properties");
         try{
             config = new Config(propsPath);
         }catch(IOException e){
@@ -79,7 +77,7 @@ public class App extends Application{
         progressBar.setPrefWidth(300);
         progressBar.progressProperty().bind(initTask.progressProperty());
 
-        Label statusLabel = new Label("Initalizing...");
+        Label statusLabel = new Label("Initializing...");
         statusLabel.textProperty().bind(initTask.messageProperty());
 
         VBox splashLayout = new VBox(15, statusLabel, progressBar);
@@ -100,7 +98,7 @@ public class App extends Application{
             Throwable ex = initTask.getException();
             ex.printStackTrace();
             statusLabel.textProperty().unbind();
-            statusLabel.setText("Exception occured:" +ex.getMessage());
+            statusLabel.setText("Exception occurred:" +ex.getMessage());
         });
         Thread initThread = new Thread(initTask, "pokecard-init");
         initThread.setDaemon(true);
@@ -140,8 +138,11 @@ public class App extends Application{
             scan.setDisable(true);
             Task<Void> scanTask = new Task<>(){
                 @Override
-                protected Void call()throws Exception{
-                    ctx.cardDB.scanImports(ctx.importDB(), this::updateMessage);
+                protected Void call(){
+                    ctx.cardDB.scanImports(ctx.importDB(), (msg, frac) ->{
+                        updateMessage(msg);
+                        updateProgress(frac,1.0);
+                    });
                     return null;
                 }
                 };
@@ -157,17 +158,20 @@ public class App extends Application{
         importItem.setOnAction(e ->{
             FileChooser chooser = new FileChooser();
             chooser.setTitle("Select a card to scan");
-            chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Images", ".png", ".jpg", ".jpeg"));
+            chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Images", "*.png", "*.jpg", "*.jpeg"));
             File file = chooser.showOpenDialog(mainStage);
             if(file == null) return;
             Path image = file.toPath();
             Task<CardImports> t = new Task<>() {
                 @Override
                 protected CardImports call()throws Exception{
-                    return ctx.importDB().scanOne(image, this::updateMessage);
+                    return ctx.importDB().scanOne(image, (msg, frac) -> {
+                        updateMessage(msg);
+                        updateProgress(frac, 1.0);
+                    });
                 }
             };
-            runTask(t , found -> {
+            runTask(t, found -> {
                 view.setImage(new Image(file.toURI().toString()));
                 if(found != null) result.setText(found.getORBRecordHistory());
             });
@@ -205,14 +209,14 @@ public class App extends Application{
         return bar;
     }
 
-    private <T> void runTask(Task<T> task, Consumer<T> onSucsess){
+    private <T> void runTask(Task<T> task, Consumer<T> onSuccess){
         statusBar.textProperty().bind(task.messageProperty());
         statusProgress.progressProperty().bind(task.progressProperty());
         statusProgress.setVisible(true);
         task.setOnSucceeded(e ->{
             finishTask();
-            if(onSucsess != null){
-                onSucsess.accept(task.getValue());
+            if(onSuccess != null){
+                onSuccess.accept(task.getValue());
             }
         });
         task.setOnFailed(e -> {
@@ -220,7 +224,7 @@ public class App extends Application{
             showError(task.getException());
         });
         task.setOnCancelled(e -> finishTask());
-        Thread t = new Thread();
+        Thread t = new Thread(task, "pokecard-task");
         t.setDaemon(true);
         t.start();
     }
@@ -229,7 +233,7 @@ public class App extends Application{
         statusBar.textProperty().unbind();
         statusProgress.progressProperty().unbind();
         statusBar.setText("Ready.");
-        statusBar.setVisible(false);
+        statusProgress.setVisible(false);
     }
 
     private void showError(Throwable ex){
@@ -250,7 +254,7 @@ public class App extends Application{
 class InitTask extends Task<App.AppContext>{
 
     private final Path dbPath, imagesDir, compareDir, outputDir, cacheDir;
-    InitTask(Path dbPath, Path imagesDir, Path compareDir, Path outputDir, Path cacheDir){
+    protected InitTask(Path dbPath, Path imagesDir, Path compareDir, Path outputDir, Path cacheDir){
         this.dbPath = dbPath;
         this.imagesDir = imagesDir;
         this.compareDir = compareDir;

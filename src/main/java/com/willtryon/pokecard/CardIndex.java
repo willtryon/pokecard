@@ -36,12 +36,12 @@ import java.math.BigInteger;
 import org.bytedeco.javacpp.BytePointer;
 
 public class CardIndex{
-    private CardSignature [] cardDB;
-    private Path imagesDir;
-    private Path outputDir;
-    private Path cacheDir;
+    private final CardSignature [] cardDB;
+    private final Path imagesDir;
+    private final Path outputDir;
+    private final Path cacheDir;
 
-    /*Approach so far is the query sql db and dump it's contents for every hit to a new Card obj, wiich is stored
+    /*Approach so far is the query sql db and dump its contents for every hit to a new Card obj, wiich is stored
     in an array of cards...*/
     public CardIndex(int size, String url, Path imagesDir, Path outputDir, Path cacheDir) throws SQLException, FileNotFoundException {
         int line = 0;
@@ -57,7 +57,7 @@ public class CardIndex{
         cardDB = new CardSignature[size];
         try (Connection conn = DriverManager.getConnection(url);
              Statement st = conn.createStatement();
-            ResultSet rs = st.executeQuery("SELECT cardId, name, expName, expCardNumber, rarity FROM cards");) {
+            ResultSet rs = st.executeQuery("SELECT cardId, name, expName, expCardNumber, rarity FROM cards")) {
             long startTime = System.currentTimeMillis();
             System.out.println("Now generating hashes for the database...");
             System.out.println("\n\n");
@@ -116,10 +116,7 @@ public class CardIndex{
         if(check.matches("y|Y")){
             System.out.println("Writing cache to the disk...");
             writeToDisk(cacheDir);
-        }else{
-            return;
         }
-
     }
 
    public CardIndex(Path imagesDir, Path outputDir, Path cacheDir) {
@@ -250,7 +247,7 @@ public class CardIndex{
     }
 
 
-    //shallow test of Card & cardIndex init..
+    //shallow test of Card & cardIndex init...
     public void test(int args)throws NullPointerException{
         System.out.println("\n"+cardDB.length);
         int factor = args/10;
@@ -403,7 +400,7 @@ public class CardIndex{
         scanImports(importDB, null);
     }
 
-    public void scanImports(CardImportsIndex importDB, Consumer <String> progress){
+    public void scanImports(CardImportsIndex importDB, ScanProgress progress){
         List<CardImports> fresh = importDB.scan(progress);
         if (fresh.isEmpty()) return;
         List<String[]> rows = new ArrayList<>();

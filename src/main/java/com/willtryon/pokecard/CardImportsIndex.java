@@ -35,7 +35,7 @@ public class CardImportsIndex {
 
     public List<CardImports> scan(){ return scan(null); }
 
-    public synchronized List<CardImports> scan(Consumer <String> progress){
+    public synchronized List<CardImports> scan(ScanProgress progress){
         List<CardImports> fresh = new ArrayList<>();
         System.out.println("Scanning "+ compareDir+" for new images...");
         try (Stream<Path> stream = Files.walk(compareDir)){
@@ -49,9 +49,6 @@ public class CardImportsIndex {
             int loc = 0;
             for(Path path : imgList){
                 loc++;
-                if (progress != null){
-                    progress.accept("Scanning"+path.getFileName()+ "  (" + loc + "/" + count + ")");
-                }
                 Hash qHash;
                 try{
                     qHash = hasher.hash(new File(path.toString()));
@@ -61,7 +58,7 @@ public class CardImportsIndex {
                 if(isDuplicate(qHash)){
                     continue;
                 }
-                CardImports result = compareOne(path, qHash, loc, count);
+                CardImports result = compareOne(path, qHash, loc, count, progress);
                 if (result != null){
                     fresh.add(result);
                     seenHashes.add(qHash);
@@ -86,16 +83,15 @@ public class CardImportsIndex {
         return false;
     }
 
-    public synchronized CardImports scanOne(Path image, Consumer <String> progress) throws IOException{
-        if (!(progress == null)){
-            progress.accept("Scanning " + image.getFileName());
-        }
+    public synchronized CardImports scanOne(Path image, ScanProgress progress) throws IOException{
         Hash qHash = hasher.hash(new File(image.toString()));
-        CardImports result = compareOne(image, qHash, 1, 1);
+        CardImports result = compareOne(image, qHash, 1, 1, progress);
+        if (result != null){ seenHashes.add(qHash); imports.add(result); }
+        if (progress != null) progress.report("Scan complete", 1.0);
         return result;
     }
 
-    private CardImports compareOne(Path path, Hash test, int loc, long count) {
+    private CardImports compareOne(Path path, Hash test, int loc, long count, ScanProgress progress) {
         File victim = new File(path.toString());
         PriorityQueue<Scored> topHash = new PriorityQueue<>(Comparator.comparingDouble((Scored s) -> s.score()).reversed());
 		for (int i = 0; i < hashed.size(); i++) {
@@ -121,12 +117,21 @@ public class CardImportsIndex {
 		CardIndex.Features test2 = cardDB.describe(path.toString(), orb);
 		PriorityQueue<Scored> bottomOrb = new PriorityQueue<>(Comparator.comparingDouble((Scored s)->s.score()));
 		long startTime = System.currentTimeMillis();
+        int lastPct = -1;
 		for (int i = 0; i < hashed.size(); i++) {
 		    int comp = cardDB.geometricMatches(test2.desciptors, test2.keypoints, hashed.get(i).getMatData(), hashed.get(i).getKeypoints());
 		    bottomOrb.offer(new Scored(hashed.get(i), comp));
 		    if(bottomOrb.size()>10) bottomOrb.poll();
 		    String percent = String.format("%.0f", ((double) i / hashed.size()) * 100);
 		    System.out.println("\033[0F\033[K" + percent + "% " + cardDB.timer(startTime) + " ("+loc+"/"+count+")");
+            if (progress != null) {                                    // <-- new
+                int pct = (int) (((double) i / hashed.size()) * 100);
+                if (pct != lastPct) {                                  // throttle: only on % change
+                    lastPct = pct;
+                    double overall = ((loc - 1) + (double) i / hashed.size()) / count;
+                    progress.report("Scanning " + victim.getName() + "  (" + loc + "/" + count + ")", overall);
+                }
+            }
 		}
 		List<Scored> orbSorted = new ArrayList<>(bottomOrb);
 		orbSorted.sort(Comparator.comparingDouble(Scored::score).reversed());
