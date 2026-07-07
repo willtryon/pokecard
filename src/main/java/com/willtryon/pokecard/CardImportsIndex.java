@@ -7,7 +7,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.PriorityQueue;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -97,7 +96,7 @@ public class CardImportsIndex {
 		for (int i = 0; i < hashed.size(); i++) {
 		    double comp = test.normalizedHammingDistance(hashed.get(i).getBinaryHash());
 		    topHash.offer(new Scored(hashed.get(i), comp));
-		    if (topHash.size()>10) topHash.poll();
+		    if (topHash.size()>1000) topHash.poll();
 		}
 		List <Scored> hashSorted = new ArrayList<>(topHash);
 		hashSorted.sort(Comparator.comparingDouble(Scored::score));
@@ -119,9 +118,9 @@ public class CardImportsIndex {
 		long startTime = System.currentTimeMillis();
         int lastPct = -1;
 		for (int i = 0; i < hashed.size(); i++) {
-		    int comp = cardDB.geometricMatches(test2.desciptors, test2.keypoints, hashed.get(i).getMatData(), hashed.get(i).getKeypoints());
+		    int comp = cardDB.geometricMatches(test2.descriptors, test2.keypoints, hashed.get(i).getMatData(), hashed.get(i).getKeypoints());
 		    bottomOrb.offer(new Scored(hashed.get(i), comp));
-		    if(bottomOrb.size()>10) bottomOrb.poll();
+		    if(bottomOrb.size()>1000) bottomOrb.poll();
 		    String percent = String.format("%.0f", ((double) i / hashed.size()) * 100);
 		    System.out.println("\033[0F\033[K" + percent + "% " + cardDB.timer(startTime) + " ("+loc+"/"+count+")");
             if (progress != null) {                                    // <-- new
@@ -149,6 +148,10 @@ public class CardImportsIndex {
     }
 
     public List<CardImports> getImports() { return imports; }
+
+    public CardImports getLastImports() {
+        return imports.isEmpty() ? null : imports.get(imports.size() - 1);
+    }
 
     public List<String[]> toCsvData() {
         List<String[]> data = new ArrayList<>();

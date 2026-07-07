@@ -1,6 +1,5 @@
 package com.willtryon.pokecard;
 import java.util.*;
-import java.util.function.Consumer;
 import java.util.stream.Stream;
 import java.io.*;
 import java.nio.file.Files;
@@ -41,7 +40,7 @@ public class CardIndex{
     private final Path outputDir;
     private final Path cacheDir;
 
-    /*Approach so far is the query sql db and dump its contents for every hit to a new Card obj, wiich is stored
+    /*Approach so far is the query sql db and dump its contents for every hit to a new Card obj, which is stored
     in an array of cards...*/
     public CardIndex(int size, String url, Path imagesDir, Path outputDir, Path cacheDir) throws SQLException, FileNotFoundException {
         int line = 0;
@@ -79,7 +78,7 @@ public class CardIndex{
                         File victim = new File(address);
                         try {
                             Features f = describe(address, orb);
-                            cardDB[line] = new CardSignature(cardId, img, hasher.hash(victim), f.desciptors, f.keypoints);
+                            cardDB[line] = new CardSignature(cardId, img, hasher.hash(victim), f.descriptors, f.keypoints);
                             System.out.print("\033[3A\033[J");
                             System.out.println("Hashing:  " + cardId + " \u2713");
                             System.out.println("ORB map:  " + cardId + " \u2713");
@@ -91,7 +90,7 @@ public class CardIndex{
                             corrupt++;
                         }
                     } catch (IOException e){
-                        data.add(new String[]{"An unknown exception occured when hashing " + cardId});
+                        data.add(new String[]{"An unknown exception occurred when hashing " + cardId});
                         failed++;
                     }
                 } else{
@@ -113,7 +112,7 @@ public class CardIndex{
         writeToTxt("log.txt", data);
         System.out.println("Done calculating image data. Writing the data to the disk will take about 620MB. Do you want save the data?(y/n)");
         String check = scan.nextLine();
-        if(check.matches("y|Y")){
+        if(check.matches("[yY]")){
             System.out.println("Writing cache to the disk...");
             writeToDisk(cacheDir);
         }
@@ -183,7 +182,7 @@ public class CardIndex{
                     }
                 }
             }
-            // 3) Last resort: normalized prefix match (kept from the original behaviour).
+            // 3) Last resort: normalized prefix match (kept from the original behavior).
             for (Path p : candidates){
                 if (normalizeForMatch(stripExt(p)).startsWith(wantStemFull)) {
                     return p;
@@ -277,7 +276,7 @@ public class CardIndex{
         double record = Double.MAX_VALUE;
         String recordHolderA = "", recordHolderB = "";
         long startTime = System.currentTimeMillis();
-        //Won't be much use for this porgram's purpose, but nice way to test all valid hashes work.
+        //Won't be much use for this program's purpose, but nice way to test all valid hashes work.
         try (PrintWriter pw = new PrintWriter("hashes.txt")) {
             for (int i = 0; i < hashed.size(); i++) {
                 Hash first = hashed.get(i).getBinaryHash();
@@ -303,17 +302,17 @@ public class CardIndex{
     
     public static final class Features{
         final KeyPointVector keypoints;
-        final Mat desciptors;
+        final Mat descriptors;
         Features(KeyPointVector k, Mat d){
             this.keypoints = k;
-            this.desciptors = d;
+            this.descriptors = d;
         }
         public KeyPointVector getKeyPointVector(){
             return keypoints;
         }
 
-        public Mat getDecriptors(){
-            return desciptors;
+        public Mat getDescriptors(){
+            return descriptors;
         }
 
     }
@@ -324,11 +323,11 @@ public class CardIndex{
             System.out.println("Something went wrong when trying to load round 2 image: "+path);
         }
         KeyPointVector keypoints = new KeyPointVector();
-        Mat descriptiors = new Mat();
+        Mat descriptors = new Mat();
         //System.out.println("Now generating ORB vectors for "+cardID);
-        orb.detectAndCompute(img, new Mat(), keypoints, descriptiors);
+        orb.detectAndCompute(img, new Mat(), keypoints, descriptors);
         img.release();
-        return new Features(keypoints, descriptiors);
+        return new Features(keypoints, descriptors);
     }
 
     public int geometricMatches(Mat descA, KeyPointVector kpA, Mat descB, KeyPointVector kpB){
@@ -417,8 +416,7 @@ public class CardIndex{
         Path orbPath = cacheDir.resolve("cache_orb.dat");
 
         // Write ORB binary data first — if this fails, skip the XML
-        try (DataOutputStream dos = new DataOutputStream(
-                new BufferedOutputStream(new FileOutputStream(orbPath.toFile())))) {
+        try (DataOutputStream dos = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(orbPath.toFile())))) {
             dos.writeInt(cardDB.length);
             for (int i = 0; i < cardDB.length; i++) {
                 CardSignature c = cardDB[i];

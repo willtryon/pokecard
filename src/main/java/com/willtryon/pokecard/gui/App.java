@@ -173,13 +173,21 @@ public class App extends Application{
         Menu fileMenu = new Menu("File");
         fileMenu.getItems().addAll(importItem, settingsItem, new SeparatorMenuItem(), exitItem);
         Menu editMenu = new Menu("Edit");
-        MenuBar menuBar = new MenuBar(fileMenu, editMenu);
+        Menu helpMenu = new Menu("Help");
+        MenuItem aboutItem = new MenuItem("About");
+        helpMenu.getItems().addAll(aboutItem);
+        MenuBar menuBar = new MenuBar(fileMenu, editMenu, helpMenu);
         menuBar.setUseSystemMenuBar(true);
         //Main init...
         Label title = new Label("Pokecard");
-        ImageView view = new ImageView();
-        view.setFitHeight(320);
-        view.setPreserveRatio(true);
+        ImageView view1 = new ImageView();
+        ImageView view2 = new ImageView();
+        view1.setFitHeight(320); view2.setFitHeight(320);
+        view1.setPreserveRatio(true); view2.setPreserveRatio(true);
+        File initImport = new File("/Users/willtryon/javaprojects/PokeImageComp/pokecard/src/main/resources/importedImage.png");
+        File initFound = new File("/Users/willtryon/javaprojects/PokeImageComp/pokecard/src/main/resources/foundImage.png");
+        view1.setImage(new Image(initImport.toURI().toString()));
+        view2.setImage(new Image(initFound.toURI().toString()));
         Label result = new Label();
         result.setWrapText(true);
 
@@ -198,8 +206,8 @@ public class App extends Application{
             };
             runTask(scanTask, v -> {});
         });
-
-        VBox center = new VBox(12, title, view, result, scan);
+        HBox imageView = new HBox(20, view1, view2);
+        VBox center = new VBox(12, title, imageView, result, scan);
         center.setAlignment(Pos.CENTER);
         center.setPadding(new Insets(16));
 
@@ -215,14 +223,17 @@ public class App extends Application{
             Task<CardImports> t = new Task<>() {
                 @Override
                 protected CardImports call()throws Exception{
-                    return ctx.importDB().scanOne(image, (msg, frac) -> {
+                    CardImports result = ctx.importDB().scanOne(image, (msg, frac) -> {
                         updateMessage(msg);
                         updateProgress(frac, 1.0);
                     });
+                    System.out.println("\n\n"+ctx.importDB.getLastImports().getOrbWinner());
+                    return result;
                 }
             };
             runTask(t, found -> {
-                view.setImage(new Image(file.toURI().toString()));
+                view1.setImage(new Image(file.toURI().toString()));
+                view2.setImage(new Image(file.toURI().toString()));
                 if(found != null) result.setText(found.getORBRecordHistory());
             });
         });
@@ -234,6 +245,21 @@ public class App extends Application{
         });
 
         exitItem.setOnAction(e -> Platform.exit());
+
+        aboutItem.setOnAction(e -> {
+            Stage aboutStage = new Stage();
+            aboutStage.setTitle("About Pokecard");
+            Label name = new Label("Pokecard");
+            Label version = new Label("Version 0.5.0");
+            Label author = new Label("by willtryon");
+            Button close = new Button("Close");
+            VBox aboutLayout = new VBox(12, name, version, author, close);
+            aboutLayout.setAlignment(Pos.CENTER);
+            aboutLayout.setPadding(new Insets(16));
+            aboutStage.setScene(new Scene(aboutLayout, 300, 150));
+            close.setOnAction(e1 -> aboutStage.close());
+            aboutStage.show();
+        });
         //build window...
         BorderPane root = new BorderPane();
         root.setTop(menuBar);
