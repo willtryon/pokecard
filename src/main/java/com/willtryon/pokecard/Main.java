@@ -46,7 +46,7 @@ public class Main {
                         System.out.println("Calculating image data, please wait...");
                         cardDB = new CardIndex(size, url, imagesDir, outputDir, cacheDir);
                     }
-                    CardImportsIndex importDB = cardDB.newImportsIndex(compareDir);
+                    CardImportsIndex importDB = cardDB.newImportsIndex(compareDir, cacheDir);
                     int choice;
                     ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
                     do{

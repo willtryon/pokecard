@@ -1,12 +1,8 @@
 package com.willtryon.pokecard;
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.PriorityQueue;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -161,5 +157,100 @@ public class CardImportsIndex {
             }
         }
         return data;
+    }
+
+
+    //I write session information to the disk
+    private static final int IMPORTS_FORMAT_VERSION = 1;
+
+    public void writeImportsToDisk(Path cacheDir) {
+        Path path = cacheDir.resolve("imports.dat");
+        try (DataOutputStream dos = new DataOutputStream(
+                new BufferedOutputStream(new FileOutputStream(path.toFile())))) {
+
+            dos.writeInt(IMPORTS_FORMAT_VERSION);
+            dos.writeInt(imports.size());
+
+            for (CardImports ci : imports) {
+                Path q = ci.getQueryImage();
+                dos.writeUTF(q != null ? q.toString() : "");
+
+                CardImports.Match hm = ci.getHashWinner();
+                dos.writeUTF(hm != null && hm.cardID() != null ? hm.cardID() : "");
+                dos.writeUTF(hm != null && hm.img()    != null ? hm.img()    : "");
+                dos.writeDouble(hm != null ? hm.winner() : 0.0);
+
+                // full hash ranking: store cardID + score, NOT the CardSignature
+                int n = ci.getRecordSize();
+                dos.writeInt(n);
+                for (int i = 0; i < n; i++) {
+                    CardSignature sig = ci.getARecordRecord(i, "hash");
+                    dos.writeUTF(sig != null && sig.getCardID() != null ? sig.getCardID() : "");
+                    dos.writeDouble(ci.getARecordScore(i, "hash"));
+                }
+            }
+        } catch (IOException e) {
+            System.out.println("Failed to write imports cache: " + e.getMessage());
+        }
+    }
+
+
+    //I read session information from the disk
+    public void readImportsFromDisk(Path cacheDir) {
+        Path path = cacheDir.resolve("imports.dat");
+        if (!Files.exists(path)) {
+            System.out.println("No imports cache found at " + path);
+            return;
+        }
+
+        // cardID -> live CardSignature, re-linked from the DB already in memory
+        Map<String, CardSignature> byId = new HashMap<>();
+        for (CardSignature c : hashed) {
+            if (c != null && c.getCardID() != null) byId.put(c.getCardID(), c);
+        }
+
+        try (DataInputStream dis = new DataInputStream(
+                new BufferedInputStream(new FileInputStream(path.toFile())))) {
+
+            int version = dis.readInt();
+            if (version != IMPORTS_FORMAT_VERSION) {
+                System.out.println("Imports cache version mismatch; skipping load.");
+                return;
+            }
+            int importCount = dis.readInt();
+
+            List<CardImports> loaded = new ArrayList<>(importCount);
+            for (int j = 0; j < importCount; j++) {
+                String qStr = dis.readUTF();
+                Path q = qStr.isEmpty() ? null : Path.of(qStr);
+
+                String hmId  = dis.readUTF();
+                String hmImg = dis.readUTF();
+                double hmWin = dis.readDouble();
+                CardImports.Match hashMatch = new CardImports.Match(hmId, hmImg, hmWin);
+
+                int n = dis.readInt();
+                List<CardSignature> recordRecord = new ArrayList<>(n);
+                List<Double> recordScore = new ArrayList<>(n);
+                for (int i = 0; i < n; i++) {
+                    String id = dis.readUTF();
+                    double score = dis.readDouble();
+                    CardSignature sig = byId.get(id);
+                    if (sig == null) continue;      // card no longer in DB; drop this row
+                    recordRecord.add(sig);
+                    recordScore.add(score);
+                }
+
+                // ORB side intentionally empty (never persisted)
+                loaded.add(new CardImports(
+                        q, hashMatch, null,
+                        recordScore, recordRecord,
+                        new ArrayList<>(), new ArrayList<>()));
+            }
+            imports.clear();
+            imports.addAll(loaded);
+        } catch (IOException e) {
+            System.out.println("Failed to read imports cache: " + e.getMessage());
+        }
     }
 }

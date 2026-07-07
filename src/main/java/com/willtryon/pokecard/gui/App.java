@@ -26,9 +26,13 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import javafx.stage.*;
+
+import javax.smartcardio.Card;
+
 public class App extends Application{
 
     private Config config;
+    private Path cacheDir;
     private AppContext ctx;
 
     private Label statusBar;
@@ -122,7 +126,7 @@ public class App extends Application{
         Path imagesDir  = Path.of(config.get(Config.IMAGES_DIR));
         Path compareDir = Path.of(config.get(Config.COMPARE_DIR));
         Path outputDir  = Path.of(config.get(Config.OUTPUT_DIR));
-        Path cacheDir   = Path.of(config.get(Config.CACHE_DIR));
+        cacheDir   = Path.of(config.get(Config.CACHE_DIR));
 
         InitTask initTask = new InitTask(dbPath, imagesDir, compareDir, outputDir, cacheDir);
         ProgressBar progressBar = new ProgressBar();
@@ -167,11 +171,13 @@ public class App extends Application{
     public void showMainStage(){
         Stage mainStage = new Stage();
         //Menu Bar init...
-        MenuItem importItem = new MenuItem("Import images to scan...");
+        MenuItem saveSessionItem = new MenuItem("Save session");
+        MenuItem loadSessionItem = new MenuItem("Load session");
+        MenuItem importItem = new MenuItem("Import an image to scan...");
         MenuItem settingsItem = new MenuItem("Settings...");
         MenuItem exitItem = new MenuItem("Quit");
         Menu fileMenu = new Menu("File");
-        fileMenu.getItems().addAll(importItem, settingsItem, new SeparatorMenuItem(), exitItem);
+        fileMenu.getItems().addAll(saveSessionItem, loadSessionItem, settingsItem, new SeparatorMenuItem(), exitItem);
         Menu editMenu = new Menu("Edit");
         Menu helpMenu = new Menu("Help");
         MenuItem aboutItem = new MenuItem("About");
@@ -201,6 +207,7 @@ public class App extends Application{
                         updateMessage(msg);
                         updateProgress(frac,1.0);
                     });
+                    scan.setDisable(false);
                     return null;
                 }
             };
@@ -212,6 +219,28 @@ public class App extends Application{
         center.setPadding(new Insets(16));
 
         //Menu bar operations...
+
+        saveSessionItem.setOnAction(e -> {
+            System.out.println("Saving imports to disk:");
+            statusBar.setText("Saving Session...");
+            statusProgress.setVisible(true);
+            ctx.importDB.writeImportsToDisk(cacheDir);
+            System.out.println("Done.");
+            statusBar.setText("Ready.");
+            statusProgress.setVisible(false);
+        });
+
+        loadSessionItem.setOnAction(e -> {
+            System.out.println("Loading imports from disk:");
+            statusBar.setText("Loading Session...");
+            statusProgress.setVisible(true);
+            ctx.importDB.readImportsFromDisk(cacheDir);
+            List<CardImports> restored = ctx.importDB.getImports();
+            System.out.println("Loaded " + restored.size() + " imports.");
+            System.out.println(restored.get(0).getORBRecordHistory()+"\n"+restored.get(0).getOrbWinner());
+            System.out.println("Done.");
+            statusBar.setText("Ready.");
+        });
 
         importItem.setOnAction(e ->{
             FileChooser chooser = new FileChooser();
@@ -381,7 +410,7 @@ class InitTask extends Task<App.AppContext>{
             }
         }
         updateMessage("Indexing imports...");
-        CardImportsIndex importDB = cardDB.newImportsIndex(compareDir);
+        CardImportsIndex importDB = cardDB.newImportsIndex(compareDir, cacheDir);
         return new App.AppContext(cardDB, importDB, size);
     }
 }

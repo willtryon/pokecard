@@ -387,7 +387,7 @@ public class CardIndex{
         return inliers;
     }
 
-    public CardImportsIndex newImportsIndex(Path compareDir){
+    public CardImportsIndex newImportsIndex(Path compareDir, Path cacheDir){
         List<CardSignature> hashed = new ArrayList<>();
         for(int c = 0; c < cardDB.length; c++){
             if(cardDB[c] != null && cardDB[c].getBinaryHash() != null) hashed.add(cardDB[c]);
@@ -578,7 +578,25 @@ public class CardIndex{
         return bp != null ? bp.getString() : "";
     }
 
-    private void csvOutput(String args, Path outputDir, List<String[]> data){
+    private void csvOutput(String fileName, Path outputDir, List<String[]> data){
+        Path dir  = outputDir.resolve("csv");
+        Path file = dir.resolve(fileName);              // standardized name, no getTime()
+        try {
+            Files.createDirectories(dir);               // FileWriter won't make the dir for you
+            boolean writeHeader = !Files.exists(file) || Files.size(file) == 0;
+            try (CSVWriter writer = new CSVWriter(new FileWriter(file.toFile(), true))) { // append
+                if (writeHeader) {
+                    writer.writeNext(new String[]{
+                            "scanId","timestamp","kind","queryImage","cardId","matchImage","score","rank"});
+                }
+                writer.writeAll(data);
+            }
+        } catch (IOException e){
+            System.out.println("Sorry, couldn't write to the file." + e.getMessage());
+        }
+    }
+    /*
+    private void OLDcsvOutput(String args, Path outputDir, List<String[]> data){
         Path dir = outputDir.resolve("csv/"+getTime()+args);
         try(CSVWriter writer = new CSVWriter(new FileWriter(dir.toFile()))){
             writer.writeAll(data);
@@ -586,7 +604,7 @@ public class CardIndex{
             System.out.println("Sorry, couldn't write to the file."+e.getMessage());
         }
     }
- 
+    */
     private void writeToTxt(String args, List<String[]> data){
         Path dir = outputDir.resolve("logs/"+getTime()+args);
         try(PrintWriter pw = new PrintWriter(new FileWriter(dir.toFile()))){
@@ -615,8 +633,7 @@ public class CardIndex{
     private String getTime(){
         LocalDateTime currentDateTime = LocalDateTime.now();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-HH:mm:ss");
-        String formattedDateTime = currentDateTime.format(formatter);
-        return formattedDateTime;
+        return currentDateTime.format(formatter);
     }
 
 }
