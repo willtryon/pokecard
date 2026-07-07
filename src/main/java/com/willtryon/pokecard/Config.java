@@ -15,6 +15,7 @@ public class Config {
     public static final String COMPARE_DIR  = "compare.dir";
     public static final String OUTPUT_DIR = "output.dir";
     public static final String CACHE_DIR =  "cache.dir";
+    public static final String EBAY_API_KEY = "ebay.apiKey";
 
     private final Path file;
     private final Properties props = new Properties();
@@ -42,9 +43,22 @@ public class Config {
         return Path.of(value);
     }
 
-    private void save() throws IOException {
+    public void save() throws IOException {
         try (OutputStream out = Files.newOutputStream(file)) {
             props.store(out, "pokecard configuration");
         }
+    }
+
+    public String get(String key){
+        return props.getProperty(key, "").trim();
+    }
+
+    public boolean isValid(String key, Predicate <Path> valid){
+        String v = get(key);
+        return !v.isBlank() && valid.test(Path.of(v));
+    }
+
+    public void set(String key, String value){
+        props.setProperty(key, value == null ? "" : value.trim());
     }
 }

@@ -2,7 +2,7 @@
 pokecard
 by willtryon
 version 0.4.0
-this build is from june 30th, 2026.
+this build is from july 1st, 2026.
 */
 
 package com.willtryon.pokecard;
@@ -17,9 +17,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-public class App {
+public class Main {
     public static int size = 0;
-    public static boolean firstRun = true;
     //uses config object to read info from pokeard.properties, so the program can run on different computers without having to mannually
     //code paths to dirs and files manually.
     public static void main(String[] args) throws Exception {
@@ -47,7 +46,7 @@ public class App {
                         System.out.println("Calculating image data, please wait...");
                         cardDB = new CardIndex(size, url, imagesDir, outputDir, cacheDir);
                     }
-                    CardImportsIndex importDB = cardDB.newImportsIndex(compareDir);
+                    CardImportsIndex importDB = cardDB.newImportsIndex(compareDir, cacheDir);
                     int choice;
                     ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
                     do{

@@ -35,12 +35,12 @@ import java.math.BigInteger;
 import org.bytedeco.javacpp.BytePointer;
 
 public class CardIndex{
-    private CardSignature [] cardDB;
-    private Path imagesDir;
-    private Path outputDir;
-    private Path cacheDir;
+    private final CardSignature [] cardDB;
+    private final Path imagesDir;
+    private final Path outputDir;
+    private final Path cacheDir;
 
-    /*Approach so far is the query sql db and dump it's contents for every hit to a new Card obj, wiich is stored
+    /*Approach so far is the query sql db and dump its contents for every hit to a new Card obj, which is stored
     in an array of cards...*/
     public CardIndex(int size, String url, Path imagesDir, Path outputDir, Path cacheDir) throws SQLException, FileNotFoundException {
         int line = 0;
@@ -56,7 +56,7 @@ public class CardIndex{
         cardDB = new CardSignature[size];
         try (Connection conn = DriverManager.getConnection(url);
              Statement st = conn.createStatement();
-            ResultSet rs = st.executeQuery("SELECT cardId, name, expName, expCardNumber, rarity FROM cards");) {
+            ResultSet rs = st.executeQuery("SELECT cardId, name, expName, expCardNumber, rarity FROM cards")) {
             long startTime = System.currentTimeMillis();
             System.out.println("Now generating hashes for the database...");
             System.out.println("\n\n");
@@ -78,7 +78,7 @@ public class CardIndex{
                         File victim = new File(address);
                         try {
                             Features f = describe(address, orb);
-                            cardDB[line] = new CardSignature(cardId, img, hasher.hash(victim), f.desciptors, f.keypoints);
+                            cardDB[line] = new CardSignature(cardId, img, hasher.hash(victim), f.descriptors, f.keypoints);
                             System.out.print("\033[3A\033[J");
                             System.out.println("Hashing:  " + cardId + " \u2713");
                             System.out.println("ORB map:  " + cardId + " \u2713");
@@ -90,7 +90,7 @@ public class CardIndex{
                             corrupt++;
                         }
                     } catch (IOException e){
-                        data.add(new String[]{"An unknown exception occured when hashing " + cardId});
+                        data.add(new String[]{"An unknown exception occurred when hashing " + cardId});
                         failed++;
                     }
                 } else{
@@ -112,13 +112,10 @@ public class CardIndex{
         writeToTxt("log.txt", data);
         System.out.println("Done calculating image data. Writing the data to the disk will take about 620MB. Do you want save the data?(y/n)");
         String check = scan.nextLine();
-        if(check.matches("y|Y")){
+        if(check.matches("[yY]")){
             System.out.println("Writing cache to the disk...");
             writeToDisk(cacheDir);
-        }else{
-            return;
         }
-
     }
 
    public CardIndex(Path imagesDir, Path outputDir, Path cacheDir) {
@@ -185,7 +182,7 @@ public class CardIndex{
                     }
                 }
             }
-            // 3) Last resort: normalized prefix match (kept from the original behaviour).
+            // 3) Last resort: normalized prefix match (kept from the original behavior).
             for (Path p : candidates){
                 if (normalizeForMatch(stripExt(p)).startsWith(wantStemFull)) {
                     return p;
@@ -249,7 +246,7 @@ public class CardIndex{
     }
 
 
-    //shallow test of Card & cardIndex init..
+    //shallow test of Card & cardIndex init...
     public void test(int args)throws NullPointerException{
         System.out.println("\n"+cardDB.length);
         int factor = args/10;
@@ -279,7 +276,7 @@ public class CardIndex{
         double record = Double.MAX_VALUE;
         String recordHolderA = "", recordHolderB = "";
         long startTime = System.currentTimeMillis();
-        //Won't be much use for this porgram's purpose, but nice way to test all valid hashes work.
+        //Won't be much use for this program's purpose, but nice way to test all valid hashes work.
         try (PrintWriter pw = new PrintWriter("hashes.txt")) {
             for (int i = 0; i < hashed.size(); i++) {
                 Hash first = hashed.get(i).getBinaryHash();
@@ -305,17 +302,17 @@ public class CardIndex{
     
     public static final class Features{
         final KeyPointVector keypoints;
-        final Mat desciptors;
+        final Mat descriptors;
         Features(KeyPointVector k, Mat d){
             this.keypoints = k;
-            this.desciptors = d;
+            this.descriptors = d;
         }
         public KeyPointVector getKeyPointVector(){
             return keypoints;
         }
 
-        public Mat getDecriptors(){
-            return desciptors;
+        public Mat getDescriptors(){
+            return descriptors;
         }
 
     }
@@ -326,11 +323,11 @@ public class CardIndex{
             System.out.println("Something went wrong when trying to load round 2 image: "+path);
         }
         KeyPointVector keypoints = new KeyPointVector();
-        Mat descriptiors = new Mat();
+        Mat descriptors = new Mat();
         //System.out.println("Now generating ORB vectors for "+cardID);
-        orb.detectAndCompute(img, new Mat(), keypoints, descriptiors);
+        orb.detectAndCompute(img, new Mat(), keypoints, descriptors);
         img.release();
-        return new Features(keypoints, descriptiors);
+        return new Features(keypoints, descriptors);
     }
 
     public int geometricMatches(Mat descA, KeyPointVector kpA, Mat descB, KeyPointVector kpB){
@@ -390,7 +387,7 @@ public class CardIndex{
         return inliers;
     }
 
-    public CardImportsIndex newImportsIndex(Path compareDir){
+    public CardImportsIndex newImportsIndex(Path compareDir, Path cacheDir){
         List<CardSignature> hashed = new ArrayList<>();
         for(int c = 0; c < cardDB.length; c++){
             if(cardDB[c] != null && cardDB[c].getBinaryHash() != null) hashed.add(cardDB[c]);
@@ -399,7 +396,11 @@ public class CardIndex{
     }   
     
     public void scanImports(CardImportsIndex importDB){
-        List<CardImports> fresh = importDB.scan();
+        scanImports(importDB, null);
+    }
+
+    public void scanImports(CardImportsIndex importDB, ScanProgress progress){
+        List<CardImports> fresh = importDB.scan(progress);
         if (fresh.isEmpty()) return;
         List<String[]> rows = new ArrayList<>();
         for(CardImports ci : fresh){
@@ -408,13 +409,14 @@ public class CardIndex{
         csvOutput("ImageComparisonOutput.csv", outputDir, rows);
     }
 
-    private void writeToDisk(Path cacheDir) {
+
+
+    public void writeToDisk(Path cacheDir) {
         Path xmlPath = cacheDir.resolve("cache.xml");
         Path orbPath = cacheDir.resolve("cache_orb.dat");
 
         // Write ORB binary data first — if this fails, skip the XML
-        try (DataOutputStream dos = new DataOutputStream(
-                new BufferedOutputStream(new FileOutputStream(orbPath.toFile())))) {
+        try (DataOutputStream dos = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(orbPath.toFile())))) {
             dos.writeInt(cardDB.length);
             for (int i = 0; i < cardDB.length; i++) {
                 CardSignature c = cardDB[i];
@@ -576,7 +578,25 @@ public class CardIndex{
         return bp != null ? bp.getString() : "";
     }
 
-    private void csvOutput(String args, Path outputDir, List<String[]> data){
+    private void csvOutput(String fileName, Path outputDir, List<String[]> data){
+        Path dir  = outputDir.resolve("csv");
+        Path file = dir.resolve(fileName);              // standardized name, no getTime()
+        try {
+            Files.createDirectories(dir);               // FileWriter won't make the dir for you
+            boolean writeHeader = !Files.exists(file) || Files.size(file) == 0;
+            try (CSVWriter writer = new CSVWriter(new FileWriter(file.toFile(), true))) { // append
+                if (writeHeader) {
+                    writer.writeNext(new String[]{
+                            "scanId","timestamp","kind","queryImage","cardId","matchImage","score","rank"});
+                }
+                writer.writeAll(data);
+            }
+        } catch (IOException e){
+            System.out.println("Sorry, couldn't write to the file." + e.getMessage());
+        }
+    }
+    /*
+    private void OLDcsvOutput(String args, Path outputDir, List<String[]> data){
         Path dir = outputDir.resolve("csv/"+getTime()+args);
         try(CSVWriter writer = new CSVWriter(new FileWriter(dir.toFile()))){
             writer.writeAll(data);
@@ -584,7 +604,7 @@ public class CardIndex{
             System.out.println("Sorry, couldn't write to the file."+e.getMessage());
         }
     }
- 
+    */
     private void writeToTxt(String args, List<String[]> data){
         Path dir = outputDir.resolve("logs/"+getTime()+args);
         try(PrintWriter pw = new PrintWriter(new FileWriter(dir.toFile()))){
@@ -613,8 +633,7 @@ public class CardIndex{
     private String getTime(){
         LocalDateTime currentDateTime = LocalDateTime.now();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-HH:mm:ss");
-        String formattedDateTime = currentDateTime.format(formatter);
-        return formattedDateTime;
+        return currentDateTime.format(formatter);
     }
 
 }
