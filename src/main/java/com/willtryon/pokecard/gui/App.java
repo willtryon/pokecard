@@ -177,7 +177,7 @@ public class App extends Application{
         MenuItem settingsItem = new MenuItem("Settings...");
         MenuItem exitItem = new MenuItem("Quit");
         Menu fileMenu = new Menu("File");
-        fileMenu.getItems().addAll(saveSessionItem, loadSessionItem, settingsItem, new SeparatorMenuItem(), exitItem);
+        fileMenu.getItems().addAll(saveSessionItem, loadSessionItem, importItem, settingsItem, new SeparatorMenuItem(), exitItem);
         Menu editMenu = new Menu("Edit");
         Menu helpMenu = new Menu("Help");
         MenuItem aboutItem = new MenuItem("About");
@@ -262,8 +262,12 @@ public class App extends Application{
             };
             runTask(t, found -> {
                 view1.setImage(new Image(file.toURI().toString()));
-                view2.setImage(new Image(file.toURI().toString()));
-                if(found != null) result.setText(found.getORBRecordHistory());
+                String foundImage = found.getOrbWinner().img();
+                System.out.println(foundImage);
+                view2.setImage(new Image(new File(foundImage).toURI().toString()));
+                System.out.println(ctx.importDB.getLastImports().getOrbWinner().img());
+                //view2.setImage(new Image(ctx.importDB.getLastImports().getOrbWinner().img()));
+
             });
         });
 
@@ -279,7 +283,7 @@ public class App extends Application{
             Stage aboutStage = new Stage();
             aboutStage.setTitle("About Pokecard");
             Label name = new Label("Pokecard");
-            Label version = new Label("Version 0.5.0");
+            Label version = new Label("Version 0.5.1");
             Label author = new Label("by willtryon");
             Button close = new Button("Close");
             VBox aboutLayout = new VBox(12, name, version, author, close);
@@ -295,7 +299,7 @@ public class App extends Application{
         root.setCenter(center);
         root.setBottom(buildStatusBar());
 
-        mainStage.setScene(new Scene(root, 420, 520));
+        mainStage.setScene(new Scene(root, 700, 600));
         mainStage.setTitle("Pokecard");
         mainStage.show();
     }
