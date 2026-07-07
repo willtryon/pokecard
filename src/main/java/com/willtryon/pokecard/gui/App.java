@@ -177,7 +177,7 @@ public class App extends Application{
         MenuItem settingsItem = new MenuItem("Settings...");
         MenuItem exitItem = new MenuItem("Quit");
         Menu fileMenu = new Menu("File");
-        fileMenu.getItems().addAll(saveSessionItem, loadSessionItem, settingsItem, new SeparatorMenuItem(), exitItem);
+        fileMenu.getItems().addAll(saveSessionItem, loadSessionItem, importItem, settingsItem, new SeparatorMenuItem(), exitItem);
         Menu editMenu = new Menu("Edit");
         Menu helpMenu = new Menu("Help");
         MenuItem aboutItem = new MenuItem("About");
@@ -295,7 +295,7 @@ public class App extends Application{
         root.setCenter(center);
         root.setBottom(buildStatusBar());
 
-        mainStage.setScene(new Scene(root, 420, 520));
+        mainStage.setScene(new Scene(root, 700, 600));
         mainStage.setTitle("Pokecard");
         mainStage.show();
     }
