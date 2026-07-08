@@ -1,0 +1,209 @@
+# Builds and publishes a release whenever a pull request is merged into master:
+#   - a runnable "fat" jar with every dependency bundled in
+#   - a macOS pokecard.app app image
+#   - a Fedora/RHEL pokecard rpm package
+# The rpm is then published to a small DNF/YUM repository hosted on GitHub
+# Pages, so `sudo dnf update` on a machine with that repo configured will
+# pick up new releases automatically.
+#
+# This workflow uses actions that are not certified by GitHub. They are
+# provided by third parties and governed by separate terms of service,
+# privacy policy, and support documentation.
+
+name: Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [ "master" ]
+
+permissions:
+  contents: read
+
+jobs:
+  # Reads the version out of pom.xml (the single source of truth) and makes
+  # sure we're not about to re-publish a release that already exists - if
+  # this fails, bump <version> in pom.xml as part of the PR you're merging.
+  check-version:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Read project version from pom.xml
+        id: version
+        run: echo "version=$(mvn -q -Dexpression=project.version -DforceStdout help:evaluate)" >> "$GITHUB_OUTPUT"
+
+      - name: Fail if this version was already released
+        run: |
+          if git ls-remote --tags --exit-code origin "refs/tags/v${{ steps.version.outputs.version }}" > /dev/null 2>&1; then
+            echo "::error::v${{ steps.version.outputs.version }} already has a release. Bump <version> in pom.xml before merging to master."
+            exit 1
+          fi
+
+  build-macos-app:
+    needs: check-version
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build jar with Maven
+        run: mvn -B clean package --file pom.xml
+
+      - name: Package pokecard.app with jpackage
+        run: |
+          jpackage \
+            --type app-image \
+            --input target \
+            --dest dist \
+            --name pokecard \
+            --main-jar pokecard-${{ needs.check-version.outputs.version }}.jar \
+            --main-class com.willtryon.pokecard.gui.Launcher \
+            --app-version ${{ needs.check-version.outputs.version }} \
+            --vendor willtryon
+
+      - name: Zip the app bundle
+        run: cd dist && zip -r -X pokecard-${{ needs.check-version.outputs.version }}-macos.zip pokecard.app
+
+      - name: Upload app-image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pokecard-macos-app
+          path: dist/pokecard-${{ needs.check-version.outputs.version }}-macos.zip
+
+  build-linux-rpm:
+    needs: check-version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Install rpm packaging tools
+        run: sudo apt-get update && sudo apt-get install -y rpm createrepo-c
+
+      - name: Build jar with Maven
+        run: mvn -B clean package --file pom.xml
+
+      - name: Upload jar artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pokecard-jar
+          path: target/pokecard-${{ needs.check-version.outputs.version }}.jar
+
+      - name: Package .rpm with jpackage
+        run: |
+          jpackage \
+            --type rpm \
+            --input target \
+            --dest dist \
+            --name pokecard \
+            --main-jar pokecard-${{ needs.check-version.outputs.version }}.jar \
+            --main-class com.willtryon.pokecard.gui.Launcher \
+            --app-version ${{ needs.check-version.outputs.version }} \
+            --vendor willtryon \
+            --linux-package-name pokecard \
+            --description "PokeCard - Pokemon card scanning and collection tool"
+
+      - name: Upload rpm artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pokecard-rpm
+          path: dist/*.rpm
+
+  create-release:
+    needs: [check-version, build-macos-app, build-linux-rpm]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v5
+        with:
+          path: artifacts
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: v${{ needs.check-version.outputs.version }}
+          name: PokeCard v${{ needs.check-version.outputs.version }}
+          generate_release_notes: true
+          files: |
+            artifacts/pokecard-jar/*.jar
+            artifacts/pokecard-macos-app/*.zip
+            artifacts/pokecard-rpm/*.rpm
+
+  publish-rpm-repo:
+    needs: [build-linux-rpm, create-release]
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pokecard-rpm-repo-publish
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - name: Download rpm artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: pokecard-rpm
+          path: staging
+
+      - name: Check out existing repo, if one exists yet
+        uses: actions/checkout@v6
+        continue-on-error: true
+        with:
+          ref: gh-pages
+          path: gh-pages-old
+
+      - name: Assemble repo directory
+        run: |
+          mkdir -p repo/rpm
+          if [ -d gh-pages-old/rpm ]; then
+            cp gh-pages-old/rpm/*.rpm repo/rpm/ 2>/dev/null || true
+          fi
+          cp staging/*.rpm repo/rpm/
+
+      - name: Install createrepo_c
+        run: sudo apt-get update && sudo apt-get install -y createrepo-c
+
+      - name: Generate repodata
+        run: createrepo_c --update repo/rpm
+
+      - name: Write .repo file
+        run: |
+          cat > repo/rpm/pokecard.repo << 'EOF'
+          [pokecard]
+          name=PokeCard
+          baseurl=https://willtryon.github.io/pokecard/rpm/
+          enabled=1
+          gpgcheck=0
+          EOF
+
+      - name: Publish to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./repo
+          keep_files: true
