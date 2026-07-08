@@ -11,6 +11,9 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
@@ -283,7 +286,7 @@ public class App extends Application{
             Stage aboutStage = new Stage();
             aboutStage.setTitle("About Pokecard");
             Label name = new Label("Pokecard");
-            Label version = new Label("Version 0.5.1");
+            Label version = new Label("Version 0.6.0");
             Label author = new Label("by willtryon");
             Button close = new Button("Close");
             VBox aboutLayout = new VBox(12, name, version, author, close);
@@ -302,6 +305,26 @@ public class App extends Application{
         mainStage.setScene(new Scene(root, 700, 600));
         mainStage.setTitle("Pokecard");
         mainStage.show();
+
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "pokecard-scheduled-scan");
+            t.setDaemon(true);          // don't keep the JVM alive after the window closes
+            return t;
+        });
+
+        scheduler.scheduleAtFixedRate(() -> Platform.runLater(() -> {
+            Task<Void> tick = new Task<>() {
+                @Override
+                protected Void call() {
+                    ctx.cardDB.scanImports(ctx.importDB(), (msg, frac) -> {
+                        updateMessage(msg);       // now inside THIS task's call(), on its thread
+                        updateProgress(frac, 1.0);
+                    });
+                    return null;
+                }
+            };
+            runTask(tick, v -> {});
+        }), 0, 1, TimeUnit.MINUTES);
     }
 
     private HBox buildStatusBar(){
@@ -414,9 +437,9 @@ class InitTask extends Task<App.AppContext>{
             }
         }
         updateMessage("Indexing imports...");
-        CardImportsIndex importDB = cardDB.newImportsIndex(compareDir, cacheDir);
-        return new App.AppContext(cardDB, importDB, size);
-    }
+        CardImportsIndex importDB = cardDB.newImportsIndex(compareDir, cacheDir);;
+        return new App.AppContext(cardDB,importDB,size);
+        }
 }
 
 class ConfigEditor{
