@@ -39,6 +39,7 @@ public class App extends Application{
     private AppContext ctx;
 
     private Label statusBar;
+    private Label statusTime;
     private ProgressBar statusProgress;
 
     // --- settings model: sidebar sections, each holding typed fields ---
@@ -313,24 +314,30 @@ public class App extends Application{
         });
 
         scheduler.scheduleAtFixedRate(() -> Platform.runLater(() -> {
+            if (!scanRunning.compareAndSet(false, true)) return;
             Task<Void> tick = new Task<>() {
                 @Override
                 protected Void call() {
                     ctx.cardDB.scanImports(ctx.importDB(), (msg, frac) -> {
-                        updateMessage(msg);       // now inside THIS task's call(), on its thread
+                        updateMessage(msg);
                         updateProgress(frac, 1.0);
                     });
                     return null;
                 }
             };
+            tick.setOnSucceeded(e -> scanRunning.set(false));
+            tick.setOnFailed(e -> scanRunning.set(false));
+            tick.setOnCancelled(e -> scanRunning.set(false));
             runTask(tick, v -> {});
         }), 0, 1, TimeUnit.MINUTES);
     }
 
     private HBox buildStatusBar(){
         statusBar = new Label("Ready.");
+        statusTime = new Label("");
         statusProgress = new ProgressBar();
         statusProgress.setPrefWidth(120);
+        statusTime.setVisible(false);
         statusProgress.setVisible(false);
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -341,31 +348,33 @@ public class App extends Application{
         return bar;
     }
 
+    private Task<?> currentStatusTask;
+    private final AtomicBoolean scanRunning = new AtomicBoolean(false);
+
     private <T> void runTask(Task<T> task, Consumer<T> onSuccess){
+        currentStatusTask = task;
         statusBar.textProperty().bind(task.messageProperty());
         statusProgress.progressProperty().bind(task.progressProperty());
         statusProgress.setVisible(true);
-        task.setOnSucceeded(e ->{
-            finishTask();
-            if(onSuccess != null){
-                onSuccess.accept(task.getValue());
-            }
+        task.setOnSucceeded(e -> {
+            finishTask(task);
+            if (onSuccess != null) onSuccess.accept(task.getValue());
         });
-        task.setOnFailed(e -> {
-            finishTask();
-            showError(task.getException());
-        });
-        task.setOnCancelled(e -> finishTask());
-        Thread t = new Thread(task, "pokecard-task");
+        task.setOnFailed(e -> { finishTask(task); showError(task.getException()); });
+        task.setOnCancelled(e -> finishTask(task));
+        Thread t = new Thread(task);
         t.setDaemon(true);
         t.start();
     }
 
-    private void finishTask(){
-        statusBar.textProperty().unbind();
-        statusProgress.progressProperty().unbind();
-        statusBar.setText("Ready.");
-        statusProgress.setVisible(false);
+    private void finishTask(Task<?> task){
+        if (currentStatusTask == task){       // only the task that's still "current" may unbind
+            statusBar.textProperty().unbind();
+            statusProgress.progressProperty().unbind();
+            statusBar.setText("Ready.");
+            statusProgress.setVisible(false);
+            currentStatusTask = null;
+        }
     }
 
     private void showError(Throwable ex){

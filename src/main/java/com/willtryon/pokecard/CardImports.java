@@ -77,6 +77,17 @@ public class CardImports {
         return sb.toString();
     }
 
+    public int howLowIsHash(){
+        String subject = orbMatch.cardID();
+        for(int c = 0; c<recordRecord.size();c++){
+            if(!(recordRecord.get(c).getCardID().equals(subject))){
+               continue;
+            }
+            return c;
+        }
+        return -1;
+    }
+
     public String[][] toCsvRows() {
         String q = img.toString();
         return new String[][]{
