@@ -1,19 +1,6 @@
 package com.willtryon.pokecard.gui;
+
 import com.willtryon.pokecard.*;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.Statement;
-import java.util.*;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
-
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
@@ -26,8 +13,21 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import javafx.stage.*;
-
-import javax.smartcardio.Card;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import java.util.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 public class App extends Application{
 
@@ -36,6 +36,7 @@ public class App extends Application{
     private AppContext ctx;
 
     private Label statusBar;
+    private Label statusTime;
     private ProgressBar statusProgress;
 
     // --- settings model: sidebar sections, each holding typed fields ---
@@ -277,13 +278,16 @@ public class App extends Application{
             }
         });
 
-        exitItem.setOnAction(e -> Platform.exit());
+        exitItem.setOnAction(e -> {
+            ctx.cardDB.shutdown();
+            Platform.exit();
+        });
 
         aboutItem.setOnAction(e -> {
             Stage aboutStage = new Stage();
             aboutStage.setTitle("About Pokecard");
             Label name = new Label("Pokecard");
-            Label version = new Label("Version 0.5.1");
+            Label version = new Label("Version 0.5.2");
             Label author = new Label("by willtryon");
             Button close = new Button("Close");
             VBox aboutLayout = new VBox(12, name, version, author, close);
@@ -298,16 +302,48 @@ public class App extends Application{
         root.setTop(menuBar);
         root.setCenter(center);
         root.setBottom(buildStatusBar());
+        TreeItem<String> rootItem = new TreeItem<>("Project Files");
+        TreeItem<String> cardsItem = new TreeItem<>("Cards");
 
+        //root.setLeft(buildSideTree(ctx.cardDB, ctx.importDB()));
+        Alert a = new Alert(Alert.AlertType.INFORMATION, "To safely exit the program, click 'Quit' in the file menu. \nIf you click the x, the program will halt and you'll have to kill the program in the terminal.", ButtonType.OK);
+        a.setHeaderText("Notice");
+        a.showAndWait();
         mainStage.setScene(new Scene(root, 700, 600));
         mainStage.setTitle("Pokecard");
         mainStage.show();
+
+        /*ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "pokecard-scheduled-scan");
+            t.setDaemon(true);          // don't keep the JVM alive after the window closes
+            return t;
+        });
+
+        scheduler.scheduleAtFixedRate(() -> Platform.runLater(() -> {
+            if (!scanRunning.compareAndSet(false, true)) return;
+            Task<Void> tick = new Task<>() {
+                @Override
+                protected Void call() {
+                    ctx.cardDB.scanImports(ctx.importDB(), (msg, frac) -> {
+                        updateMessage(msg);
+                        updateProgress(frac, 1.0);
+                    });
+                    return null;
+                }
+            };
+            tick.setOnSucceeded(e -> scanRunning.set(false));
+            tick.setOnFailed(e -> scanRunning.set(false));
+            tick.setOnCancelled(e -> scanRunning.set(false));
+            runTask(tick, v -> {});
+        }), 0, 1, TimeUnit.MINUTES);*/
     }
 
     private HBox buildStatusBar(){
         statusBar = new Label("Ready.");
+        statusTime = new Label("");
         statusProgress = new ProgressBar();
         statusProgress.setPrefWidth(120);
+        statusTime.setVisible(false);
         statusProgress.setVisible(false);
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -318,31 +354,42 @@ public class App extends Application{
         return bar;
     }
 
+    /*private TreeView buildSideTree(CardIndex cardDB, CardImportsIndex importDB) {
+        //cardDB.retrieveFileStructure("cards/");
+        TreeItem<String> rootItem = new TreeItem<>("Project Files");
+        TreeItem<String> cardsItem = new TreeItem<>("Cards");
+        TreeItem<String> importsItem = new TreeItem<>("Imports");
+        rootItem.getChildren().addAll(cardsItem, importsItem);
+        return new TreeView<>(rootItem);
+    }*/
+
+    private Task<?> currentStatusTask;
+    private final AtomicBoolean scanRunning = new AtomicBoolean(false);
+
     private <T> void runTask(Task<T> task, Consumer<T> onSuccess){
+        currentStatusTask = task;
         statusBar.textProperty().bind(task.messageProperty());
         statusProgress.progressProperty().bind(task.progressProperty());
         statusProgress.setVisible(true);
-        task.setOnSucceeded(e ->{
-            finishTask();
-            if(onSuccess != null){
-                onSuccess.accept(task.getValue());
-            }
+        task.setOnSucceeded(e -> {
+            finishTask(task);
+            if (onSuccess != null) onSuccess.accept(task.getValue());
         });
-        task.setOnFailed(e -> {
-            finishTask();
-            showError(task.getException());
-        });
-        task.setOnCancelled(e -> finishTask());
-        Thread t = new Thread(task, "pokecard-task");
+        task.setOnFailed(e -> { finishTask(task); showError(task.getException()); });
+        task.setOnCancelled(e -> finishTask(task));
+        Thread t = new Thread(task);
         t.setDaemon(true);
         t.start();
     }
 
-    private void finishTask(){
-        statusBar.textProperty().unbind();
-        statusProgress.progressProperty().unbind();
-        statusBar.setText("Ready.");
-        statusProgress.setVisible(false);
+    private void finishTask(Task<?> task){
+        if (currentStatusTask == task){       // only the task that's still "current" may unbind
+            statusBar.textProperty().unbind();
+            statusProgress.progressProperty().unbind();
+            statusBar.setText("Ready.");
+            statusProgress.setVisible(false);
+            currentStatusTask = null;
+        }
     }
 
     private void showError(Throwable ex){
@@ -414,9 +461,9 @@ class InitTask extends Task<App.AppContext>{
             }
         }
         updateMessage("Indexing imports...");
-        CardImportsIndex importDB = cardDB.newImportsIndex(compareDir, cacheDir);
-        return new App.AppContext(cardDB, importDB, size);
-    }
+        CardImportsIndex importDB = cardDB.newImportsIndex(compareDir, cacheDir);;
+        return new App.AppContext(cardDB,importDB,size);
+        }
 }
 
 class ConfigEditor{

@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.willtryon</groupId>
     <artifactId>pokecard</artifactId>   
-    <version>0.5.1</version>
+    <version>0.5.2</version>
     <packaging>jar</packaging>
 
     <properties>

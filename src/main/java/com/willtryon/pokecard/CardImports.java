@@ -1,5 +1,7 @@
 package com.willtryon.pokecard;
 
+import dev.brachtendorf.jimagehash.hash.Hash;
+
 import java.nio.file.Path;
 import java.util.List;
 
@@ -8,6 +10,7 @@ public class CardImports {
     public record Match(String cardID, String img, double winner) {}
 
     private final Path img;
+    private final Hash qHash;
     private final Match hashMatch;
     private final Match orbMatch;
     private final List<Double> recordScore;
@@ -15,8 +18,9 @@ public class CardImports {
     private final List<Double> recordScore2;
     private final List<CardSignature> recordRecord2;
 
-    public CardImports(Path img, Match hashMatch, Match orbMatch, List<Double> recordScore, List<CardSignature> recordRecord, List<Double> recordScore2, List<CardSignature> recordRecord2) {
+    public CardImports(Path img, Hash qHash, Match hashMatch, Match orbMatch, List<Double> recordScore, List<CardSignature> recordRecord, List<Double> recordScore2, List<CardSignature> recordRecord2) {
         this.img = img;
+        this.qHash = qHash;
         this.hashMatch  = hashMatch;
         this.orbMatch   = orbMatch;
         this.recordScore = recordScore;
@@ -28,6 +32,8 @@ public class CardImports {
     public Path getQueryImage() {
         return img; 
     }
+
+    public Hash getQueryHash() {return qHash;}
 
     public Match getHashWinner(){
         return hashMatch;
@@ -52,7 +58,7 @@ public class CardImports {
         if(args.equals("hash")){
             return recordRecord.get(loc);
         }
-        return recordRecord.get(loc);
+        return recordRecord2.get(loc);
     }
 
     public String getHashedRecordHistory(){
@@ -69,6 +75,17 @@ public class CardImports {
             sb.append("\n"+recordRecord2.get(i).getCardID()+" "+recordRecord2.get(i).getStringImgPath()+" "+recordScore2.get(i));
         }
         return sb.toString();
+    }
+
+    public int howLowIsHash(){
+        String subject = orbMatch.cardID();
+        for(int c = 0; c<recordRecord.size();c++){
+            if(!(recordRecord.get(c).getCardID().equals(subject))){
+               continue;
+            }
+            return c;
+        }
+        return -1;
     }
 
     public String[][] toCsvRows() {

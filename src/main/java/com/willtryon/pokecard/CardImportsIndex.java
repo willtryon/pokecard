@@ -1,9 +1,10 @@
 package com.willtryon.pokecard;
 import java.io.*;
+import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.stream.Collectors;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 import dev.brachtendorf.jimagehash.hash.Hash;
@@ -12,6 +13,7 @@ import dev.brachtendorf.jimagehash.hashAlgorithms.PerceptiveHash;
 import org.bytedeco.opencv.opencv_features2d.ORB;
 
 public class CardImportsIndex {
+    private String guess;
     private final Path compareDir;
     private final List<CardSignature> hashed;
     private final CardIndex cardDB;
@@ -28,9 +30,13 @@ public class CardImportsIndex {
         this.cardDB = cardDB;
     }
 
-    public List<CardImports> scan(){ return scan(null); }
+    public List<CardImports> scan(){
+        return scan(null);
+    }
 
     public synchronized List<CardImports> scan(ScanProgress progress){
+        guess = "";
+        long beginOrbJob = System.currentTimeMillis();
         List<CardImports> fresh = new ArrayList<>();
         System.out.println("Scanning "+ compareDir+" for new images...");
         try (Stream<Path> stream = Files.walk(compareDir)){
@@ -39,10 +45,16 @@ public class CardImportsIndex {
                     String s = path.toString().toLowerCase();
                     return s.endsWith(".jpg") || s.endsWith(".png");
                 })
-                .collect(Collectors.toList());
+                .toList();
             long count = imgList.size();
             int loc = 0;
+            long [] times = new long[(int)count];
+            for(int i = 0; i < count; i++){ times[i] = 0; }
             for(Path path : imgList){
+                if(!(loc < 1)){
+                    guess = niceTimer(beginOrbJob,loc, imgList, times);
+                    beginOrbJob = System.currentTimeMillis();
+                }
                 loc++;
                 Hash qHash;
                 try{
@@ -53,18 +65,27 @@ public class CardImportsIndex {
                 if(isDuplicate(qHash)){
                     continue;
                 }
-                CardImports result = compareOne(path, qHash, loc, count, progress);
+                CardImports result = compareOne(path, qHash, loc, count, progress, guess);
                 if (result != null){
                     fresh.add(result);
                     seenHashes.add(qHash);
                     imports.add(result);
-                    System.out.println(result.getHashedRecordHistory());
-                    System.out.println(result.getORBRecordHistory());
+                    //System.out.println(result.getHashedRecordHistory());
+                    //System.out.println(result.getORBRecordHistory());
 
                 }
             }
         }catch(IOException e){
             e.printStackTrace();
+        }
+        for(CardImports f : fresh){
+            if(f.howLowIsHash() == -1){
+                System.out.println("No match found for "+f.getQueryImage().getFileName().toString());
+                continue;
+            }
+            System.out.println("\n"+f.getQueryImage().getFileName().toString());
+            System.out.println("The hash result that matches the orb winner " +f.getOrbWinner().cardID());
+            System.out.print(" is "+f.getARecordRecord(f.howLowIsHash(), "hash").getCardID() +"at position "+f.howLowIsHash());
         }
         return fresh;
     }
@@ -80,20 +101,20 @@ public class CardImportsIndex {
 
     public synchronized CardImports scanOne(Path image, ScanProgress progress) throws IOException{
         Hash qHash = hasher.hash(new File(image.toString()));
-        CardImports result = compareOne(image, qHash, 1, 1, progress);
+        CardImports result = compareOne(image, qHash, 1, 1, progress, guess);
         if (result != null){ seenHashes.add(qHash); imports.add(result); }
         if (progress != null) progress.report("Scan complete", 1.0);
         return result;
     }
 
-    private CardImports compareOne(Path path, Hash test, int loc, long count, ScanProgress progress) {
+    private CardImports compareOne(Path path, Hash test, int loc, long count, ScanProgress progress, String guess) {
         File victim = new File(path.toString());
         PriorityQueue<Scored> topHash = new PriorityQueue<>(Comparator.comparingDouble((Scored s) -> s.score()).reversed());
-		for (int i = 0; i < hashed.size(); i++) {
-		    double comp = test.normalizedHammingDistance(hashed.get(i).getBinaryHash());
-		    topHash.offer(new Scored(hashed.get(i), comp));
-		    if (topHash.size()>1000) topHash.poll();
-		}
+        for (CardSignature cardSignature : hashed) {
+            double comp = test.normalizedHammingDistance(cardSignature.getBinaryHash());
+            topHash.offer(new Scored(cardSignature, comp));
+            if (topHash.size() > 20000) topHash.poll();
+        }
 		List <Scored> hashSorted = new ArrayList<>(topHash);
 		hashSorted.sort(Comparator.comparingDouble(Scored::score));
 		Scored bestHash = hashSorted.get(0);
@@ -102,10 +123,10 @@ public class CardImportsIndex {
 		CardImports.Match hashMatch = new CardImports.Match(bestHash.sig.getCardID(), bestHash.sig.getStringImgPath(), bestHash.score());
 		List<CardSignature> recordRecord = new ArrayList<>();
 		List<Double> recordScore = new ArrayList<>();
-		for(int s = 0; s<hashSorted.size();s++){
-		    recordRecord.add(hashSorted.get(s).sig());
-		    recordScore.add(hashSorted.get(s).score());
-		}
+        for (Scored value : hashSorted) {
+            recordRecord.add(value.sig());
+            recordScore.add(value.score());
+        }
 
 		// ---- ORB pass (higher is closer) ----
 		ORB orb = ORB.create();
@@ -113,40 +134,34 @@ public class CardImportsIndex {
 		PriorityQueue<Scored> bottomOrb = new PriorityQueue<>(Comparator.comparingDouble((Scored s)->s.score()));
 		long startTime = System.currentTimeMillis();
         int lastPct = -1;
-		for (int i = 0; i < hashed.size(); i++) {
-		    int comp = cardDB.geometricMatches(test2.descriptors, test2.keypoints, hashed.get(i).getMatData(), hashed.get(i).getKeypoints());
-		    bottomOrb.offer(new Scored(hashed.get(i), comp));
-		    if(bottomOrb.size()>1000) bottomOrb.poll();
-		    String percent = String.format("%.0f", ((double) i / hashed.size()) * 100);
-		    System.out.println("\033[0F\033[K" + percent + "% " + cardDB.timer(startTime) + " ("+loc+"/"+count+")");
-            if (progress != null) {                                    // <-- new
-                int pct = (int) (((double) i / hashed.size()) * 100);
-                if (pct != lastPct) {                                  // throttle: only on % change
-                    lastPct = pct;
-                    double overall = ((loc - 1) + (double) i / hashed.size()) / count;
-                    progress.report("Scanning " + victim.getName() + "  (" + loc + "/" + count + ")", overall);
-                }
-            }
-		}
+        double[] orbScores = cardDB.scoreOrbParallel(test2, hashed);
+        for (int i = 0; i < hashed.size(); i++) {
+            bottomOrb.offer(new Scored(hashed.get(i), orbScores[i]));
+            if (bottomOrb.size() > 20000) bottomOrb.poll();
+        }
+        if (progress != null) {
+            double overall = (double) loc / count;
+            progress.report("Scanning " + victim.getName() + "  (" + loc + "/" + count + ") " + guess + ".", overall);
+        }
 		List<Scored> orbSorted = new ArrayList<>(bottomOrb);
 		orbSorted.sort(Comparator.comparingDouble(Scored::score).reversed());
-		Scored bestOrb = orbSorted.get(0);
+		Scored bestOrb = orbSorted.getFirst();
 		System.out.println("\nUploaded image " + victim + " appears to be closest to " + bestOrb.sig.getStringImgPath() + ". (ORB)");
 		System.out.println(bestOrb.score());
 		CardImports.Match orbMatch = new CardImports.Match(bestOrb.sig.getCardID(), bestOrb.sig.getStringImgPath(), bestOrb.score());
 		List<CardSignature> recordRecord2 = new ArrayList<>();
 		List<Double> recordScore2 = new ArrayList<>();
-		for(int s = 0; s<orbSorted.size(); s++){
-		    recordRecord2.add(orbSorted.get(s).sig());
-		    recordScore2.add(orbSorted.get(s).score());
-		}
-		return new CardImports(path, hashMatch, orbMatch, recordScore, recordRecord, recordScore2, recordRecord2);
+        for (Scored scored : orbSorted) {
+            recordRecord2.add(scored.sig());
+            recordScore2.add(scored.score());
+        }
+		return new CardImports(path, test, hashMatch, orbMatch, recordScore, recordRecord, recordScore2, recordRecord2);
     }
 
     public List<CardImports> getImports() { return imports; }
 
     public CardImports getLastImports() {
-        return imports.isEmpty() ? null : imports.get(imports.size() - 1);
+        return imports.isEmpty() ? null : imports.getLast();
     }
 
     public List<String[]> toCsvData() {
@@ -161,41 +176,58 @@ public class CardImportsIndex {
 
 
     //I write session information to the disk
-    private static final int IMPORTS_FORMAT_VERSION = 1;
+    private static final int IMPORTS_FORMAT_VERSION = 2;
 
     public void writeImportsToDisk(Path cacheDir) {
         Path path = cacheDir.resolve("imports.dat");
         try (DataOutputStream dos = new DataOutputStream(
                 new BufferedOutputStream(new FileOutputStream(path.toFile())))) {
 
+            // query-hash params are identical for every import (one hasher)
+            int bits = 0, algo = 0;
+            for (CardImports ci : imports) {
+                Hash h = ci.getQueryHash();
+                if (h != null) { bits = h.getBitResolution(); algo = h.getAlgorithmId(); break; }
+            }
             dos.writeInt(IMPORTS_FORMAT_VERSION);
+            dos.writeInt(bits);
+            dos.writeInt(algo);
             dos.writeInt(imports.size());
 
             for (CardImports ci : imports) {
                 Path q = ci.getQueryImage();
                 dos.writeUTF(q != null ? q.toString() : "");
 
-                CardImports.Match hm = ci.getHashWinner();
-                dos.writeUTF(hm != null && hm.cardID() != null ? hm.cardID() : "");
-                dos.writeUTF(hm != null && hm.img()    != null ? hm.img()    : "");
-                dos.writeDouble(hm != null ? hm.winner() : 0.0);
+                Hash qh = ci.getQueryHash();
+                dos.writeUTF(qh != null ? qh.getHashValue().toString(16) : "");
 
-                // full hash ranking: store cardID + score, NOT the CardSignature
-                int n = ci.getRecordSize();
-                dos.writeInt(n);
-                for (int i = 0; i < n; i++) {
-                    CardSignature sig = ci.getARecordRecord(i, "hash");
-                    dos.writeUTF(sig != null && sig.getCardID() != null ? sig.getCardID() : "");
-                    dos.writeDouble(ci.getARecordScore(i, "hash"));
-                }
+                writeMatch(dos, ci.getHashWinner());
+                writeMatch(dos, ci.getOrbWinner());
+
+                writeRanking(dos, ci, "hash");
+                writeRanking(dos, ci, "orb");   // same length as hash side by construction
             }
         } catch (IOException e) {
             System.out.println("Failed to write imports cache: " + e.getMessage());
         }
     }
 
+    private void writeMatch(DataOutputStream dos, CardImports.Match m) throws IOException {
+        dos.writeUTF(m != null && m.cardID() != null ? m.cardID() : "");
+        dos.writeUTF(m != null && m.img()    != null ? m.img()    : "");
+        dos.writeDouble(m != null ? m.winner() : 0.0);
+    }
 
-    //I read session information from the disk
+    private void writeRanking(DataOutputStream dos, CardImports ci, String side) throws IOException {
+        int n = ci.getRecordSize();
+        dos.writeInt(n);
+        for (int i = 0; i < n; i++) {
+            CardSignature sig = ci.getARecordRecord(i, side);
+            dos.writeUTF(sig != null && sig.getCardID() != null ? sig.getCardID() : "");
+            dos.writeDouble(ci.getARecordScore(i, side));
+        }
+    }
+
     public void readImportsFromDisk(Path cacheDir) {
         Path path = cacheDir.resolve("imports.dat");
         if (!Files.exists(path)) {
@@ -203,7 +235,6 @@ public class CardImportsIndex {
             return;
         }
 
-        // cardID -> live CardSignature, re-linked from the DB already in memory
         Map<String, CardSignature> byId = new HashMap<>();
         for (CardSignature c : hashed) {
             if (c != null && c.getCardID() != null) byId.put(c.getCardID(), c);
@@ -214,43 +245,100 @@ public class CardImportsIndex {
 
             int version = dis.readInt();
             if (version != IMPORTS_FORMAT_VERSION) {
-                System.out.println("Imports cache version mismatch; skipping load.");
+                System.out.println("Imports cache version mismatch (found " + version +
+                        ", expected " + IMPORTS_FORMAT_VERSION + "); skipping load.");
                 return;
             }
+            int bits = dis.readInt();
+            int algo = dis.readInt();
             int importCount = dis.readInt();
 
             List<CardImports> loaded = new ArrayList<>(importCount);
+            List<Hash> loadedHashes  = new ArrayList<>(importCount);
+
             for (int j = 0; j < importCount; j++) {
                 String qStr = dis.readUTF();
                 Path q = qStr.isEmpty() ? null : Path.of(qStr);
 
-                String hmId  = dis.readUTF();
-                String hmImg = dis.readUTF();
-                double hmWin = dis.readDouble();
-                CardImports.Match hashMatch = new CardImports.Match(hmId, hmImg, hmWin);
+                String qHex = dis.readUTF();
+                Hash qHash = qHex.isEmpty() ? null : new Hash(new BigInteger(qHex, 16), bits, algo);
 
-                int n = dis.readInt();
-                List<CardSignature> recordRecord = new ArrayList<>(n);
-                List<Double> recordScore = new ArrayList<>(n);
-                for (int i = 0; i < n; i++) {
-                    String id = dis.readUTF();
-                    double score = dis.readDouble();
-                    CardSignature sig = byId.get(id);
-                    if (sig == null) continue;      // card no longer in DB; drop this row
-                    recordRecord.add(sig);
-                    recordScore.add(score);
-                }
+                CardImports.Match hashMatch = readMatch(dis);
+                CardImports.Match orbMatch  = readMatch(dis);
 
-                // ORB side intentionally empty (never persisted)
-                loaded.add(new CardImports(
-                        q, hashMatch, null,
-                        recordScore, recordRecord,
-                        new ArrayList<>(), new ArrayList<>()));
+                List<CardSignature> recordRecord  = new ArrayList<>();
+                List<Double>        recordScore   = new ArrayList<>();
+                readRanking(dis, byId, recordRecord, recordScore);
+
+                List<CardSignature> recordRecord2 = new ArrayList<>();
+                List<Double>        recordScore2  = new ArrayList<>();
+                readRanking(dis, byId, recordRecord2, recordScore2);
+
+                loaded.add(new CardImports(q, qHash, hashMatch, orbMatch,
+                        recordScore, recordRecord, recordScore2, recordRecord2));
+                if (qHash != null) loadedHashes.add(qHash);
             }
-            imports.clear();
-            imports.addAll(loaded);
+
+            // overwrite in place: the results AND the dedup set that makes re-scans skip them
+            imports.clear();    imports.addAll(loaded);
+            seenHashes.clear(); seenHashes.addAll(loadedHashes);
+            System.out.println("Loaded " + loaded.size() + " imports (" +
+                    loadedHashes.size() + " will be skipped on re-scan).");
         } catch (IOException e) {
             System.out.println("Failed to read imports cache: " + e.getMessage());
         }
+    }
+
+    private CardImports.Match readMatch(DataInputStream dis) throws IOException {
+        String id  = dis.readUTF();
+        String img = dis.readUTF();
+        double win = dis.readDouble();
+        return id.isEmpty() ? null : new CardImports.Match(id, img, win);
+    }
+
+    private void readRanking(DataInputStream dis, Map<String, CardSignature> byId,
+                             List<CardSignature> outSigs, List<Double> outScores) throws IOException {
+        int n = dis.readInt();
+        for (int i = 0; i < n; i++) {
+            String id = dis.readUTF();
+            double score = dis.readDouble();
+            CardSignature sig = byId.get(id);
+            if (sig == null) continue;   // card no longer in DB
+            outSigs.add(sig);
+            outScores.add(score);
+        }
+    }
+
+    private String niceTimer(long startTime, int loc, List<Path>imgList, long[] times) {
+        long elapsed = System.currentTimeMillis() - startTime;
+        times[loc] = elapsed;
+
+        // Weighted average: recent items count more, but use all completed samples
+        int completed = loc + 1;
+        long sum = 0;
+        for (int i = 0; i < completed; i++) {
+            sum += times[i];
+        }
+        long avgPerItem = sum / completed;
+
+        long remainingItems = imgList.size() - completed;
+        long guess = avgPerItem * remainingItems;
+
+        long hours   = guess / 3600000;
+        long minutes = (guess % 3600000) / 60000;
+        long seconds = (guess % 60000) / 1000;
+
+        StringBuilder sb = new StringBuilder("about ");
+        if (hours > 0) {
+            sb.append(hours).append(hours == 1 ? " hour " : " hours ");
+            //sb.append(minutes).append(minutes == 1 ? " minute" : " minutes");
+        } else if (minutes > 0) {
+            sb.append(minutes).append(minutes == 1 ? " minute " : " minutes ");
+            //sb.append(seconds).append(seconds == 1 ? " second" : " seconds");
+        } else {
+            sb.append(seconds).append(seconds == 1 ? " second " : " seconds ");
+        }
+        sb.append("remaining");
+        return sb.toString();
     }
 }
