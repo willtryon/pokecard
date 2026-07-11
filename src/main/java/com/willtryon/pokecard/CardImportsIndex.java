@@ -83,7 +83,7 @@ public class CardImportsIndex {
                 continue;
             }
             System.out.println("\n"+f.getQueryImage().getFileName().toString());
-            System.out.println("The hash result that matches the orb winner " +f.getHashWinner().cardID());
+            System.out.println("The hash result that matches the orb winner " +f.getOrbWinner().cardID());
             System.out.print(" is "+f.getARecordRecord(f.howLowIsHash(), "hash").getCardID() +"at position "+f.howLowIsHash());
         }
         return fresh;
@@ -341,14 +341,14 @@ public class CardImportsIndex {
         StringBuilder sb = new StringBuilder("about ");
         if (hours > 0) {
             sb.append(hours).append(hours == 1 ? " hour " : " hours ");
-            sb.append(minutes).append(minutes == 1 ? " minute" : " minutes");
+            //sb.append(minutes).append(minutes == 1 ? " minute" : " minutes");
         } else if (minutes > 0) {
             sb.append(minutes).append(minutes == 1 ? " minute " : " minutes ");
-            sb.append(seconds).append(seconds == 1 ? " second" : " seconds");
+            //sb.append(seconds).append(seconds == 1 ? " second" : " seconds");
         } else {
             sb.append(seconds).append(seconds == 1 ? " second" : " seconds");
         }
-        sb.append(" remaining");
+        sb.append("remaining");
         return sb.toString();
     }
 }

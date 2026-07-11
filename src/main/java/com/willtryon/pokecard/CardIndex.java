@@ -1,4 +1,5 @@
 package com.willtryon.pokecard;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Stream;
 import java.io.*;
@@ -110,12 +111,6 @@ public class CardIndex{
         String result = String.format("%.0f", ((double) line / size) * 100);
         System.out.println(result + "% passed.\n\n");
         writeToTxt("log.txt", data);
-        System.out.println("Done calculating image data. Writing the data to the disk will take about 620MB. Do you want save the data?(y/n)");
-        String check = scan.nextLine();
-        if(check.matches("[yY]")){
-            System.out.println("Writing cache to the disk...");
-            writeToDisk(cacheDir);
-        }
     }
 
    public CardIndex(Path imagesDir, Path outputDir, Path cacheDir) {
@@ -127,7 +122,7 @@ public class CardIndex{
 
     private Path resolveImage(Path imagesDir, String expName, String cardId, String expCardNumber){
         String folder = (expName == null ? "" : expName.replace(" ", "-"));
-        Path dir = imagesDir.resolve(folder);
+        Path dir = imagesDir.resolve("cards/"+folder);
        //bail out if normal file path is correct (about 77% chance it is)
         Path exact = dir.resolve(cardId.replace("/", "-") + ".jpg");
         if (Files.exists(exact)){
@@ -409,7 +404,35 @@ public class CardIndex{
         csvOutput("ImageComparisonOutput.csv", outputDir, rows);
     }
 
+    /*public void retrieveFileStructure(String args){
+        Path masterPath = imagesDir.resolve(args);
 
+        try {
+            long subfolderCount;
+            try (Stream<Path> stream = Files.list(masterPath)) {
+                subfolderCount = stream.filter(Files::isDirectory).count();
+            }
+            System.out.println("Total number of subfolders: " + subfolderCount);
+            System.out.println("----------------------------------------");
+            String [][] files;
+            try (Stream<Path> stream = Files.list(masterPath)) {
+                stream.filter(Files::isDirectory).forEach(subfolder -> {
+                    try (Stream<Path> fileStream = Files.list(subfolder)) {
+                        files[0] = subfolder.toString();
+                        List<String> fileList = new ArrayList<>();
+                        fileList = Collections.singletonList(fileStream.filter(Files::isRegularFile).toList().toString());
+                        System.out.println("Subfolder: " + subfolder.getFileName() + " | Files inside: " + fileCount);
+                        files[0] = fileList.toArray(new String[0]);
+
+                    } catch (IOException e) {
+                        System.err.println("Could not read subfolder: " + subfolder + " - " + e.getMessage());
+                    }
+                });
+            }
+        } catch (IOException e) {
+            System.err.println("Error reading the root directory: " + e.getMessage());
+        }
+    }*/
 
     public void writeToDisk(Path cacheDir) {
         Path xmlPath = cacheDir.resolve("cache.xml");

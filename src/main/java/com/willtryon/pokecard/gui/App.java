@@ -1,6 +1,18 @@
 package com.willtryon.pokecard.gui;
-import com.willtryon.pokecard.*;
 
+import com.willtryon.pokecard.*;
+import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.concurrent.Task;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Node;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.layout.*;
+import javafx.stage.*;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -16,21 +28,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
-
-import javafx.application.Application;
-import javafx.application.Platform;
-import javafx.concurrent.Task;
-import javafx.geometry.Insets;
-import javafx.geometry.Pos;
-import javafx.scene.Node;
-import javafx.scene.Scene;
-import javafx.scene.control.*;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
-import javafx.scene.layout.*;
-import javafx.stage.*;
-
-import javax.smartcardio.Card;
 
 public class App extends Application{
 
@@ -302,6 +299,10 @@ public class App extends Application{
         root.setTop(menuBar);
         root.setCenter(center);
         root.setBottom(buildStatusBar());
+        TreeItem<String> rootItem = new TreeItem<>("Project Files");
+        TreeItem<String> cardsItem = new TreeItem<>("Cards");
+
+        root.setLeft(buildSideTree(ctx.cardDB, ctx.importDB()));
 
         mainStage.setScene(new Scene(root, 700, 600));
         mainStage.setTitle("Pokecard");
@@ -346,6 +347,15 @@ public class App extends Application{
         bar.setPadding(new Insets(4, 8, 4, 8));
         bar.setStyle("-fx-border-color: #cccccc; -fx-border-width: 1 0 0 0;");
         return bar;
+    }
+
+    private TreeView buildSideTree(CardIndex cardDB, CardImportsIndex importDB) {
+        //cardDB.retrieveFileStructure("cards/");
+        TreeItem<String> rootItem = new TreeItem<>("Project Files");
+        TreeItem<String> cardsItem = new TreeItem<>("Cards");
+        TreeItem<String> importsItem = new TreeItem<>("Imports");
+        rootItem.getChildren().addAll(cardsItem, importsItem);
+        return new TreeView<>(rootItem);
     }
 
     private Task<?> currentStatusTask;
