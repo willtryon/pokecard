@@ -278,13 +278,16 @@ public class App extends Application{
             }
         });
 
-        exitItem.setOnAction(e -> Platform.exit());
+        exitItem.setOnAction(e -> {
+            ctx.cardDB.shutdown();
+            Platform.exit();
+        });
 
         aboutItem.setOnAction(e -> {
             Stage aboutStage = new Stage();
             aboutStage.setTitle("About Pokecard");
             Label name = new Label("Pokecard");
-            Label version = new Label("Version 0.6.0");
+            Label version = new Label("Version 0.5.2");
             Label author = new Label("by willtryon");
             Button close = new Button("Close");
             VBox aboutLayout = new VBox(12, name, version, author, close);
@@ -302,13 +305,15 @@ public class App extends Application{
         TreeItem<String> rootItem = new TreeItem<>("Project Files");
         TreeItem<String> cardsItem = new TreeItem<>("Cards");
 
-        root.setLeft(buildSideTree(ctx.cardDB, ctx.importDB()));
-
+        //root.setLeft(buildSideTree(ctx.cardDB, ctx.importDB()));
+        Alert a = new Alert(Alert.AlertType.INFORMATION, "To safely exit the program, click 'Quit' in the file menu. \nIf you click the x, the program will halt and you'll have to kill the program in the terminal.", ButtonType.OK);
+        a.setHeaderText("Notice");
+        a.showAndWait();
         mainStage.setScene(new Scene(root, 700, 600));
         mainStage.setTitle("Pokecard");
         mainStage.show();
 
-        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+        /*ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "pokecard-scheduled-scan");
             t.setDaemon(true);          // don't keep the JVM alive after the window closes
             return t;
@@ -330,7 +335,7 @@ public class App extends Application{
             tick.setOnFailed(e -> scanRunning.set(false));
             tick.setOnCancelled(e -> scanRunning.set(false));
             runTask(tick, v -> {});
-        }), 0, 1, TimeUnit.MINUTES);
+        }), 0, 1, TimeUnit.MINUTES);*/
     }
 
     private HBox buildStatusBar(){
@@ -349,14 +354,14 @@ public class App extends Application{
         return bar;
     }
 
-    private TreeView buildSideTree(CardIndex cardDB, CardImportsIndex importDB) {
+    /*private TreeView buildSideTree(CardIndex cardDB, CardImportsIndex importDB) {
         //cardDB.retrieveFileStructure("cards/");
         TreeItem<String> rootItem = new TreeItem<>("Project Files");
         TreeItem<String> cardsItem = new TreeItem<>("Cards");
         TreeItem<String> importsItem = new TreeItem<>("Imports");
         rootItem.getChildren().addAll(cardsItem, importsItem);
         return new TreeView<>(rootItem);
-    }
+    }*/
 
     private Task<?> currentStatusTask;
     private final AtomicBoolean scanRunning = new AtomicBoolean(false);

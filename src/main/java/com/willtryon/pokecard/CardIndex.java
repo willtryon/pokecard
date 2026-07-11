@@ -1,6 +1,8 @@
 package com.willtryon.pokecard;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Stream;
 import java.io.*;
 import java.nio.file.Files;
@@ -34,12 +36,16 @@ import static org.bytedeco.opencv.global.opencv_calib3d.findHomography;
 import static org.bytedeco.opencv.global.opencv_calib3d.RANSAC;
 import java.math.BigInteger;
 import org.bytedeco.javacpp.BytePointer;
+import java.util.concurrent.*;
 
 public class CardIndex{
     private final CardSignature [] cardDB;
     private final Path imagesDir;
     private final Path outputDir;
     private final Path cacheDir;
+    private final int orbThreads = Math.max(1, Runtime.getRuntime().availableProcessors() - 1);
+    private final ExecutorService orbPool = Executors.newFixedThreadPool(orbThreads);
+    private boolean firstScan = true;
 
     /*Approach so far is the query sql db and dump its contents for every hit to a new Card obj, which is stored
     in an array of cards...*/
@@ -382,6 +388,41 @@ public class CardIndex{
         return inliers;
     }
 
+    public double[] scoreOrbParallel(Features query, List<CardSignature> candidates) {
+        int n = candidates.size();
+        if (firstScan){
+            System.out.println("Using " + orbThreads + " threads...");
+            firstScan = false;
+        }
+        double[] scores = new double[n];
+        List<Future<?>> futures = new ArrayList<>();
+        // chunk the work so each task scores a contiguous range (less task overhead than one-per-card)
+        int chunk = Math.max(1, n / (orbThreads * 4));
+        for (int start = 0; start < n; start += chunk) {
+            final int s = start;
+            final int e = Math.min(n, start + chunk);
+            futures.add(orbPool.submit(() -> {
+                for (int i = s; i < e; i++) {
+                    CardSignature c = candidates.get(i);
+                    scores[i] = geometricMatches(
+                            query.descriptors, query.keypoints,
+                            c.getMatData(), c.getKeypoints());
+                }
+            }));
+        }
+        for (Future<?> f : futures) {
+            try {
+                f.get();
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException(ie);
+            } catch (ExecutionException ee) {
+                throw new RuntimeException(ee.getCause());
+            }
+        }
+        return scores;
+    }
+
     public CardImportsIndex newImportsIndex(Path compareDir, Path cacheDir){
         List<CardSignature> hashed = new ArrayList<>();
         for(int c = 0; c < cardDB.length; c++){
@@ -657,6 +698,10 @@ public class CardIndex{
         LocalDateTime currentDateTime = LocalDateTime.now();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-HH:mm:ss");
         return currentDateTime.format(formatter);
+    }
+
+    public void shutdown() {
+        orbPool.shutdown();
     }
 
 }
