@@ -268,6 +268,7 @@ public class App extends Application {
             ctx.importDB.readImportsFromDisk(cacheDir);
             List<CardImports> restored = ctx.importDB.getImports();
             System.out.println("Loaded " + restored.size() + " imports.");
+            buildSideTree(ctx.cardDB, ctx.importDB());
             System.out.println(restored.get(0).getORBRecordHistory() + "\n" + restored.get(0).getOrbWinner());
             System.out.println("Done.");
             statusBar.setText("Ready.");
@@ -426,13 +427,13 @@ public class App extends Application {
             CardSignature sig = cardDB.getCardSignature(i);
             if(sig==null) continue;
             bySeries.computeIfAbsent(seriesOf(sig), k ->new ArrayList<>()).add(sig);
-
         }
         for(var e : bySeries.entrySet()){
             TreeItem<SideNode> series = new TreeItem<>(new Group(e.getKey()));
             for(CardSignature sig : e.getValue()){
                 series.getChildren().add(new TreeItem<>(new CardEntry(sig)));
             }
+            cards.getChildren().add(series);
         }
         return cards;
     }

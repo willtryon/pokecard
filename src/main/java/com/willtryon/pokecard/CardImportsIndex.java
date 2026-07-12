@@ -113,7 +113,7 @@ public class CardImportsIndex {
         for (CardSignature cardSignature : hashed) {
             double comp = test.normalizedHammingDistance(cardSignature.getBinaryHash());
             topHash.offer(new Scored(cardSignature, comp));
-            if (topHash.size() > 20000) topHash.poll();
+            if (topHash.size() > 200) topHash.poll();
         }
 		List <Scored> hashSorted = new ArrayList<>(topHash);
 		hashSorted.sort(Comparator.comparingDouble(Scored::score));
@@ -134,10 +134,13 @@ public class CardImportsIndex {
 		PriorityQueue<Scored> bottomOrb = new PriorityQueue<>(Comparator.comparingDouble((Scored s)->s.score()));
 		long startTime = System.currentTimeMillis();
         int lastPct = -1;
-        double[] orbScores = cardDB.scoreOrbParallel(test2, hashed);
-        for (int i = 0; i < hashed.size(); i++) {
-            bottomOrb.offer(new Scored(hashed.get(i), orbScores[i]));
-            if (bottomOrb.size() > 20000) bottomOrb.poll();
+        int K = 200;
+        List<CardSignature> shortlist = hashSorted.stream().limit(K).map(Scored::sig).toList();
+        double[] orbScores = cardDB.scoreOrbParallel(test2, shortlist);
+        //double[] orbScores = cardDB.scoreOrbParallel(test2, hashed);
+        for (int i = 0; i < shortlist.size(); i++) {
+            bottomOrb.offer(new Scored(shortlist.get(i), orbScores[i]));
+            if (bottomOrb.size() > 200) bottomOrb.poll();
         }
         if (progress != null) {
             double overall = (double) loc / count;
