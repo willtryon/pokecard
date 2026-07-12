@@ -610,22 +610,22 @@ public class CardIndex{
                 int rows = dis.readInt();
                 int cols = dis.readInt();
                 int type = dis.readInt();
+                byte[] descBytes = new byte[rows * cols];
+                dis.readFully(descBytes);
                 Mat desc = new Mat(rows, cols, type);
-                UByteIndexer idx = desc.createIndexer();
-                for (int r = 0; r < rows; r++)
-                    for (int c = 0; c < cols; c++)
-                        idx.put(r, c, dis.readByte() & 0xFF);
-                idx.release();
+                desc.data().put(descBytes);
                 long n = dis.readLong();
+                final int KP_BYTES = 28;
+                byte[] kpBytes = new byte[(int)(n * KP_BYTES)];
+                dis.readFully(kpBytes);
+                java.nio.ByteBuffer bb = java.nio.ByteBuffer.wrap(kpBytes);
                 KeyPointVector kp = new KeyPointVector(n);
                 for (long k = 0; k < n; k++) {
-                    kp.get(k).pt().x(dis.readFloat());
-                    kp.get(k).pt().y(dis.readFloat());
-                    kp.get(k).size(dis.readFloat());
-                    kp.get(k).angle(dis.readFloat());
-                    kp.get(k).response(dis.readFloat());
-                    kp.get(k).octave(dis.readInt());
-                    kp.get(k).class_id(dis.readInt());
+                    float x = bb.getFloat();
+                    float y = bb.getFloat();
+                    bb.position(bb.position() + 20);
+                    kp.get(k).pt().x(x);
+                    kp.get(k).pt().y(y);
                 }
                 if (db[i] != null) {
                     String pStr = db[i].getStringImgPath();
