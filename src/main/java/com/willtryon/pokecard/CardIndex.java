@@ -1,5 +1,4 @@
 package com.willtryon.pokecard;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -43,13 +42,13 @@ public class CardIndex{
     private final Path imagesDir;
     private final Path outputDir;
     private final Path cacheDir;
-    private final int orbThreads = Math.max(1, Runtime.getRuntime().availableProcessors() - 1);
-    private final ExecutorService orbPool = Executors.newFixedThreadPool(orbThreads);
+    private final ExecutorService executor;
     private boolean firstScan = true;
+    private int orbThreads;
 
     /*Approach so far is the query sql db and dump its contents for every hit to a new Card obj, which is stored
     in an array of cards...*/
-    public CardIndex(int size, String url, Path imagesDir, Path outputDir, Path cacheDir) throws SQLException, FileNotFoundException {
+    public CardIndex(int size, String url, Path imagesDir, Path outputDir, Path cacheDir, int orbThreads) throws SQLException, FileNotFoundException {
         int line = 0;
         int failed = 0;
         int passed = 0;
@@ -57,6 +56,8 @@ public class CardIndex{
         this.imagesDir = imagesDir;
         this.outputDir = outputDir;
         this.cacheDir = cacheDir;
+        this.orbThreads = orbThreads;
+        this.executor = Executors.newFixedThreadPool(orbThreads);
         List<String[]> data = new ArrayList<>();
         HashingAlgorithm hasher = new PerceptiveHash(64);
         Scanner scan = new Scanner(System.in);
@@ -119,11 +120,12 @@ public class CardIndex{
         writeToTxt("log.txt", data);
     }
 
-   public CardIndex(Path imagesDir, Path outputDir, Path cacheDir) {
+   public CardIndex(Path imagesDir, Path outputDir, Path cacheDir, int orbThreads) {
         this.imagesDir = imagesDir;
         this.outputDir = outputDir;
         this.cacheDir = cacheDir;
         this.cardDB = readFromDisk(cacheDir);
+        this.executor = Executors.newFixedThreadPool(orbThreads);
     }
 
     private Path resolveImage(Path imagesDir, String expName, String cardId, String expCardNumber){
@@ -401,7 +403,7 @@ public class CardIndex{
         for (int start = 0; start < n; start += chunk) {
             final int s = start;
             final int e = Math.min(n, start + chunk);
-            futures.add(orbPool.submit(() -> {
+            futures.add(executor.submit(() -> {
                 for (int i = s; i < e; i++) {
                     CardSignature c = candidates.get(i);
                     scores[i] = geometricMatches(
@@ -701,7 +703,7 @@ public class CardIndex{
     }
 
     public void shutdown() {
-        orbPool.shutdown();
+        executor.shutdown();
     }
 
 }

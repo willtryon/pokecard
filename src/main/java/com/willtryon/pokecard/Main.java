@@ -29,6 +29,7 @@ public class Main {
             Path compareDir = config.require(Config.COMPARE_DIR, "Path to images to compare to", Files::isDirectory, in);
             Path outputDir = config.require(Config.OUTPUT_DIR, "Path to output log files", Files::isDirectory, in);
             Path cacheDir = config.require(Config.CACHE_DIR, "Path to cache directory", Files::isDirectory, in);
+            int orbThreads = config.getScanThreads();
             String url = "jdbc:sqlite:" + dbPath;
             try (Connection conn = DriverManager.getConnection(url);
                 Statement st = conn.createStatement();
@@ -41,10 +42,10 @@ public class Main {
                     CardIndex cardDB;
                     if(Files.isRegularFile(cacheFile)){
                         System.out.println("Loading cache, please wait...\n");
-                        cardDB = new CardIndex(imagesDir, outputDir, cacheDir);
+                        cardDB = new CardIndex(imagesDir, outputDir, cacheDir, orbThreads);
                     }else{
                         System.out.println("Calculating image data, please wait...");
-                        cardDB = new CardIndex(size, url, imagesDir, outputDir, cacheDir);
+                        cardDB = new CardIndex(size, url, imagesDir, outputDir, cacheDir, orbThreads);
                     }
                     CardImportsIndex importDB = cardDB.newImportsIndex(compareDir, cacheDir);
                     int choice;
