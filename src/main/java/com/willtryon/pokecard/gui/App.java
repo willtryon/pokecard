@@ -37,8 +37,9 @@ public class App extends Application {
     private AppContext ctx;
 
     private Label statusBar;
-    private Label statusTime;
     private ProgressBar statusProgress;
+    private TabPane detailTabs;
+
 
     // --- settings model: sidebar sections, each holding typed fields ---
     enum Kind {
@@ -52,6 +53,11 @@ public class App extends Application {
             };
         }
     }
+
+    sealed interface SideNode permits Group, CardEntry, ImportEntry{}
+    record Group(String label) implements SideNode{}
+    record CardEntry(CardSignature sig) implements SideNode{}
+    record ImportEntry(CardImports imp) implements SideNode{}
 
     record Setting(String key, String label, Kind kind, boolean required) {
     }
@@ -143,8 +149,12 @@ public class App extends Application {
         Path compareDir = Path.of(config.get(Config.COMPARE_DIR));
         Path outputDir = Path.of(config.get(Config.OUTPUT_DIR));
         cacheDir = Path.of(config.get(Config.CACHE_DIR));
-        int orbThreads = Integer.parseInt(config.get(Config.SCAN_THREADS));
-
+        int orbThreads = 1;
+        try{
+            orbThreads = Integer.parseInt(config.get(Config.SCAN_THREADS));
+        }catch(NumberFormatException e){
+            config.set(Config.SCAN_THREADS, String.valueOf(config.getScanThreads()));
+        }
 
         InitTask initTask = new InitTask(dbPath, imagesDir, compareDir, outputDir, cacheDir, orbThreads);
         ProgressBar progressBar = new ProgressBar();
@@ -320,11 +330,12 @@ public class App extends Application {
         //build window...
         BorderPane root = new BorderPane();
         root.setTop(menuBar);
-        root.setCenter(center);
+        detailTabs = new TabPane();
+        Tab scannerTab = new Tab("Scanner", center);
+        scannerTab.setClosable(false);              // the home tab stays put
+        detailTabs.getTabs().add(scannerTab);
+        root.setCenter(detailTabs);
         root.setBottom(buildStatusBar());
-        TreeItem<String> rootItem = new TreeItem<>("Project Files");
-        TreeItem<String> cardsItem = new TreeItem<>("Cards");
-
         root.setLeft(buildSideTree(ctx.cardDB, ctx.importDB()));
         Alert a = new Alert(Alert.AlertType.INFORMATION, "To safely exit the program, click 'Quit' in the file menu. \nIf you click the x, the program will halt and you'll have to kill the program in the terminal.", ButtonType.OK);
         a.setHeaderText("Notice");
@@ -333,7 +344,7 @@ public class App extends Application {
         mainStage.setTitle("Pokecard");
         mainStage.show();
 
-        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+        /*ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "pokecard-scheduled-scan");
             t.setDaemon(true);          // don't keep the JVM alive after the window closes
             return t;
@@ -356,15 +367,13 @@ public class App extends Application {
             tick.setOnCancelled(e -> scanRunning.set(false));
             runTask(tick, v -> {
             });
-        }), 0, 1, TimeUnit.MINUTES);
+        }), 0, 1, TimeUnit.MINUTES);*/
     }
 
     private HBox buildStatusBar() {
         statusBar = new Label("Ready.");
-        statusTime = new Label("");
         statusProgress = new ProgressBar();
         statusProgress.setPrefWidth(120);
-        statusTime.setVisible(false);
         statusProgress.setVisible(false);
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -375,13 +384,154 @@ public class App extends Application {
         return bar;
     }
 
-    private TreeView buildSideTree(CardIndex cardDB, CardImportsIndex importDB) {
-        //cardDB.retrieveFileStructure("cards/");
-        TreeItem<String> rootItem = new TreeItem<>("Project Files");
-        TreeItem<String> cardsItem = new TreeItem<>("Cards");
-        TreeItem<String> importsItem = new TreeItem<>("Imports");
-        rootItem.getChildren().addAll(cardsItem, importsItem);
-        return new TreeView<>(rootItem);
+    private TreeView<SideNode> buildSideTree(CardIndex cardDB, CardImportsIndex importDB) {
+        TreeItem<SideNode> rootItem = new TreeItem<>(new Group("Cards"));
+        rootItem.getChildren().add(buildCardsBranch(cardDB));
+        rootItem.getChildren().add(buildImportsBranch(importDB));
+        rootItem.setExpanded(true);
+
+        TreeView<SideNode> tree = new TreeView<>(rootItem);
+        tree.setCellFactory(tv -> new TreeCell<>() {
+            @Override
+            protected void updateItem(SideNode node, boolean empty) {
+                super.updateItem(node, empty);
+                setText((empty||node==null) ? null : switch(node){
+                    case Group g -> g.label();
+                    case CardEntry c -> c.sig().getCardID();
+                    case ImportEntry i -> {
+                        Path q = i.imp().getQueryImage();
+                        yield q == null ? "(unknown image)" : q.getFileName().toString();
+                    }
+                    default -> throw new IllegalStateException("Unexpected value: " + node);
+
+                });
+
+            }
+        });
+        tree.getSelectionModel().selectedItemProperty().addListener((obs, old, item) -> {
+            if(item == null) return;
+            switch (item.getValue()){
+                case CardEntry c -> openCardTab(c.sig());
+                case ImportEntry i -> openImportTab(i.imp());
+                case Group g -> {}
+            }
+        });
+        return tree;
+    }
+
+    private TreeItem<SideNode> buildCardsBranch(CardIndex cardDB) {
+        TreeItem<SideNode> cards = new TreeItem<>(new Group("Database"));
+        Map<String, List<CardSignature>> bySeries = new TreeMap<>();
+        for(int i = 0; i<cardDB.getCardIndexSize(); i++){
+            CardSignature sig = cardDB.getCardSignature(i);
+            if(sig==null) continue;
+            bySeries.computeIfAbsent(seriesOf(sig), k ->new ArrayList<>()).add(sig);
+
+        }
+        for(var e : bySeries.entrySet()){
+            TreeItem<SideNode> series = new TreeItem<>(new Group(e.getKey()));
+            for(CardSignature sig : e.getValue()){
+                series.getChildren().add(new TreeItem<>(new CardEntry(sig)));
+            }
+        }
+        return cards;
+    }
+
+    private TreeItem<SideNode> buildImportsBranch(CardImportsIndex importDB) {
+        TreeItem<SideNode> imports = new TreeItem<>(new Group("Imports"));
+        for (CardImports imp : importDB.getImports()) {
+            imports.getChildren().add(new TreeItem<>(new ImportEntry(imp)));
+        }
+        return imports;
+    }
+
+    private String seriesOf(CardSignature sig) {
+        Path p = sig.getImgPath();
+        if (p == null || p.getParent() == null) return "Unknown";
+        return p.getParent().getFileName().toString();
+    }
+
+    private void openCardTab(CardSignature sig) {
+        if (focusExistingTab("card:" + sig.getCardID())) return;
+        Tab tab = new Tab(sig.getCardID(), buildCardDetail(sig));
+        tab.setId("card:" + sig.getCardID());
+        detailTabs.getTabs().add(tab);
+        detailTabs.getSelectionModel().select(tab);
+    }
+
+    private void openImportTab(CardImports imp) {
+        Path q = imp.getQueryImage();
+        String key = "import:" + (q == null ? String.valueOf(imp.hashCode()) : q.toString());
+        if (focusExistingTab(key)) return;
+        Tab tab = new Tab(q == null ? "Import" : q.getFileName().toString(), buildImportDetail(imp));
+        tab.setId(key);
+        detailTabs.getTabs().add(tab);
+        detailTabs.getSelectionModel().select(tab);
+    }
+
+    private boolean focusExistingTab(String id) {
+        for (Tab t : detailTabs.getTabs()) {
+            if (id.equals(t.getId())) {
+                detailTabs.getSelectionModel().select(t);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private Node buildCardDetail(CardSignature sig) {
+        VBox box = new VBox(10);
+        box.setPadding(new Insets(16));
+
+        Label id = new Label("Card ID: " + sig.getCardID());
+        id.setStyle("-fx-font-size: 15px; -fx-font-weight: bold;");
+
+        Path p = sig.getImgPath();
+        boolean hasOrb = sig.getMatData() != null && !sig.getMatData().empty();
+        box.getChildren().addAll(
+                id,
+                new Label("Image: " + (p == null ? "(none on disk)" : p.toString())),
+                new Label("pHash: " + (sig.getBinaryHash() != null ? "yes" : "no")
+                        + "    ORB: " + (hasOrb ? "yes" : "no"))
+        );
+
+        if (p != null && Files.exists(p)) {
+            ImageView iv = new ImageView(new Image(p.toUri().toString()));
+            iv.setPreserveRatio(true);
+            iv.setFitHeight(360);
+            box.getChildren().add(iv);
+        }
+        return box;
+    }
+
+    private Node buildImportDetail(CardImports imp) {
+        VBox box = new VBox(10);
+        box.setPadding(new Insets(16));
+
+        CardImports.Match orb  = imp.getOrbWinner();
+        CardImports.Match hash = imp.getHashWinner();
+        box.getChildren().addAll(
+                new Label("ORB match: "  + (orb  == null ? "-" : orb.cardID()  + "  (" + orb.winner()  + ")")),
+                new Label("pHash match: "+ (hash == null ? "-" : hash.cardID() + "  (" + hash.winner() + ")"))
+        );
+
+        HBox images = new HBox(16);
+        Path q = imp.getQueryImage();
+        if (q != null && Files.exists(q)) {
+            images.getChildren().add(imageAt(q.toUri().toString()));
+        }
+        if (orb != null && orb.img() != null && new File(orb.img()).exists()) {
+            images.getChildren().add(imageAt(new File(orb.img()).toURI().toString()));
+        }
+        box.getChildren().add(images);
+        return box;
+    }
+
+    private ImageView imageAt(String uri) {
+        ImageView iv = new ImageView(new Image(uri));
+        iv.setPreserveRatio(true);
+        iv.setFitHeight(300);
+        return iv;
     }
 
     private Task<?> currentStatusTask;

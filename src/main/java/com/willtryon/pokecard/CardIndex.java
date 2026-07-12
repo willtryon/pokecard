@@ -125,6 +125,7 @@ public class CardIndex{
         this.outputDir = outputDir;
         this.cacheDir = cacheDir;
         this.cardDB = readFromDisk(cacheDir);
+        this.orbThreads = orbThreads;
         this.executor = Executors.newFixedThreadPool(orbThreads);
     }
 
