@@ -39,6 +39,9 @@ public class App extends Application {
     private Label statusBar;
     private ProgressBar statusProgress;
     private TabPane detailTabs;
+    private TreeItem<SideNode> importsBranch;
+    private CardSignature hash;
+    private CardSignature orb;
 
 
     // --- settings model: sidebar sections, each holding typed fields ---
@@ -237,6 +240,7 @@ public class App extends Application {
                         updateMessage(msg);
                         updateProgress(frac, 1.0);
                     });
+                    refreshImports(ctx.importDB());
                     scan.setDisable(false);
                     return null;
                 }
@@ -268,10 +272,13 @@ public class App extends Application {
             ctx.importDB.readImportsFromDisk(cacheDir);
             List<CardImports> restored = ctx.importDB.getImports();
             System.out.println("Loaded " + restored.size() + " imports.");
-            buildSideTree(ctx.cardDB, ctx.importDB());
-            System.out.println(restored.get(0).getORBRecordHistory() + "\n" + restored.get(0).getOrbWinner());
+            refreshImports(ctx.importDB());
+            if (!restored.isEmpty()) {
+                System.out.println(restored.getFirst().getORBRecordHistory() + "\n" + restored.get(0).getOrbWinner());
+            }
             System.out.println("Done.");
             statusBar.setText("Ready.");
+            statusProgress.setVisible(false);
         });
 
         importItem.setOnAction(e -> {
@@ -439,11 +446,17 @@ public class App extends Application {
     }
 
     private TreeItem<SideNode> buildImportsBranch(CardImportsIndex importDB) {
-        TreeItem<SideNode> imports = new TreeItem<>(new Group("Imports"));
+        importsBranch = new TreeItem<>(new Group("Imports"));
+        refreshImports(importDB);
+        return importsBranch;
+    }
+
+    private void refreshImports(CardImportsIndex importDB) {
+        importsBranch.getChildren().clear();
         for (CardImports imp : importDB.getImports()) {
-            imports.getChildren().add(new TreeItem<>(new ImportEntry(imp)));
+            importsBranch.getChildren().add(new TreeItem<>(new ImportEntry(imp)));
         }
-        return imports;
+        importsBranch.setExpanded(true);
     }
 
     private String seriesOf(CardSignature sig) {
@@ -509,22 +522,54 @@ public class App extends Application {
         VBox box = new VBox(10);
         box.setPadding(new Insets(16));
 
-        CardImports.Match orb  = imp.getOrbWinner();
-        CardImports.Match hash = imp.getHashWinner();
-        box.getChildren().addAll(
-                new Label("ORB match: "  + (orb  == null ? "-" : orb.cardID()  + "  (" + orb.winner()  + ")")),
-                new Label("pHash match: "+ (hash == null ? "-" : hash.cardID() + "  (" + hash.winner() + ")"))
-        );
+        int size = imp.getRecordSize();
 
-        HBox images = new HBox(16);
+        Label orbLabel  = new Label();
+        Label hashLabel = new Label();
+
+        ImageView image1 = new ImageView(); image1.setPreserveRatio(true); image1.setFitHeight(300);
+        ImageView image2 = new ImageView(); image2.setPreserveRatio(true); image2.setFitHeight(300);
+        HBox images = new HBox(16, image1, image2);
+
         Path q = imp.getQueryImage();
-        if (q != null && Files.exists(q)) {
-            images.getChildren().add(imageAt(q.toUri().toString()));
-        }
-        if (orb != null && orb.img() != null && new File(orb.img()).exists()) {
-            images.getChildren().add(imageAt(new File(orb.img()).toURI().toString()));
-        }
-        box.getChildren().add(images);
+        if (q != null && Files.exists(q)) image1.setImage(new Image(q.toUri().toString()));
+
+        Label count = new Label();
+        Button previous = new Button("Previous");
+        Button next = new Button("Next");
+
+        int[] pos = {0};
+
+        Runnable render = () -> {
+            if (size == 0) {
+                orbLabel.setText("ORB match: -");
+                hashLabel.setText("pHash match: -");
+                count.setText("(0 of 0)");
+                previous.setDisable(true);
+                next.setDisable(true);
+                return;
+            }
+            int p = pos[0];
+            CardSignature orbSig  = imp.getARecordRecord(p, "orb");
+            CardSignature hashSig = imp.getARecordRecord(p, "hash");
+
+            orbLabel.setText ("ORB match: "   + (orbSig  == null ? "-" : orbSig.getCardID()  + "  (" + imp.getARecordScore(p, "orb")  + ")"));
+            hashLabel.setText("pHash match: " + (hashSig == null ? "-" : hashSig.getCardID() + "  (" + imp.getARecordScore(p, "hash") + ")"));
+
+            Path orbImg = (orbSig != null) ? orbSig.getImgPath() : null;
+            image2.setImage((orbImg != null && Files.exists(orbImg)) ? new Image(orbImg.toUri().toString()) : null);
+
+            count.setText("(" + (p + 1) + " of " + size + ")");
+            previous.setDisable(p == 0);
+            next.setDisable(p >= size - 1);
+        };
+
+        previous.setOnAction(e -> { if (pos[0] > 0)        { pos[0]--; render.run(); } });
+        next.setOnAction(e ->     { if (pos[0] < size - 1) { pos[0]++; render.run(); } });
+
+        render.run();   // initial paint
+
+        box.getChildren().addAll(orbLabel, hashLabel, images, new HBox(16, previous, count, next));
         return box;
     }
 
