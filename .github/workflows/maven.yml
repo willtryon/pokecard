@@ -1,0 +1,39 @@
+name: Maven Check
+on: [pull_request]
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os == 'fedora' && 'ubuntu-latest' || matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, fedora, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      # Native runs for Ubuntu, Windows, and macOS
+      - name: Set up JDK
+        if: matrix.os != 'fedora'
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+      - name: Run Maven (Ubuntu, Windows, macOS)
+        if: matrix.os != 'fedora'
+        run: mvn clean verify
+
+      # docker for fedora
+      - name: Set up JDK and Run Maven (Fedora)
+        if: matrix.os == 'fedora'
+        uses: addnab/docker-run-action@v3
+        with:
+          image: fedora:latest
+          options: -v ${{ github.workspace }}:/workspace -w /workspace
+          run: |
+            dnf install -y adoptium-temurin-java-repository
+            fedora-third-party enable
+            dnf install -y temurin-21-jdk maven
+            export JAVA_HOME=$(dirname $(dirname $(rpm -ql temurin-21-jdk | grep '/bin/javac$' | head -1)))
+            echo "JAVA_HOME=$JAVA_HOME"
+            mvn clean verify

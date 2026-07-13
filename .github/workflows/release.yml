@@ -68,11 +68,6 @@ jobs:
 
       - name: Package pokecard.app with jpackage
         run: |
-          IFS='.' read -r major minor patch <<< "${{ needs.check-version.outputs.version }}"
-          if [ -z "${minor}" ]; then minor=0; fi
-          if [ -z "${patch}" ]; then patch=0; fi
-          if [ "${major}" -lt 1 ]; then major=1; fi
-
           jpackage \
             --type app-image \
             --input target \
@@ -80,7 +75,7 @@ jobs:
             --name pokecard \
             --main-jar pokecard-${{ needs.check-version.outputs.version }}.jar \
             --main-class com.willtryon.pokecard.gui.Launcher \
-            --app-version ${major}.${minor}.${patch} \
+            --app-version ${{ needs.check-version.outputs.version }} \
             --vendor willtryon
 
       - name: Zip the app bundle
