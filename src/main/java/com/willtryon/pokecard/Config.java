@@ -16,6 +16,7 @@ public class Config {
     public static final String OUTPUT_DIR = "output.dir";
     public static final String CACHE_DIR =  "cache.dir";
     public static final String EBAY_API_KEY = "ebay.apiKey";
+    public static final String SCAN_THREADS = "scan.threads";
 
     private final Path file;
     private final Properties props = new Properties();
@@ -56,6 +57,20 @@ public class Config {
     public boolean isValid(String key, Predicate <Path> valid){
         String v = get(key);
         return !v.isBlank() && valid.test(Path.of(v));
+    }
+
+    public int getScanThreads() {
+        int cores = Runtime.getRuntime().availableProcessors();
+        int fallback = Math.max(1, cores - 1);   // leave one core for the UI/OS
+        String v = get(SCAN_THREADS);
+        if (v.isBlank()) return fallback;
+        try {
+            int n = Integer.parseInt(v);
+            if (n < 1) return 1;
+            return Math.min(n, cores);
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
     }
 
     public void set(String key, String value){
