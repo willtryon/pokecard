@@ -18,10 +18,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -42,6 +39,7 @@ public class App extends Application {
     private TreeItem<SideNode> importsBranch;
     private CardSignature hash;
     private CardSignature orb;
+    private Path dbPath;
 
 
     // --- settings model: sidebar sections, each holding typed fields ---
@@ -147,7 +145,7 @@ public class App extends Application {
             return;
         }
 
-        Path dbPath = Path.of(config.get(Config.DB_PATH));
+        dbPath = Path.of(config.get(Config.DB_PATH));
         Path imagesDir = Path.of(config.get(Config.IMAGES_DIR));
         Path compareDir = Path.of(config.get(Config.COMPARE_DIR));
         Path outputDir = Path.of(config.get(Config.OUTPUT_DIR));
@@ -519,7 +517,7 @@ public class App extends Application {
     }
 
     private Node buildImportDetail(CardImports imp) {
-        VBox box = new VBox(10);
+        HBox box = new HBox(10);
         box.setPadding(new Insets(16));
 
         int size = imp.getRecordSize();
@@ -538,6 +536,18 @@ public class App extends Application {
         Button previous = new Button("Previous");
         Button next = new Button("Next");
 
+        Label cardInfomation = new Label("Card information:");
+        Label cardName = new Label();
+        Label collectorNum = new Label();
+        Label series = new Label();
+        Label cardType = new Label();
+        Label rarity = new Label();
+        Label price = new Label();
+        Label description = new Label();
+        VBox info = new VBox(10, cardInfomation, cardName, collectorNum, series, cardType, rarity, price, description);
+        info.setPadding(new Insets(16));
+        info.setSpacing(10);
+
         int[] pos = {0};
 
         Runnable render = () -> {
@@ -550,7 +560,14 @@ public class App extends Application {
                 return;
             }
             int p = pos[0];
-            CardSignature orbSig  = imp.getARecordRecord(p, "orb");
+            CardSignature orbSigVictim  = imp.getARecordRecord(p, "orb");
+            FullCardSignature orbSig = null;
+            try {
+                orbSig = new FullCardSignature(orbSigVictim, dbPath);
+                System.out.println(orbSig.getName());
+            } catch (SQLException e) {
+                showError(e);
+            }
             CardSignature hashSig = imp.getARecordRecord(p, "hash");
 
             orbLabel.setText ("ORB match: "   + (orbSig  == null ? "-" : orbSig.getCardID()  + "  (" + imp.getARecordScore(p, "orb")  + ")"));
@@ -562,6 +579,16 @@ public class App extends Application {
             count.setText("(" + (p + 1) + " of " + size + ")");
             previous.setDisable(p == 0);
             next.setDisable(p >= size - 1);
+
+            cardName.setText(orbSig == null ? "" : orbSig.getName());
+            collectorNum.setText(orbSig == null ? "" : orbSig.getExpCardNumber());
+            series.setText(orbSig == null ? "" : orbSig.getExpName());
+            cardType.setText(orbSig == null ? "" : orbSig.getCardType());
+            rarity.setText(orbSig == null ? "" : orbSig.getRarity());
+            price.setText(orbSig == null ? "" : String.valueOf(orbSig.getPrice()));
+            description.setText(orbSig == null ? "" : orbSig.getDescription());
+
+
         };
 
         previous.setOnAction(e -> { if (pos[0] > 0)        { pos[0]--; render.run(); } });
@@ -569,7 +596,9 @@ public class App extends Application {
 
         render.run();
 
-        box.getChildren().addAll(orbLabel, hashLabel, images, new HBox(16, previous, count, next));
+        VBox imgStack = new VBox(10);
+        imgStack.getChildren().addAll(orbLabel, hashLabel, images, new HBox(16, previous, count, next));
+        box.getChildren().addAll(imgStack, info);
         return box;
     }
 
