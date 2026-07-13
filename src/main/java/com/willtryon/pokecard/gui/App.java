@@ -325,7 +325,7 @@ public class App extends Application {
             Stage aboutStage = new Stage();
             aboutStage.setTitle("About Pokecard");
             Label name = new Label("Pokecard");
-            Label version = new Label("Version 0.5.2");
+            Label version = new Label("Version 0.6.0");
             Label author = new Label("by willtryon");
             Button close = new Button("Close");
             VBox aboutLayout = new VBox(12, name, version, author, close);
@@ -567,7 +567,7 @@ public class App extends Application {
         previous.setOnAction(e -> { if (pos[0] > 0)        { pos[0]--; render.run(); } });
         next.setOnAction(e ->     { if (pos[0] < size - 1) { pos[0]++; render.run(); } });
 
-        render.run();   // initial paint
+        render.run();
 
         box.getChildren().addAll(orbLabel, hashLabel, images, new HBox(16, previous, count, next));
         return box;
