@@ -580,13 +580,13 @@ public class App extends Application {
             previous.setDisable(p == 0);
             next.setDisable(p >= size - 1);
 
-            cardName.setText(orbSig == null ? "" : orbSig.getName());
-            collectorNum.setText(orbSig == null ? "" : orbSig.getExpCardNumber());
-            series.setText(orbSig == null ? "" : orbSig.getExpName());
-            cardType.setText(orbSig == null ? "" : orbSig.getCardType());
-            rarity.setText(orbSig == null ? "" : orbSig.getRarity());
-            price.setText(orbSig == null ? "" : String.valueOf(orbSig.getPrice()));
-            description.setText(orbSig == null ? "" : orbSig.getDescription());
+            cardName.setText("Name: " + (orbSig == null ? "" : orbSig.getName()));
+            collectorNum.setText("Collection Number: "+(orbSig == null ? "" : orbSig.getExpCardNumber()));
+            series.setText("Series: "+(orbSig == null ? "" : orbSig.getExpName()));
+            cardType.setText("Type: "+(orbSig == null ? "" : orbSig.getCardType()));
+            rarity.setText("Rarity: "+(orbSig == null ? "" : orbSig.getRarity()));
+            price.setText("Price (Not valid)"+(orbSig == null ? "" : String.valueOf(orbSig.getPrice())));
+            description.setText((orbSig == null ? "" : orbSig.getDescription()));
 
 
         };
