@@ -182,7 +182,7 @@ public class CardImportsIndex {
     private static final int IMPORTS_FORMAT_VERSION = 2;
 
     public void writeImportsToDisk(Path outputDir, String currentSession) {
-        Path path = outputDir.resolve(currentSession+".dat");
+        Path path = outputDir.resolve(currentSession);
         try (DataOutputStream dos = new DataOutputStream(
                 new BufferedOutputStream(new FileOutputStream(path.toFile())))) {
 
@@ -231,10 +231,10 @@ public class CardImportsIndex {
         }
     }
 
-    public void readImportsFromDisk(Path cacheDir) {
-        Path path = cacheDir.resolve("imports.dat");
-        if (!Files.exists(path)) {
-            System.out.println("No imports cache found at " + path);
+    public void readImportsFromDisk(Path currentSession) {
+        File file = currentSession.toFile();
+        if (!Files.exists(currentSession)) {
+            System.out.println("No imports cache found at " + currentSession);
             return;
         }
 
@@ -244,7 +244,7 @@ public class CardImportsIndex {
         }
 
         try (DataInputStream dis = new DataInputStream(
-                new BufferedInputStream(new FileInputStream(path.toFile())))) {
+                new BufferedInputStream(new FileInputStream(currentSession.toFile())))) {
 
             int version = dis.readInt();
             if (version != IMPORTS_FORMAT_VERSION) {

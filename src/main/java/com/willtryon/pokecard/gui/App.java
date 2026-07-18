@@ -32,6 +32,7 @@ public class App extends Application {
     private Path dbPath;
     private Path sessionPath;
     private String currentSession;
+    private boolean saved;
     private AppContext ctx;
 
     private Label statusBar;
@@ -198,7 +199,7 @@ public class App extends Application {
     public void showMainStage() {
         Stage mainStage = new Stage();
         //Menu Bar init...
-        MenuItem newSessionItem = new MenuItem("New Session");
+        MenuItem newSessionItem = new MenuItem("New session");
         MenuItem saveSessionItem = new MenuItem("Save session");
         MenuItem loadSessionItem = new MenuItem("Load session");
         MenuItem importItem = new MenuItem("Import an image to scan...");
@@ -227,6 +228,11 @@ public class App extends Application {
         Label result = new Label();
         result.setWrapText(true);
 
+        mainStage.setOnCloseRequest(event -> {
+           Platform.exit();
+           System.exit(0);
+        });
+
         Button scan = new Button("Scan folder...");
         scan.setOnAction(e -> {
             scan.setDisable(true);
@@ -252,33 +258,26 @@ public class App extends Application {
 
         //Menu bar operations...
 
+
         newSessionItem.setOnAction(e -> {
             System.out.println("Creating new session...");
+            saved = false;
             ctx.importDB.clearSession();
             refreshImports(ctx.importDB());
-            currentSession = "Untitled";
-            title.setText("Pokecard - "+currentSession);
+            currentSession = "";
+            mainStage.setTitle("Pokecard - "+currentSession);
             sessionPath = Path.of(outputDir+"/"+ currentSession);
             config.set(Config.SESSION_PATH, String.valueOf(sessionPath));
-            try {
-                config.save();
-            } catch (IOException ex) {
-                showError(ex);
-            }
         });
 
         saveSessionItem.setOnAction(e -> {
-            System.out.println("Saving imports to disk:");
-            statusBar.setText("Saving Session...");
-            statusProgress.setVisible(true);
-            ctx.importDB.writeImportsToDisk(outputDir, currentSession);
-            System.out.println("Done.");
-            statusBar.setText("Ready.");
-            statusProgress.setVisible(false);
+            saveSession(mainStage);
+            mainStage.setTitle("Pokecard - "+currentSession);
         });
 
         loadSessionItem.setOnAction(e -> {
-            loadSession();
+            loadSession(mainStage, false);
+            mainStage.setTitle("Pokecard - "+currentSession);
         });
 
         importItem.setOnAction(e -> {
@@ -319,6 +318,7 @@ public class App extends Application {
         exitItem.setOnAction(e -> {
             ctx.cardDB.shutdown();
             Platform.exit();
+            System.exit(0);
         });
 
         aboutItem.setOnAction(e -> {
@@ -336,10 +336,6 @@ public class App extends Application {
             aboutStage.show();
         });
 
-        if(!(sessionPath.getFileName()==null)){
-            loadSession();
-        }
-
         //build window...
         BorderPane root = new BorderPane();
         root.setTop(menuBar);
@@ -353,9 +349,16 @@ public class App extends Application {
         Alert a = new Alert(Alert.AlertType.INFORMATION, "To safely exit the program, click 'Quit' in the file menu. \nIf you click the x, the program will halt and you'll have to kill the program in the terminal.", ButtonType.OK);
         a.setHeaderText("Notice");
         a.showAndWait();
-        mainStage.setScene(new Scene(root, 700, 600));
         mainStage.setTitle("Pokecard");
+
+        if(!(sessionPath.getFileName().toString().isEmpty())) {
+            loadSession(mainStage, true);
+            mainStage.setTitle("Pokecard - "+sessionPath.getFileName());
+        }
+
+        mainStage.setScene(new Scene(root, 700, 600));
         mainStage.show();
+
 
         /*ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "pokecard-scheduled-scan");
@@ -383,13 +386,70 @@ public class App extends Application {
         }), 0, 1, TimeUnit.MINUTES);*/
     }
 
-    private void loadSession(){
+    private void saveSession(Stage owner){
+        System.out.println("Saving imports to disk:");
+        if(saved) ctx.importDB.writeImportsToDisk(outputDir, currentSession);
+        if (!saved) {
+            FileChooser fc = new FileChooser();
+            fc.setTitle("Save Session");
+            fc.getExtensionFilters().addAll(
+                    new FileChooser.ExtensionFilter("Binary (*.dat)", "*.dat")
+            );
+            File targetFile = fc.showSaveDialog(owner);
+            if (targetFile != null) {
+                String filePath = targetFile.getAbsolutePath();
+                String extension = ".dat";
+
+                if (filePath.toLowerCase().endsWith(extension + extension)) {
+                    filePath = filePath.substring(0, filePath.length() - extension.length());
+                }
+                else if (!filePath.toLowerCase().endsWith(extension)) {
+                    filePath += extension;
+                }
+                File fixedFile = new File(filePath);
+                sessionPath = fixedFile.toPath();
+                currentSession = sessionPath.getFileName().toString();
+                ctx.importDB.writeImportsToDisk(outputDir, currentSession);
+                config.set(Config.SESSION_PATH, fixedFile.getAbsolutePath());
+                try {
+                    config.save();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+        statusBar.setText("Saving Session...");
+        statusProgress.setVisible(true);
+        System.out.println("Done.");
+        statusBar.setText("Ready.");
+        statusProgress.setVisible(false);
+        saved = true;
+    }
+
+    private void loadSession(Stage owner, boolean tf){
         System.out.println("Loading imports from disk:");
         statusBar.setText("Loading Session...");
         statusProgress.setVisible(true);
-        ctx.importDB.readImportsFromDisk(cacheDir);
+        if (tf) {
+            ctx.importDB.readImportsFromDisk(sessionPath);
+        }
+        else{
+            FileChooser fc = new FileChooser();
+            fc.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Binary (*.dat)", "*.dat"));
+            File targetFile = fc.showOpenDialog(owner);
+            if(targetFile != null){
+                sessionPath = targetFile.toPath();
+                ctx.importDB.readImportsFromDisk(sessionPath);
+            }
+        }
         List<CardImports> restored = ctx.importDB.getImports();
-        currentSession = sessionPath.getFileName().toString();
+        currentSession = sessionPath.toString();
+        config.set(Config.SESSION_PATH, currentSession);
+        try {
+            config.save();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
         System.out.println("Loaded " + restored.size() + " imports.");
         refreshImports(ctx.importDB());
         if (!restored.isEmpty()) {
