@@ -181,8 +181,8 @@ public class CardImportsIndex {
     //I write session information to the disk
     private static final int IMPORTS_FORMAT_VERSION = 2;
 
-    public void writeImportsToDisk(Path cacheDir) {
-        Path path = cacheDir.resolve("imports.dat");
+    public void writeImportsToDisk(Path outputDir, String currentSession) {
+        Path path = outputDir.resolve(currentSession+".dat");
         try (DataOutputStream dos = new DataOutputStream(
                 new BufferedOutputStream(new FileOutputStream(path.toFile())))) {
 

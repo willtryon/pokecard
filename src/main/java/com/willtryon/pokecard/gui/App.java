@@ -21,9 +21,6 @@ import java.nio.file.Path;
 import java.sql.*;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
@@ -31,8 +28,10 @@ public class App extends Application {
 
     private Config config;
     private Path cacheDir;
+    private Path outputDir;
     private Path dbPath;
-    private String lastSession;
+    private Path sessionPath;
+    private String currentSession;
     private AppContext ctx;
 
     private Label statusBar;
@@ -146,9 +145,9 @@ public class App extends Application {
         dbPath = Path.of(config.get(Config.DB_PATH));
         Path imagesDir = Path.of(config.get(Config.IMAGES_DIR));
         Path compareDir = Path.of(config.get(Config.COMPARE_DIR));
-        Path outputDir = Path.of(config.get(Config.OUTPUT_DIR));
+        outputDir = Path.of(config.get(Config.OUTPUT_DIR));
         cacheDir = Path.of(config.get(Config.CACHE_DIR));
-        lastSession = config.get(Config.LAST_SESSION);
+        sessionPath = Path.of(config.get(Config.SESSION_PATH));
         int orbThreads = 1;
         try{
             orbThreads = Integer.parseInt(config.get(Config.SCAN_THREADS));
@@ -254,18 +253,25 @@ public class App extends Application {
         //Menu bar operations...
 
         newSessionItem.setOnAction(e -> {
-
             System.out.println("Creating new session...");
             ctx.importDB.clearSession();
             refreshImports(ctx.importDB());
-
+            currentSession = "Untitled";
+            title.setText("Pokecard - "+currentSession);
+            sessionPath = Path.of(outputDir+"/"+ currentSession);
+            config.set(Config.SESSION_PATH, String.valueOf(sessionPath));
+            try {
+                config.save();
+            } catch (IOException ex) {
+                showError(ex);
+            }
         });
 
         saveSessionItem.setOnAction(e -> {
             System.out.println("Saving imports to disk:");
             statusBar.setText("Saving Session...");
             statusProgress.setVisible(true);
-            ctx.importDB.writeImportsToDisk(cacheDir);
+            ctx.importDB.writeImportsToDisk(outputDir, currentSession);
             System.out.println("Done.");
             statusBar.setText("Ready.");
             statusProgress.setVisible(false);
@@ -330,6 +336,10 @@ public class App extends Application {
             aboutStage.show();
         });
 
+        if(!(sessionPath.getFileName()==null)){
+            loadSession();
+        }
+
         //build window...
         BorderPane root = new BorderPane();
         root.setTop(menuBar);
@@ -379,6 +389,7 @@ public class App extends Application {
         statusProgress.setVisible(true);
         ctx.importDB.readImportsFromDisk(cacheDir);
         List<CardImports> restored = ctx.importDB.getImports();
+        currentSession = sessionPath.getFileName().toString();
         System.out.println("Loaded " + restored.size() + " imports.");
         refreshImports(ctx.importDB());
         if (!restored.isEmpty()) {
