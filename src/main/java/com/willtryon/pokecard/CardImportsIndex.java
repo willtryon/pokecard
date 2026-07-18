@@ -292,6 +292,11 @@ public class CardImportsIndex {
         }
     }
 
+    public void clearSession(){
+        imports.clear();
+        seenHashes.clear();
+    }
+
     private CardImports.Match readMatch(DataInputStream dis) throws IOException {
         String id  = dis.readUTF();
         String img = dis.readUTF();
@@ -316,7 +321,6 @@ public class CardImportsIndex {
         long elapsed = System.currentTimeMillis() - startTime;
         times[loc] = elapsed;
 
-        // Weighted average: recent items count more, but use all completed samples
         int completed = loc + 1;
         long sum = 0;
         for (int i = 0; i < completed; i++) {

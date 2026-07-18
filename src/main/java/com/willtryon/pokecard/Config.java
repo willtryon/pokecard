@@ -17,6 +17,7 @@ public class Config {
     public static final String CACHE_DIR =  "cache.dir";
     public static final String EBAY_API_KEY = "ebay.apiKey";
     public static final String SCAN_THREADS = "scan.threads";
+    public static final String LAST_SESSION = "session.name";
 
     private final Path file;
     private final Properties props = new Properties();
