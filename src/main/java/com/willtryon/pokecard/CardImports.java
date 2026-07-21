@@ -4,6 +4,10 @@ import dev.brachtendorf.jimagehash.hash.Hash;
 
 import java.nio.file.Path;
 import java.util.List;
+import org.controlsfx.control.spreadsheet.SpreadsheetView;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+
 
 public class CardImports {
     // one match against the DB (pHash or ORB)

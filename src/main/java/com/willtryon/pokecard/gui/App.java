@@ -346,6 +346,7 @@ public class App extends Application {
         root.setCenter(detailTabs);
         root.setBottom(buildStatusBar());
         root.setLeft(buildSideTree(ctx.cardDB, ctx.importDB()));
+
         Alert a = new Alert(Alert.AlertType.INFORMATION, "To safely exit the program, click 'Quit' in the file menu. \nIf you click the x, the program will halt and you'll have to kill the program in the terminal.", ButtonType.OK);
         a.setHeaderText("Notice");
         a.showAndWait();
@@ -357,6 +358,7 @@ public class App extends Application {
         }
 
         mainStage.setScene(new Scene(root, 700, 600));
+        mainStage.getScene().getRoot().setStyle("-fx-base: #2a2a2a;");
         mainStage.show();
 
 

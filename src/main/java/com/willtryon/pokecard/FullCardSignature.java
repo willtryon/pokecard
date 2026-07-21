@@ -76,13 +76,9 @@ public class FullCardSignature extends CardSignature {
         return super.getKeypoints();
     }
 
-    public int getIdTCGP() {
-        return idTCGP;
-    }
+    public int getIdTCGP() {return idTCGP;}
 
-    public String getName() {
-        return name;
-    }
+    public String getName() { return name;}
 
     public String getExpIdTCGP() {
         return expIdTCGP;
