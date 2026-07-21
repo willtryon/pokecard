@@ -1,0 +1,12 @@
+{
+  "image": "scans/card19.png",
+  "width": 620,
+  "height": 865,
+  "mode": "split",
+  "rotation": 0,
+  "sections": {
+    "top": "!",
+    "middle": "Heal 30 damage from this Pokémon. Nap Smack 20",
+    "bottom": "×2 of people and Pokémon. It hides if it senses hostility. retreat ©2015 Pokémon Illus. MAHOU 68/162"
+  }
+}

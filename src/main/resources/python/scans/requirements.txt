@@ -1,0 +1,19 @@
+# torch/torchvision are installed separately so you can pick the right build:
+#   CPU   : pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+#   CUDA  : pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124   (GTX 1660 Super)
+#   ROCm  : pip install torch torchvision --index-url https://download.pytorch.org/whl/rocm6.4 (RX 9070 XT)
+# See setup.sh / README for details.
+
+# --- baseline OCR + outputs ---
+easyocr
+reportlab
+pillow
+numpy
+
+# --- hybrid VLM recognizers (got-ocr2, qwen2.5-vl) ---
+transformers>=4.49,<5    # 5.x dropped legacy (TrOCR) tokenizer conversion
+sentencepiece
+accelerate
+safetensors
+einops
+tiktoken

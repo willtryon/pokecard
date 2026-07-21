@@ -1,0 +1,12 @@
+{
+  "image": "scans/card31.png",
+  "width": 620,
+  "height": 865,
+  "mode": "split",
+  "rotation": 0,
+  "sections": {
+    "top": "BASIC Magnemite LV.13 50 HP",
+    "middle": "NO. 081 Magnet Pokémon HT: 1'00\" WT: 13.2 lbs. Thunder Wave Flip a coin. If heads, your opponent's Active Pokémon is now Paralyzed. Self-Destruct 50 This Pokémon does 50 damage to itself. It moves while constantly hovering.",
+    "bottom": "weakness ×2 resistance -20 It discharges Thunder Wave and so on from the units at its sides. retreat cost Illus. Keiji Kinebuchi ©2016 Pokémon 37/108"
+  }
+}
