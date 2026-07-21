@@ -16,6 +16,8 @@ on:
   pull_request:
     types: [closed]
     branches: [ "master" ]
+  workflow_dispatch:
+
 
 permissions:
   contents: read
@@ -25,7 +27,7 @@ jobs:
   # sure we're not about to re-publish a release that already exists - if
   # this fails, bump <version> in pom.xml as part of the PR you're merging.
   check-version:
-    if: github.event.pull_request.merged == true
+    ##if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
