@@ -75,7 +75,7 @@ jobs:
             --name pokecard \
             --main-jar pokecard-${{ needs.check-version.outputs.version }}.jar \
             --main-class com.willtryon.pokecard.gui.Launcher \
-            --app-version ${{ needs.check-version.outputs.version }} \
+            --app-version 1.0 \
             --vendor willtryon
 
       - name: Zip the app bundle
