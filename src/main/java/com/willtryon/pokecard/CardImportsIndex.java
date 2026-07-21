@@ -181,8 +181,8 @@ public class CardImportsIndex {
     //I write session information to the disk
     private static final int IMPORTS_FORMAT_VERSION = 2;
 
-    public void writeImportsToDisk(Path cacheDir) {
-        Path path = cacheDir.resolve("imports.dat");
+    public void writeImportsToDisk(Path outputDir, String currentSession) {
+        Path path = outputDir.resolve(currentSession);
         try (DataOutputStream dos = new DataOutputStream(
                 new BufferedOutputStream(new FileOutputStream(path.toFile())))) {
 
@@ -231,10 +231,10 @@ public class CardImportsIndex {
         }
     }
 
-    public void readImportsFromDisk(Path cacheDir) {
-        Path path = cacheDir.resolve("imports.dat");
-        if (!Files.exists(path)) {
-            System.out.println("No imports cache found at " + path);
+    public void readImportsFromDisk(Path currentSession) {
+        File file = currentSession.toFile();
+        if (!Files.exists(currentSession)) {
+            System.out.println("No imports cache found at " + currentSession);
             return;
         }
 
@@ -244,7 +244,7 @@ public class CardImportsIndex {
         }
 
         try (DataInputStream dis = new DataInputStream(
-                new BufferedInputStream(new FileInputStream(path.toFile())))) {
+                new BufferedInputStream(new FileInputStream(currentSession.toFile())))) {
 
             int version = dis.readInt();
             if (version != IMPORTS_FORMAT_VERSION) {
@@ -292,6 +292,11 @@ public class CardImportsIndex {
         }
     }
 
+    public void clearSession(){
+        imports.clear();
+        seenHashes.clear();
+    }
+
     private CardImports.Match readMatch(DataInputStream dis) throws IOException {
         String id  = dis.readUTF();
         String img = dis.readUTF();
@@ -316,7 +321,6 @@ public class CardImportsIndex {
         long elapsed = System.currentTimeMillis() - startTime;
         times[loc] = elapsed;
 
-        // Weighted average: recent items count more, but use all completed samples
         int completed = loc + 1;
         long sum = 0;
         for (int i = 0; i < completed; i++) {

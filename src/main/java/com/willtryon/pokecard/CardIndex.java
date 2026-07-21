@@ -20,7 +20,6 @@ import org.bytedeco.opencv.opencv_core.KeyPointVector;
 import org.bytedeco.opencv.opencv_core.DMatchVector;
 import org.bytedeco.opencv.opencv_core.DMatchVectorVector;
 import org.bytedeco.opencv.opencv_core.FileNode;
-import org.bytedeco.opencv.opencv_core.FileStorage;
 import org.bytedeco.javacpp.indexer.FloatIndexer;
 import org.bytedeco.javacpp.indexer.UByteIndexer;
 import org.bytedeco.opencv.opencv_core.DMatch;
@@ -30,7 +29,6 @@ import static org.bytedeco.opencv.global.opencv_imgcodecs.imread;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.IMREAD_GRAYSCALE;
 import static org.bytedeco.opencv.global.opencv_core.CV_32FC2;
 import static org.bytedeco.opencv.global.opencv_core.NORM_HAMMING;
-import static org.bytedeco.opencv.global.opencv_core.write;
 import static org.bytedeco.opencv.global.opencv_calib3d.findHomography;
 import static org.bytedeco.opencv.global.opencv_calib3d.RANSAC;
 import java.math.BigInteger;
@@ -44,7 +42,7 @@ public class CardIndex{
     private final Path cacheDir;
     private final ExecutorService executor;
     private boolean firstScan = true;
-    private int orbThreads;
+    private final int orbThreads;
 
     /*Approach so far is the query sql db and dump its contents for every hit to a new Card obj, which is stored
     in an array of cards...*/
@@ -477,6 +475,7 @@ public class CardIndex{
             System.err.println("Error reading the root directory: " + e.getMessage());
         }
     }*/
+    private static final int METADATA_FORMAT_VERSION = 1;
 
     public void writeToDisk(Path cacheDir) {
         Path xmlPath = cacheDir.resolve("cache.xml");
@@ -519,36 +518,37 @@ public class CardIndex{
         }
 
         // Write XML — metadata only, no Mats
-        FileStorage fs = new FileStorage(xmlPath.toString(), FileStorage.WRITE);
-        try {
+        Path metaPath = cacheDir.resolve("cache_meta.dat");
+        try (DataOutputStream dos = new DataOutputStream(
+                new BufferedOutputStream(new FileOutputStream(metaPath.toFile()), 1 << 20))) {
+
             int bitRes = 0, algId = 0;
             for (CardSignature c : cardDB) {
                 if (c != null && c.getBinaryHash() != null) {
                     bitRes = c.getBinaryHash().getBitResolution();
-                    algId  = c.getBinaryHash().getAlgorithmId();
+                    algId = c.getBinaryHash().getAlgorithmId();
                     break;
                 }
             }
-            write(fs, "count",     cardDB.length);
-            write(fs, "hash_bits", bitRes);
-            write(fs, "hash_algo", algId);
-            for (int i = 0; i < cardDB.length; i++) {
-                CardSignature c = cardDB[i];
+            dos.writeInt(METADATA_FORMAT_VERSION);
+            dos.writeInt(cardDB.length);
+            dos.writeInt(bitRes);
+            dos.writeInt(algId);
+
+            for (CardSignature c : cardDB) {
                 if (c == null) {
-                    write(fs, "cardID_" + i, "");
-                    write(fs, "path_"   + i, "");
-                    write(fs, "hash_"   + i, "");
+                    dos.writeBoolean(false);
                     continue;
                 }
-                String id = c.getCardID();
-                write(fs, "cardID_" + i, id != null ? id : "");
-                String p = c.getStringImgPath();
-                write(fs, "path_" + i, p != null ? p : "");
+                dos.writeBoolean(true);
+                dos.writeUTF(c.getCardID() != null ? c.getCardID() : "");
+                Path ip = c.getImgPath();                          // Path getter avoids NPE on null
+                dos.writeUTF(ip != null ? ip.toString() : "");
                 Hash h = c.getBinaryHash();
-                write(fs, "hash_" + i, h != null ? h.getHashValue().toString(16) : "");
+                dos.writeUTF(h != null ? h.getHashValue().toString(16) : "");
             }
-        } finally {
-            fs.release();
+        } catch (IOException e) {
+            System.out.println("Failed to write metadata cache: " + e.getMessage());
         }
     }
 
@@ -557,37 +557,34 @@ public class CardIndex{
         Path orbPath = cacheDir.resolve("cache_orb.dat");
 
         // Read XML metadata
-        FileStorage fs = new FileStorage(xmlPath.toString(), FileStorage.READ);
-        if (!fs.isOpened()) {
-            System.out.println("Sorry, the program can't open the cache.");
-            fs.release();
-            return new CardSignature[0];
-        }
+        Path metaPath = cacheDir.resolve("cache_meta.dat");
         CardSignature[] db;
-        try {
-            FileNode cNode = fs.get("count");
-            if (cNode.isNone()){
-                System.out.println("Sorry, the program can't open the cache. (invalid index)");
+        try (DataInputStream dis = new DataInputStream(
+                new BufferedInputStream(new FileInputStream(metaPath.toFile()), 1 << 20))) {
+
+            int version = dis.readInt();
+            if (version != METADATA_FORMAT_VERSION) {
+                System.out.println("Metadata cache version mismatch; please rebuild the cache.");
                 return new CardSignature[0];
             }
-            int count  = (int) cNode.real();
-            int bitRes = (int) fs.get("hash_bits").real();
-            int algId  = (int) fs.get("hash_algo").real();
+            int count  = dis.readInt();
+            int bitRes = dis.readInt();
+            int algId  = dis.readInt();
             db = new CardSignature[count];
-            for (int i = 0; i < count; i++){
-                String percent = String.format("%.0f", ((double) i / count) * 100);
-                System.out.print("\033[0F\033[J");
-                System.out.printf("\nLoading metadata...%s%%",percent);
-                String cardID = nodeToString(fs.get("cardID_" + i));
-                if (cardID.isEmpty()) { db[i] = null; continue; }
-                String pathStr = nodeToString(fs.get("path_" + i));
-                String hex = nodeToString(fs.get("hash_" + i));
-                Path img= pathStr.isEmpty() ? null : Path.of(pathStr);
-                Hash hash  = hex.isEmpty()     ? null : new Hash(new BigInteger(hex, 16), bitRes, algId);
+
+            for (int i = 0; i < count; i++) {
+                boolean present = dis.readBoolean();
+                if (!present) { db[i] = null; continue; }
+                String cardID  = dis.readUTF();
+                String pathStr = dis.readUTF();
+                String hex     = dis.readUTF();
+                Path img  = pathStr.isEmpty() ? null : Path.of(pathStr);
+                Hash hash = hex.isEmpty() ? null : new Hash(new BigInteger(hex, 16), bitRes, algId);
                 db[i] = new CardSignature(cardID, img, hash, null, null);
             }
-        } finally {
-            fs.release();
+        } catch (IOException e) {
+            System.out.println("Failed to read metadata cache: " + e.getMessage());
+            return new CardSignature[0];
         }
 
         // Now read ORB objects...

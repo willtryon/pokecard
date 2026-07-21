@@ -18,15 +18,9 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
@@ -34,25 +28,30 @@ public class App extends Application {
 
     private Config config;
     private Path cacheDir;
+    private Path outputDir;
+    private Path dbPath;
+    private Path sessionPath;
+    private String currentSession;
+    private boolean saved;
     private AppContext ctx;
 
     private Label statusBar;
     private ProgressBar statusProgress;
     private TabPane detailTabs;
     private TreeItem<SideNode> importsBranch;
-    private CardSignature hash;
-    private CardSignature orb;
 
 
-    // --- settings model: sidebar sections, each holding typed fields ---
+
+
     enum Kind {
-        DIRECTORY, FILE, TEXT, SECRET;
+        DIRECTORY, FILE, TEXT, SECRET, BOOLEAN;
 
         boolean isValidValue(String v) {
             return switch (this) {
                 case DIRECTORY -> Files.isDirectory(Path.of(v));
                 case FILE -> Files.isRegularFile(Path.of(v));
                 case TEXT, SECRET -> !v.isBlank();
+                case BOOLEAN -> Boolean.parseBoolean(v);
             };
         }
     }
@@ -87,9 +86,6 @@ public class App extends Application {
             ))
     );
 
-    /**
-     * OK if it's an allowed blank (optional) or passes its kind's check.
-     */
     static boolean satisfied(Setting s, String value) {
         if (value == null || value.isBlank()) return !s.required();
         return s.kind().isValidValue(value);
@@ -100,14 +96,14 @@ public class App extends Application {
 
     @Override
     public void start(Stage initStage) {
-        // Everything the program owns lives under ~/.pokecard (created on demand).
+        // Everything the program owns lives under ~/.pokecard.
         Path appHome = Path.of(System.getProperty("user.home"), ".pokecard");
         Path propsPath = appHome.resolve("pokecard.properties");
         try {
             Files.createDirectories(appHome);
             config = new Config(propsPath);
 
-            // program-managed folders: default under ~/.pokecard if unset, and ensure they exist
+            // looks for the folders and creates them if they don't exist
             boolean changed = false;
             if (config.get(Config.CACHE_DIR).isBlank()) {
                 config.set(Config.CACHE_DIR, appHome.resolve("cache").toString());
@@ -128,7 +124,7 @@ public class App extends Application {
             return;
         }
 
-        // Only the external inputs (DB, images, import) can block startup -- see SECTIONS.
+        // Only the external inputs (DB, images, import) can block startup -- see class ConfigEditor.
         ConfigEditor editor = new ConfigEditor(config);
         while (!allSettingsSatisfied()) {
             if (!editor.showAndWait(null)) {
@@ -147,11 +143,12 @@ public class App extends Application {
             return;
         }
 
-        Path dbPath = Path.of(config.get(Config.DB_PATH));
+        dbPath = Path.of(config.get(Config.DB_PATH));
         Path imagesDir = Path.of(config.get(Config.IMAGES_DIR));
         Path compareDir = Path.of(config.get(Config.COMPARE_DIR));
-        Path outputDir = Path.of(config.get(Config.OUTPUT_DIR));
+        outputDir = Path.of(config.get(Config.OUTPUT_DIR));
         cacheDir = Path.of(config.get(Config.CACHE_DIR));
+        sessionPath = Path.of(config.get(Config.SESSION_PATH));
         int orbThreads = 1;
         try{
             orbThreads = Integer.parseInt(config.get(Config.SCAN_THREADS));
@@ -183,7 +180,7 @@ public class App extends Application {
         }));
         initTask.setOnFailed(e -> {
             Throwable ex = initTask.getException();
-            ex.printStackTrace();
+            ex.printStackTrace(); showError(ex);
             statusLabel.textProperty().unbind();
             statusLabel.setText("Exception occurred:" + ex.getMessage());
         });
@@ -202,13 +199,14 @@ public class App extends Application {
     public void showMainStage() {
         Stage mainStage = new Stage();
         //Menu Bar init...
+        MenuItem newSessionItem = new MenuItem("New session");
         MenuItem saveSessionItem = new MenuItem("Save session");
         MenuItem loadSessionItem = new MenuItem("Load session");
         MenuItem importItem = new MenuItem("Import an image to scan...");
         MenuItem settingsItem = new MenuItem("Settings...");
         MenuItem exitItem = new MenuItem("Quit");
         Menu fileMenu = new Menu("File");
-        fileMenu.getItems().addAll(saveSessionItem, loadSessionItem, importItem, settingsItem, new SeparatorMenuItem(), exitItem);
+        fileMenu.getItems().addAll(newSessionItem, saveSessionItem, loadSessionItem, importItem, settingsItem, new SeparatorMenuItem(), exitItem);
         Menu editMenu = new Menu("Edit");
         Menu helpMenu = new Menu("Help");
         MenuItem aboutItem = new MenuItem("About");
@@ -229,6 +227,11 @@ public class App extends Application {
         view2.setImage(new Image(initFound.toURI().toString()));
         Label result = new Label();
         result.setWrapText(true);
+
+        mainStage.setOnCloseRequest(event -> {
+           Platform.exit();
+           System.exit(0);
+        });
 
         Button scan = new Button("Scan folder...");
         scan.setOnAction(e -> {
@@ -255,30 +258,26 @@ public class App extends Application {
 
         //Menu bar operations...
 
+
+        newSessionItem.setOnAction(e -> {
+            System.out.println("Creating new session...");
+            saved = false;
+            ctx.importDB.clearSession();
+            refreshImports(ctx.importDB());
+            currentSession = "";
+            mainStage.setTitle("Pokecard - "+currentSession);
+            sessionPath = Path.of(outputDir+"/"+ currentSession);
+            config.set(Config.SESSION_PATH, String.valueOf(sessionPath));
+        });
+
         saveSessionItem.setOnAction(e -> {
-            System.out.println("Saving imports to disk:");
-            statusBar.setText("Saving Session...");
-            statusProgress.setVisible(true);
-            ctx.importDB.writeImportsToDisk(cacheDir);
-            System.out.println("Done.");
-            statusBar.setText("Ready.");
-            statusProgress.setVisible(false);
+            saveSession(mainStage);
+            mainStage.setTitle("Pokecard - "+currentSession);
         });
 
         loadSessionItem.setOnAction(e -> {
-            System.out.println("Loading imports from disk:");
-            statusBar.setText("Loading Session...");
-            statusProgress.setVisible(true);
-            ctx.importDB.readImportsFromDisk(cacheDir);
-            List<CardImports> restored = ctx.importDB.getImports();
-            System.out.println("Loaded " + restored.size() + " imports.");
-            refreshImports(ctx.importDB());
-            if (!restored.isEmpty()) {
-                System.out.println(restored.getFirst().getORBRecordHistory() + "\n" + restored.get(0).getOrbWinner());
-            }
-            System.out.println("Done.");
-            statusBar.setText("Ready.");
-            statusProgress.setVisible(false);
+            loadSession(mainStage, false);
+            mainStage.setTitle("Pokecard - "+currentSession);
         });
 
         importItem.setOnAction(e -> {
@@ -319,13 +318,14 @@ public class App extends Application {
         exitItem.setOnAction(e -> {
             ctx.cardDB.shutdown();
             Platform.exit();
+            System.exit(0);
         });
 
         aboutItem.setOnAction(e -> {
             Stage aboutStage = new Stage();
             aboutStage.setTitle("About Pokecard");
             Label name = new Label("Pokecard");
-            Label version = new Label("Version 0.6.0");
+            Label version = new Label("Version 0.6.1");
             Label author = new Label("by willtryon");
             Button close = new Button("Close");
             VBox aboutLayout = new VBox(12, name, version, author, close);
@@ -335,6 +335,7 @@ public class App extends Application {
             close.setOnAction(e1 -> aboutStage.close());
             aboutStage.show();
         });
+
         //build window...
         BorderPane root = new BorderPane();
         root.setTop(menuBar);
@@ -348,9 +349,16 @@ public class App extends Application {
         Alert a = new Alert(Alert.AlertType.INFORMATION, "To safely exit the program, click 'Quit' in the file menu. \nIf you click the x, the program will halt and you'll have to kill the program in the terminal.", ButtonType.OK);
         a.setHeaderText("Notice");
         a.showAndWait();
-        mainStage.setScene(new Scene(root, 700, 600));
         mainStage.setTitle("Pokecard");
+
+        if(!(sessionPath.getFileName().toString().isEmpty())) {
+            loadSession(mainStage, true);
+            mainStage.setTitle("Pokecard - "+sessionPath.getFileName());
+        }
+
+        mainStage.setScene(new Scene(root, 700, 600));
         mainStage.show();
+
 
         /*ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "pokecard-scheduled-scan");
@@ -376,6 +384,80 @@ public class App extends Application {
             runTask(tick, v -> {
             });
         }), 0, 1, TimeUnit.MINUTES);*/
+    }
+
+    private void saveSession(Stage owner){
+        System.out.println("Saving imports to disk:");
+        if(saved) ctx.importDB.writeImportsToDisk(outputDir, currentSession);
+        if (!saved) {
+            FileChooser fc = new FileChooser();
+            fc.setTitle("Save Session");
+            fc.getExtensionFilters().addAll(
+                    new FileChooser.ExtensionFilter("Binary (*.dat)", "*.dat")
+            );
+            File targetFile = fc.showSaveDialog(owner);
+            if (targetFile != null) {
+                String filePath = targetFile.getAbsolutePath();
+                String extension = ".dat";
+
+                if (filePath.toLowerCase().endsWith(extension + extension)) {
+                    filePath = filePath.substring(0, filePath.length() - extension.length());
+                }
+                else if (!filePath.toLowerCase().endsWith(extension)) {
+                    filePath += extension;
+                }
+                File fixedFile = new File(filePath);
+                sessionPath = fixedFile.toPath();
+                currentSession = sessionPath.getFileName().toString();
+                ctx.importDB.writeImportsToDisk(outputDir, currentSession);
+                config.set(Config.SESSION_PATH, fixedFile.getAbsolutePath());
+                try {
+                    config.save();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+        statusBar.setText("Saving Session...");
+        statusProgress.setVisible(true);
+        System.out.println("Done.");
+        statusBar.setText("Ready.");
+        statusProgress.setVisible(false);
+        saved = true;
+    }
+
+    private void loadSession(Stage owner, boolean tf){
+        System.out.println("Loading imports from disk:");
+        statusBar.setText("Loading Session...");
+        statusProgress.setVisible(true);
+        if (tf) {
+            ctx.importDB.readImportsFromDisk(sessionPath);
+        }
+        else{
+            FileChooser fc = new FileChooser();
+            fc.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Binary (*.dat)", "*.dat"));
+            File targetFile = fc.showOpenDialog(owner);
+            if(targetFile != null){
+                sessionPath = targetFile.toPath();
+                ctx.importDB.readImportsFromDisk(sessionPath);
+            }
+        }
+        List<CardImports> restored = ctx.importDB.getImports();
+        currentSession = sessionPath.toString();
+        config.set(Config.SESSION_PATH, currentSession);
+        try {
+            config.save();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        System.out.println("Loaded " + restored.size() + " imports.");
+        refreshImports(ctx.importDB());
+        if (!restored.isEmpty()) {
+            System.out.println(restored.getFirst().getORBRecordHistory() + "\n" + restored.get(0).getOrbWinner());
+        }
+        System.out.println("Done.");
+        statusBar.setText("Ready.");
+        statusProgress.setVisible(false);
     }
 
     private HBox buildStatusBar() {
@@ -519,7 +601,7 @@ public class App extends Application {
     }
 
     private Node buildImportDetail(CardImports imp) {
-        VBox box = new VBox(10);
+        HBox box = new HBox(10);
         box.setPadding(new Insets(16));
 
         int size = imp.getRecordSize();
@@ -538,6 +620,18 @@ public class App extends Application {
         Button previous = new Button("Previous");
         Button next = new Button("Next");
 
+        Label cardInfomation = new Label("Card information:");
+        Label cardName = new Label();
+        Label collectorNum = new Label();
+        Label series = new Label();
+        Label cardType = new Label();
+        Label rarity = new Label();
+        Label price = new Label();
+        Label description = new Label();
+        VBox info = new VBox(10, cardInfomation, cardName, collectorNum, series, cardType, rarity, price, description);
+        info.setPadding(new Insets(16));
+        info.setSpacing(10);
+
         int[] pos = {0};
 
         Runnable render = () -> {
@@ -550,7 +644,14 @@ public class App extends Application {
                 return;
             }
             int p = pos[0];
-            CardSignature orbSig  = imp.getARecordRecord(p, "orb");
+            CardSignature orbSigVictim  = imp.getARecordRecord(p, "orb");
+            FullCardSignature orbSig = null;
+            try {
+                orbSig = new FullCardSignature(orbSigVictim, dbPath);
+                System.out.println(orbSig.getName());
+            } catch (SQLException e) {
+                showError(e);
+            }
             CardSignature hashSig = imp.getARecordRecord(p, "hash");
 
             orbLabel.setText ("ORB match: "   + (orbSig  == null ? "-" : orbSig.getCardID()  + "  (" + imp.getARecordScore(p, "orb")  + ")"));
@@ -562,6 +663,16 @@ public class App extends Application {
             count.setText("(" + (p + 1) + " of " + size + ")");
             previous.setDisable(p == 0);
             next.setDisable(p >= size - 1);
+
+            cardName.setText("Name: " + (orbSig == null ? "" : orbSig.getName()));
+            collectorNum.setText("Collection Number: "+(orbSig == null ? "" : orbSig.getExpCardNumber()));
+            series.setText("Series: "+(orbSig == null ? "" : orbSig.getExpName()));
+            cardType.setText("Type: "+(orbSig == null ? "" : orbSig.getCardType()));
+            rarity.setText("Rarity: "+(orbSig == null ? "" : orbSig.getRarity()));
+            price.setText("Price (Not valid)"+(orbSig == null ? "" : String.valueOf(orbSig.getPrice())));
+            description.setText((orbSig == null ? "" : orbSig.getDescription()));
+
+
         };
 
         previous.setOnAction(e -> { if (pos[0] > 0)        { pos[0]--; render.run(); } });
@@ -569,7 +680,9 @@ public class App extends Application {
 
         render.run();
 
-        box.getChildren().addAll(orbLabel, hashLabel, images, new HBox(16, previous, count, next));
+        VBox imgStack = new VBox(10);
+        imgStack.getChildren().addAll(orbLabel, hashLabel, images, new HBox(16, previous, count, next));
+        box.getChildren().addAll(imgStack, info);
         return box;
     }
 
@@ -650,7 +763,7 @@ class InitTask extends Task<App.AppContext>{
         }
         Main.size = size;
 
-        Path cacheFile = cacheDir.resolve("cache.xml");
+        Path cacheFile = cacheDir.resolve("cache_meta.dat");
         CardIndex cardDB;
         if (Files.isRegularFile(cacheFile)) {
             updateMessage("Loading cache (" + size + " cards)...");
