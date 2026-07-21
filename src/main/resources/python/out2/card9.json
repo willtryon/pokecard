@@ -1,0 +1,12 @@
+{
+  "image": "scans/card9.png",
+  "width": 620,
+  "height": 865,
+  "mode": "split",
+  "rotation": 0,
+  "sections": {
+    "top": "Diglett BASIC 40 HP Lv.8",
+    "middle": "",
+    "bottom": "weakness ×2 resistance retreat cost Illus. Keiji Kinebuchi ©2016 Pokémon 55/108"
+  }
+}

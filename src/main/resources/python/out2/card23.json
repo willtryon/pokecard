@@ -1,0 +1,12 @@
+{
+  "image": "scans/card23.png",
+  "width": 620,
+  "height": 865,
+  "mode": "split",
+  "rotation": 0,
+  "sections": {
+    "top": "BASIC Drowzee Lv.12 60 HP",
+    "middle": "NO. 096 Hypnosis Pokémon HT: 3'03\" WT: 71.4 lbs. Pound 10 Confuse Ray 10 Your opponent's Active Pokémon is now Confused. weakness x2 resistance",
+    "bottom": "Weakness: X2 Resistance Retreat Cost Illus. Ken Sugimori ©2016 Pokémon 49/108"
+  }
+}

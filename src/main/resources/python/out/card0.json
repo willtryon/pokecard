@@ -1,0 +1,12 @@
+{
+  "image": "card0.png",
+  "width": 620,
+  "height": 865,
+  "mode": "split",
+  "rotation": 0,
+  "sections": {
+    "top": "BASIC DragoniteEX 180 HP ★",
+    "middle": "Ability: Pull Up When you play this Pokémon from your hand onto your Bench, you may put 2 Basic Pokémon (except for Dragonite-EX) from your discard pile into your hand. Hyper Beam 130 Discard an Energy attached to your opponent's Active Pokémon.",
+    "bottom": "weakness ×2 resistance -20 Pokémon-EX rule When a Pokémon-EX has been Knocked Out, your opponent takes 2 Prize cards. Illus. Ryo Ueda ©2016 Pokémon 106/108"
+  }
+}

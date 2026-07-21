@@ -1,0 +1,12 @@
+{
+  "image": "scans/card20.png",
+  "width": 620,
+  "height": 865,
+  "mode": "split",
+  "rotation": 0,
+  "sections": {
+    "top": "Nidoran♂ BASIC 60 HP LV.20",
+    "middle": "NO. 032 Poison Pin Pokémon HT: 1'08\" WT: 19.8 lbs. Double Stab 10× Flip 2 coins. This attack does 10 damage times the number of heads. Its large ears are flapped like wings",
+    "bottom": "weakness ×2 Resistance retreat cost Illus. Ken Sugimori ©2016 Pokémon 43/108"
+  }
+}

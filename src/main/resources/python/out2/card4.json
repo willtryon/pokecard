@@ -1,0 +1,12 @@
+{
+  "image": "scans/card4.png",
+  "width": 620,
+  "height": 865,
+  "mode": "split",
+  "rotation": 0,
+  "sections": {
+    "top": "Gastly BASIC HP 50",
+    "middle": "NO. 092 Gas Pokémon HT: 4'03\" WT: 0.2 lbs. Sleep Poison Flip a coin. If heads, your opponent's Active Pokémon is now Asleep and Poisoned. weakness resistance Born from gases, anyone would",
+    "bottom": "×2 -20 retreat ©2015 Pokémon Illus. Shigenori Negishi 58/162"
+  }
+}

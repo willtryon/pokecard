@@ -4,4 +4,3 @@ cache/*
 output/*
 pokecard.properties
 hashes.txt
-/src/main/resources

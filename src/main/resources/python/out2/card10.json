@@ -1,0 +1,12 @@
+{
+  "image": "scans/card10.png",
+  "width": 620,
+  "height": 865,
+  "mode": "split",
+  "rotation": 0,
+  "sections": {
+    "top": "Tangela Lv.8 80 HP",
+    "middle": "No. 114 Vine Pokémon HT: 3'03\" WT: 77.2 lbs. Bind Flip a coin. If heads, your opponent's Active Pokémon is now Paralyzed. Poison Powder 30 Your opponent's Active Pokémon is now Poisoned. weakness x2 resistance Blue plant vines cloak the",
+    "bottom": "weakness ×2 resistance retreat cost Pokémon's identity in a tangled mass. It entangles anything that gets close. Illus. Mitsuhiro Arita ©2016 Pokémon 8/108"
+  }
+}

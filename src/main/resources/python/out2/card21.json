@@ -1,0 +1,12 @@
+{
+  "image": "scans/card21.png",
+  "width": 620,
+  "height": 865,
+  "mode": "split",
+  "rotation": 0,
+  "sections": {
+    "top": "BASIC Pikachu HP 60",
+    "middle": "",
+    "bottom": "×2 -20 retreat ©2015 Pokémon Illus. Naoki Saito 20/108●"
+  }
+}
