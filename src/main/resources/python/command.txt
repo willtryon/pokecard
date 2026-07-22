@@ -1,0 +1,1 @@
+python -m pokeocr 'scans/*.png' --engine qwen2.5-vl --mode split --device cuda --load-4bit -o out2
