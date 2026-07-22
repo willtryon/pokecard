@@ -213,6 +213,28 @@ public class App extends Application {
         helpMenu.getItems().addAll(aboutItem);
         MenuBar menuBar = new MenuBar(fileMenu, editMenu, helpMenu);
         menuBar.setUseSystemMenuBar(true);
+
+        //toolbar init...
+
+        ToolBar toolBar = new ToolBar();
+
+        Image cv1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/cv1.png")));
+        ImageView cv1View = new ImageView(cv1);
+        cv1View.setFitHeight(24);
+        cv1View.setFitWidth(24);
+        Button cv1Button = new Button();
+        cv1Button.setGraphic(cv1View);
+        cv1Button.setStyle("-fx-background-color: transparent; -fx-padding: 5;");
+        cv1Button.setOnAction(event -> {
+            Alert alert = new Alert(Alert.AlertType.INFORMATION, "cv1 works!");
+            alert.setTitle("Information");
+            alert.setHeaderText("Information");
+            alert.showAndWait();
+        });
+        toolBar.getItems().add(cv1Button);
+        VBox top = new VBox(15, menuBar, toolBar);
+
+
         //Main init...
         Label title = new Label("Pokecard");
         ImageView view1 = new ImageView();
@@ -338,7 +360,7 @@ public class App extends Application {
 
         //build window...
         BorderPane root = new BorderPane();
-        root.setTop(menuBar);
+        root.setTop(top);
         detailTabs = new TabPane();
         Tab scannerTab = new Tab("Scanner", center);
         scannerTab.setClosable(false);              // the home tab stays put
@@ -460,6 +482,10 @@ public class App extends Application {
         System.out.println("Done.");
         statusBar.setText("Ready.");
         statusProgress.setVisible(false);
+    }
+
+    private VBox buildTop(){
+        return new VBox();
     }
 
     private HBox buildStatusBar() {
