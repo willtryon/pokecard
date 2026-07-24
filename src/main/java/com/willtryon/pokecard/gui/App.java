@@ -198,43 +198,6 @@ public class App extends Application {
 
     public void showMainStage() {
         Stage mainStage = new Stage();
-        //Menu Bar init...
-        MenuItem newSessionItem = new MenuItem("New session");
-        MenuItem saveSessionItem = new MenuItem("Save session");
-        MenuItem loadSessionItem = new MenuItem("Load session");
-        MenuItem importItem = new MenuItem("Import an image to scan...");
-        MenuItem settingsItem = new MenuItem("Settings...");
-        MenuItem exitItem = new MenuItem("Quit");
-        Menu fileMenu = new Menu("File");
-        fileMenu.getItems().addAll(newSessionItem, saveSessionItem, loadSessionItem, importItem, settingsItem, new SeparatorMenuItem(), exitItem);
-        Menu editMenu = new Menu("Edit");
-        Menu helpMenu = new Menu("Help");
-        MenuItem aboutItem = new MenuItem("About");
-        helpMenu.getItems().addAll(aboutItem);
-        MenuBar menuBar = new MenuBar(fileMenu, editMenu, helpMenu);
-        menuBar.setUseSystemMenuBar(true);
-
-        //toolbar init...
-
-        ToolBar toolBar = new ToolBar();
-
-        Image cv1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/cv1.png")));
-        ImageView cv1View = new ImageView(cv1);
-        cv1View.setFitHeight(24);
-        cv1View.setFitWidth(24);
-        Button cv1Button = new Button();
-        cv1Button.setGraphic(cv1View);
-        cv1Button.setStyle("-fx-background-color: transparent; -fx-padding: 5;");
-        cv1Button.setOnAction(event -> {
-            Alert alert = new Alert(Alert.AlertType.INFORMATION, "cv1 works!");
-            alert.setTitle("Information");
-            alert.setHeaderText("Information");
-            alert.showAndWait();
-        });
-        toolBar.getItems().add(cv1Button);
-        VBox top = new VBox(15, menuBar, toolBar);
-
-
         //Main init...
         Label title = new Label("Pokecard");
         ImageView view1 = new ImageView();
@@ -277,6 +240,93 @@ public class App extends Application {
         VBox center = new VBox(12, title, imageView, result, scan);
         center.setAlignment(Pos.CENTER);
         center.setPadding(new Insets(16));
+
+
+        //build window...
+        BorderPane root = new BorderPane();
+        detailTabs = new TabPane();
+        Tab scannerTab = new Tab("Scanner", center);
+        root.setTop(buildTop(mainStage, detailTabs, view1, view2));
+        scannerTab.setClosable(false);              // the home tab stays put
+        detailTabs.getTabs().add(scannerTab);
+        root.setCenter(detailTabs);
+        root.setBottom(buildStatusBar());
+        root.setLeft(buildSideTree(ctx.cardDB, ctx.importDB()));
+        mainStage.setTitle("Pokecard");
+
+        if(!(sessionPath.getFileName().toString().isEmpty())) {
+            loadSession(mainStage, true);
+            mainStage.setTitle("Pokecard - "+sessionPath.getFileName());
+        }
+
+        mainStage.setScene(new Scene(root, 700, 600));
+        mainStage.getScene().getRoot().setStyle("-fx-base: #2a2a2a;");
+        mainStage.show();
+
+
+        /*ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "pokecard-scheduled-scan");
+            t.setDaemon(true);          // don't keep the JVM alive after the window closes
+            return t;
+        });
+
+        scheduler.scheduleAtFixedRate(() -> Platform.runLater(() -> {
+            if (!scanRunning.compareAndSet(false, true)) return;
+            Task<Void> tick = new Task<>() {
+                @Override
+                protected Void call() {
+                    ctx.cardDB.scanImports(ctx.importDB(), (msg, frac) -> {
+                        updateMessage(msg);
+                        updateProgress(frac, 1.0);
+                    });
+                    return null;
+                }
+            };
+            tick.setOnSucceeded(e -> scanRunning.set(false));
+            tick.setOnFailed(e -> scanRunning.set(false));
+            tick.setOnCancelled(e -> scanRunning.set(false));
+            runTask(tick, v -> {
+            });
+        }), 0, 1, TimeUnit.MINUTES);*/
+    }
+
+    private VBox buildTop(Stage mainStage, TabPane detailTabs, ImageView view1, ImageView view2){
+
+        //Menu Bar init...
+        MenuItem newSessionItem = new MenuItem("New session");
+        MenuItem saveSessionItem = new MenuItem("Save session");
+        MenuItem loadSessionItem = new MenuItem("Load session");
+        MenuItem importItem = new MenuItem("Import an image to scan...");
+        MenuItem closeTabsItem = new MenuItem("Close tabs");
+        MenuItem settingsItem = new MenuItem("Settings...");
+        MenuItem exitItem = new MenuItem("Quit");
+        Menu fileMenu = new Menu("File");
+        fileMenu.getItems().addAll(newSessionItem, saveSessionItem, loadSessionItem, importItem, settingsItem, new SeparatorMenuItem(),closeTabsItem, new SeparatorMenuItem(), exitItem);
+        Menu editMenu = new Menu("Edit");
+        Menu helpMenu = new Menu("Help");
+        MenuItem aboutItem = new MenuItem("About");
+        helpMenu.getItems().addAll(aboutItem);
+        MenuBar menuBar = new MenuBar(fileMenu, editMenu, helpMenu);
+        menuBar.setUseSystemMenuBar(true);
+
+        //toolbar init...
+
+        ToolBar toolBar = new ToolBar();
+        Image hash1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/hash1a.png")));
+        Button hash1Button = buildTooBarButton(hash1);
+        Image cv1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/cv1a.png")));
+        Button cv1Button = buildTooBarButton(cv1);
+        Image ocr1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/ocr1a.png")));
+        Button ocr1Button = buildTooBarButton(ocr1);
+
+        cv1Button.setOnAction(event -> {
+            Alert alert = new Alert(Alert.AlertType.INFORMATION, "cv1 works!");
+            alert.setTitle("Information");
+            alert.setHeaderText("Information");
+            alert.showAndWait();
+        });
+        toolBar.getItems().addAll(hash1Button, cv1Button,  ocr1Button);
+
 
         //Menu bar operations...
 
@@ -331,6 +381,15 @@ public class App extends Application {
             });
         });
 
+        closeTabsItem.setOnAction(e -> {
+            Tab activeTab = detailTabs.getSelectionModel().getSelectedItem();
+            if (activeTab != null) {
+                detailTabs.getTabs().retainAll(activeTab);
+            }else{
+                detailTabs.getTabs().clear();
+            }
+        });
+
         settingsItem.setOnAction(e -> {
             if (new ConfigEditor(config).showAndWait(mainStage)) {
                 new Alert(Alert.AlertType.INFORMATION, "Path changes apply next launch.", ButtonType.OK).showAndWait();
@@ -357,58 +416,20 @@ public class App extends Application {
             close.setOnAction(e1 -> aboutStage.close());
             aboutStage.show();
         });
-
-        //build window...
-        BorderPane root = new BorderPane();
-        root.setTop(top);
-        detailTabs = new TabPane();
-        Tab scannerTab = new Tab("Scanner", center);
-        scannerTab.setClosable(false);              // the home tab stays put
-        detailTabs.getTabs().add(scannerTab);
-        root.setCenter(detailTabs);
-        root.setBottom(buildStatusBar());
-        root.setLeft(buildSideTree(ctx.cardDB, ctx.importDB()));
-
-        Alert a = new Alert(Alert.AlertType.INFORMATION, "To safely exit the program, click 'Quit' in the file menu. \nIf you click the x, the program will halt and you'll have to kill the program in the terminal.", ButtonType.OK);
-        a.setHeaderText("Notice");
-        a.showAndWait();
-        mainStage.setTitle("Pokecard");
-
-        if(!(sessionPath.getFileName().toString().isEmpty())) {
-            loadSession(mainStage, true);
-            mainStage.setTitle("Pokecard - "+sessionPath.getFileName());
-        }
-
-        mainStage.setScene(new Scene(root, 700, 600));
-        mainStage.getScene().getRoot().setStyle("-fx-base: #2a2a2a;");
-        mainStage.show();
-
-
-        /*ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "pokecard-scheduled-scan");
-            t.setDaemon(true);          // don't keep the JVM alive after the window closes
-            return t;
-        });
-
-        scheduler.scheduleAtFixedRate(() -> Platform.runLater(() -> {
-            if (!scanRunning.compareAndSet(false, true)) return;
-            Task<Void> tick = new Task<>() {
-                @Override
-                protected Void call() {
-                    ctx.cardDB.scanImports(ctx.importDB(), (msg, frac) -> {
-                        updateMessage(msg);
-                        updateProgress(frac, 1.0);
-                    });
-                    return null;
-                }
-            };
-            tick.setOnSucceeded(e -> scanRunning.set(false));
-            tick.setOnFailed(e -> scanRunning.set(false));
-            tick.setOnCancelled(e -> scanRunning.set(false));
-            runTask(tick, v -> {
-            });
-        }), 0, 1, TimeUnit.MINUTES);*/
+        return new VBox(15, menuBar, toolBar);
     }
+
+    private Button buildTooBarButton(Image img){
+        ImageView view = new ImageView(img);
+        view.setFitHeight(24);
+        view.setFitWidth(24);
+        view.setPreserveRatio(true);
+        Button button = new Button();
+        button.setGraphic(view);
+        button.setStyle("-fx-background-color: transparent; -fx-padding: 5;");
+        return button;
+    }
+
 
     private void saveSession(Stage owner){
         System.out.println("Saving imports to disk:");
@@ -484,9 +505,6 @@ public class App extends Application {
         statusProgress.setVisible(false);
     }
 
-    private VBox buildTop(){
-        return new VBox();
-    }
 
     private HBox buildStatusBar() {
         statusBar = new Label("Ready.");
