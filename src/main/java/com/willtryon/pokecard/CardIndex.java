@@ -564,7 +564,7 @@ public class CardIndex{
 
             int version = dis.readInt();
             if (version != METADATA_FORMAT_VERSION) {
-                System.out.println("Metadata cache version mismatch; please rebuild the cache.");
+                System.out.println("Metadata cache version mismatch; please delete and ");
                 return new CardSignature[0];
             }
             int count  = dis.readInt();

@@ -3,6 +3,7 @@ package com.willtryon.pokecard.gui;
 import com.willtryon.pokecard.*;
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -13,6 +14,9 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import javafx.stage.*;
+import org.controlsfx.control.spreadsheet.*;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 
 import java.io.File;
 import java.io.IOException;
@@ -33,6 +37,7 @@ public class App extends Application {
     private Path sessionPath;
     private String currentSession;
     private boolean saved;
+    private final SimpleBooleanProperty isOrb = new SimpleBooleanProperty(false);
     private AppContext ctx;
 
     private Label statusBar;
@@ -173,6 +178,8 @@ public class App extends Application {
         initStage.setScene(splashScene);
         initStage.show();
 
+        isOrb.set(false);
+
         initTask.setOnSucceeded(event -> Platform.runLater(() -> {
             ctx = initTask.getValue();
             showMainStage();
@@ -288,6 +295,7 @@ public class App extends Application {
             runTask(tick, v -> {
             });
         }), 0, 1, TimeUnit.MINUTES);*/
+        //isOrb = false;
     }
 
     private VBox buildTop(Stage mainStage, TabPane detailTabs, ImageView view1, ImageView view2){
@@ -316,14 +324,12 @@ public class App extends Application {
         Button hash1Button = buildTooBarButton(hash1);
         Image cv1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/cv1a.png")));
         Button cv1Button = buildTooBarButton(cv1);
+        cv1Button.disableProperty().bind(isOrb.not());
         Image ocr1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/ocr1a.png")));
         Button ocr1Button = buildTooBarButton(ocr1);
 
         cv1Button.setOnAction(event -> {
-            Alert alert = new Alert(Alert.AlertType.INFORMATION, "cv1 works!");
-            alert.setTitle("Information");
-            alert.setHeaderText("Information");
-            alert.showAndWait();
+            openSpreadSheetTab(currentImport());
         });
         toolBar.getItems().addAll(hash1Button, cv1Button,  ocr1Button);
 
@@ -594,6 +600,7 @@ public class App extends Application {
     }
 
     private void openCardTab(CardSignature sig) {
+        isOrb.set(false);
         if (focusExistingTab("card:" + sig.getCardID())) return;
         Tab tab = new Tab(sig.getCardID(), buildCardDetail(sig));
         tab.setId("card:" + sig.getCardID());
@@ -602,10 +609,24 @@ public class App extends Application {
     }
 
     private void openImportTab(CardImports imp) {
+        isOrb.set(true);
         Path q = imp.getQueryImage();
         String key = "import:" + (q == null ? String.valueOf(imp.hashCode()) : q.toString());
         if (focusExistingTab(key)) return;
         Tab tab = new Tab(q == null ? "Import" : q.getFileName().toString(), buildImportDetail(imp));
+        tab.setId(key);
+        tab.setUserData(imp);
+        detailTabs.getTabs().add(tab);
+        detailTabs.getSelectionModel().select(tab);
+    }
+
+    private void openSpreadSheetTab(CardImports imp) {
+        isOrb.set(false);
+        Path q = imp.getQueryImage();
+        String key = "spreadsheet:" + (q == null ? String.valueOf(imp.hashCode()) : q.toString());
+        if (focusExistingTab(key)) return;
+        String title = (q == null ? "Import" : q.getFileName().toString()) + " \u2013 ORB matches";
+        Tab tab = new Tab(title, buildSpreadsheet(imp));
         tab.setId(key);
         detailTabs.getTabs().add(tab);
         detailTabs.getSelectionModel().select(tab);
@@ -619,6 +640,14 @@ public class App extends Application {
             }
         }
         return false;
+    }
+
+    private CardImports currentImport() {
+        Tab tab = detailTabs.getSelectionModel().getSelectedItem();
+        if (tab != null && tab.getUserData() instanceof CardImports imp) {
+            return imp;
+        }
+        return null;
     }
 
     private Node buildCardDetail(CardSignature sig) {
@@ -739,6 +768,44 @@ public class App extends Application {
         return iv;
     }
 
+    private SpreadsheetView buildSpreadsheet(CardImports imp) {
+        int rows = imp.getRecordSize2();
+
+        GridBase grid = new GridBase(rows, 3);
+        grid.getColumnHeaders().addAll("Card image", "Card ID (recordRecord2)", "Score (recordScore2)");
+
+        Map<Integer, Double> heights = new HashMap<>();
+        for(int i = 0; i < rows; i++){
+            heights.put(i, 140.0);
+        }
+        ObservableList<ObservableList<SpreadsheetCell>> data = FXCollections.observableArrayList();
+        for(int r = 0; r < rows; r++){
+            CardSignature sig = imp.getARecordRecord(r, "orb");
+            Double score = imp.getARecordScore(r, "orb");
+
+            SpreadsheetCell imgCell = SpreadsheetCellType.STRING.createCell(r, 0, 1, 1, "");
+            Path p = (sig == null) ? null : sig.getImgPath();
+            if(p != null && Files.exists(p)){
+                Image thumb = new Image(p.toUri().toString(), 120, 0, true, true, true);
+                ImageView iv = new ImageView(thumb);
+                iv.setPreserveRatio(true);
+                imgCell.setGraphic(iv);
+            }
+            SpreadsheetCell idCell = SpreadsheetCellType.STRING.createCell(
+                    r, 1, 1, 1, sig == null ? "-" : sig.getCardID());
+            SpreadsheetCell scoreCell = SpreadsheetCellType.DOUBLE.createCell(r, 2, 1, 1, score);
+            data.add(FXCollections.observableArrayList(imgCell, idCell, scoreCell));
+        }
+        grid.setRows(data);
+
+        SpreadsheetView sv = new SpreadsheetView(grid);
+        sv.setEditable(false);
+        sv.getColumns().get(0).setMinWidth(130);
+        sv.getColumns().get(1).setMinWidth(200);
+        sv.getColumns().get(2).setMinWidth(120);
+        return sv;
+    }
+
     private Task<?> currentStatusTask;
     private final AtomicBoolean scanRunning = new AtomicBoolean(false);
 
@@ -841,7 +908,6 @@ class InitTask extends Task<App.AppContext>{
         }
         updateMessage("Indexing imports...");
         CardImportsIndex importDB = cardDB.newImportsIndex(compareDir, cacheDir);
-        ;
         return new App.AppContext(cardDB, importDB, size);
     }
 }

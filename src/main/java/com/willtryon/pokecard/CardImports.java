@@ -22,6 +22,8 @@ public class CardImports {
     private final List<Double> recordScore2;
     private final List<CardSignature> recordRecord2;
 
+
+
     public CardImports(Path img, Hash qHash, Match hashMatch, Match orbMatch, List<Double> recordScore, List<CardSignature> recordRecord, List<Double> recordScore2, List<CardSignature> recordRecord2) {
         this.img = img;
         this.qHash = qHash;
@@ -49,6 +51,10 @@ public class CardImports {
     
     public int getRecordSize(){
         return recordScore.size();
+    }
+
+    public int getRecordSize2(){
+        return recordScore2.size();
     }
 
     public Double getARecordScore(int loc, String args){
@@ -103,5 +109,4 @@ public class CardImports {
             {}
         };
     }
-
 }
