@@ -9,6 +9,7 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -62,7 +63,7 @@ public final class PokeocrEnv{
 
         Path basePython = findBasePython();
         log.accept("Creating venv at "+venvDir);
-        mustExec(List.of(basePython.toString(), "-m", ".venv", venvDir.toString()), baseDir);
+        mustExec(List.of(basePython.toString(), "-m", "venv", venvDir.toString()), baseDir);
         mustExec(List.of(python.toString(), "-m", "pip", "install", "--upgrade", "pip"), baseDir);
 
         List<String> torchCmd = new ArrayList<>(List.of(python.toString(), "-m", "pip", "install"));
@@ -86,9 +87,31 @@ public final class PokeocrEnv{
     public int run(EnvHandle env, List<String> pokeocrArgs)throws IOException, InterruptedException{
         List<String> cmd = new ArrayList<>(List.of(env.python().toString(), "-m", "pokeocr"));
         cmd.addAll(pokeocrArgs);
-        Map<String, String> extraEnv = env.platform() == Platform.MAC_ARM
-                ? Map.of("PYTORCH_ENABLE_MPS_FALLBACK", "1")
-                : Map.of();
+        Map<String, String> extraEnv = new HashMap<>();
+        if(env.platform() == Platform.MAC_ARM){
+            extraEnv.put("PYTORCH_ENABLE_MPS_FALLBACK", "1");
+            // PyTorch's MPS allocator defaults to a 1.7 high-watermark ratio, i.e. it
+            // lets a process allocate ~1.7x the GPU's recommended working set and
+            // oversubscribe past physical RAM into swap. got-ocr2's 1024x1024 vision
+            // forward peaks near ~7GB per image; across the 3 split bands the uncapped
+            // allocator climbs to ~20GB and swaps the machine to a halt. Cap it below
+            // physical RAM: the allocator then reuses memory between bands (measured
+            // flat at ~7GB) and a genuine over-allocation becomes a clean OOM instead
+            // of a swap-storm. Ratios are relative to the recommended working set, so
+            // this scales with the machine. Low must be <= high.
+            extraEnv.put("PYTORCH_MPS_LOW_WATERMARK_RATIO", "0.7");
+            extraEnv.put("PYTORCH_MPS_HIGH_WATERMARK_RATIO", "0.8");
+        }
+        // python.org framework builds ship no OS CA bundle, so EasyOCR's plain
+        // urllib model download fails cert verification ("unable to get local
+        // issuer certificate"). Point OpenSSL/requests at certifi's bundle (present
+        // in the venv) so downloads work without the user running the interpreter's
+        // "Install Certificates.command".
+        String caBundle = certifiBundle(env.python());
+        if(caBundle != null){
+            extraEnv.put("SSL_CERT_FILE", caBundle);
+            extraEnv.put("REQUESTS_CA_BUNDLE", caBundle);
+        }
         return exec(cmd, env.appDir(), extraEnv);
     }
 
@@ -98,8 +121,13 @@ public final class PokeocrEnv{
             case CUDA -> List.of("--engine", "qwen2.5-vl", "--device", "cuda", "--load-4bit");
             // ROCm reports as "cuda" to torch; no bitsandbytes, so fp16 (~7GB VRAM).
             case ROCM -> List.of("--engine", "qwen2.5-vl", "--device", "cuda");
-            // Apple GPU: fp16, ~7GB unified memory, no 4-bit available.
-            case MPS  -> List.of("--engine", "qwen2.5-vl", "--device", "mps");
+            // Apple GPU: got-ocr2 fp16. Its 1024x1024 vision encoder does O(N^2)
+            // attention over 4096 tokens; MPS lacks the memory-efficient SDPA kernel
+            // CUDA uses, so that matrix is materialized in full. Force batch=1 to keep
+            // the peak to a single image's worth (batch 2 spikes past ~14GB).
+            //case MPS  -> List.of("--engine", "trocr", "--device", "mps");
+            case MPS  -> List.of("--engine", "qwen2.5-vl", "--device", "mps", "--batch", "1");
+            //case MPS  -> List.of("--engine", "got-ocr2", "--device", "mps", "--batch", "1");
             // CPU runs the VLM in fp32 (~12-14GB) and is very slow -> prefer the light detector.
             case CPU  -> List.of("--engine", "easyocr", "--device", "cpu");
         };
@@ -191,6 +219,23 @@ public final class PokeocrEnv{
             if (proc.waitFor() != 0 || out.isEmpty()) return null;
             String[] parts = out.split("\\s+");
             return new int[]{Integer.parseInt(parts[0]), Integer.parseInt(parts[1])};
+        } catch (IOException | InterruptedException | RuntimeException e) {
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            return null;
+        }
+    }
+
+    /** Absolute path to certifi's CA bundle inside the venv, or null if unavailable. */
+    private String certifiBundle(Path python) {
+        try {
+            Process proc = new ProcessBuilder(python.toString(), "-c",
+                    "import certifi;print(certifi.where())")
+                    .redirectErrorStream(true).start();
+            String out = new String(proc.getInputStream().readAllBytes()).strip();
+            if (proc.waitFor() != 0 || out.isEmpty()) return null;
+            // Take the last line in case an import warning is printed first.
+            String[] lines = out.split("\\R");
+            return lines[lines.length - 1].strip();
         } catch (IOException | InterruptedException | RuntimeException e) {
             if (e instanceof InterruptedException) Thread.currentThread().interrupt();
             return null;

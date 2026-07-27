@@ -503,9 +503,10 @@ public class App extends Application {
         }
         System.out.println("Loaded " + restored.size() + " imports.");
         refreshImports(ctx.importDB());
+        /*
         if (!restored.isEmpty()) {
             System.out.println(restored.getFirst().getORBRecordHistory() + "\n" + restored.get(0).getOrbWinner());
-        }
+        }*/
         System.out.println("Done.");
         statusBar.setText("Ready.");
         statusProgress.setVisible(false);
@@ -906,6 +907,8 @@ class InitTask extends Task<App.AppContext>{
                 cardDB.writeToDisk(cacheDir);
             }
         }
+        PokemonCardNameCleaner cleaner = new PokemonCardNameCleaner(dbPath, false);
+        updateMessage("Rebulding database...");
         updateMessage("Indexing imports...");
         CardImportsIndex importDB = cardDB.newImportsIndex(compareDir, cacheDir);
         return new App.AppContext(cardDB, importDB, size);
