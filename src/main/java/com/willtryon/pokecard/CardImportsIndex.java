@@ -1,16 +1,19 @@
 package com.willtryon.pokecard;
 import java.io.*;
 import java.math.BigInteger;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 import dev.brachtendorf.jimagehash.hash.Hash;
 import dev.brachtendorf.jimagehash.hashAlgorithms.HashingAlgorithm;
 import dev.brachtendorf.jimagehash.hashAlgorithms.PerceptiveHash;
 import org.bytedeco.opencv.opencv_features2d.ORB;
+
+import static com.willtryon.pokecard.PokeocrEnv.defaultCacheDir;
 
 public class CardImportsIndex {
     private String guess;
@@ -20,6 +23,7 @@ public class CardImportsIndex {
     private final List<Hash> seenHashes = new ArrayList<>();
     private final HashingAlgorithm hasher = new PerceptiveHash(64);
     private final List<CardImports> imports = new ArrayList<>();
+    private final List<CardImports> fresh = new ArrayList<>();
     private static final double DUP_THRESHOLD = 0.0;
 
     private record Scored(CardSignature sig, double score){}
@@ -30,15 +34,18 @@ public class CardImportsIndex {
         this.cardDB = cardDB;
     }
 
-    public List<CardImports> scan(){
-        return scan(null);
+    public List<CardImports> scan(Path cacheDir){
+        return scan(null, cacheDir);
     }
 
-    public synchronized List<CardImports> scan(ScanProgress progress){
+    public synchronized List<CardImports> scan(ScanProgress progress, Path cacheDir){
         guess = "";
-        List<CardImports> ocrCanidates =  new ArrayList<>();
+        List<CardImports> ocrCandidates =  new ArrayList<>();
+        Path ocrDir = cacheDir.resolve("ocr-victim");
+        try{
+            Files.delete(ocrDir);
+        }catch(IOException ignore){}
         long beginOrbJob = System.currentTimeMillis();
-        List<CardImports> fresh = new ArrayList<>();
         System.out.println("Scanning "+ compareDir+" for new images...");
         try (Stream<Path> stream = Files.walk(compareDir)){
             List<Path> imgList = stream
@@ -75,7 +82,7 @@ public class CardImportsIndex {
                     //System.out.println(result.getORBRecordHistory());
                 }
                 if(result.getARecordScore(0, "orb") - result.getARecordScore(1, "orb") < 10){
-                    ocrCanidates.add(result);
+                    ocrCandidates.add(result);
                 }
             }
         }catch(IOException e){
@@ -90,6 +97,18 @@ public class CardImportsIndex {
             System.out.println("The hash result that matches the orb winner " +f.getOrbWinner().cardID());
             System.out.print(" is "+f.getARecordRecord(f.howLowIsHash(), "hash").getCardID() +"at position "+f.howLowIsHash());
         }
+        if(!ocrCandidates.isEmpty()){
+            try(PrintWriter pw = new PrintWriter(new FileWriter(ocrDir.toFile()))){
+                for(CardImports f : ocrCandidates){
+                    pw.println(f.getQueryImage().toString());
+                    System.out.println("OCR worthy:"+f.getQueryImage().toString());
+                }
+            }catch(IOException e){
+                System.out.println("Can't write to "+ocrDir.toFile());
+                e.printStackTrace();
+            }
+        }
+        //try{Thread.sleep(5000);}catch(InterruptedException e){e.printStackTrace();}
         return fresh;
     }
 
@@ -162,6 +181,36 @@ public class CardImportsIndex {
             recordScore2.add(scored.score());
         }
 		return new CardImports(path, test, hashMatch, orbMatch, recordScore, recordRecord, recordScore2, recordRecord2);
+    }
+
+    public void runOcr(Path cacheDir, ScanProgress progress) throws IOException, URISyntaxException, InterruptedException {
+        System.out.println("I work!");
+        progress.report("OCR bullshit now", -1);
+        PokeocrEnv env = new PokeocrEnv(defaultCacheDir());
+        PokeocrEnv.EnvHandle handle = env.prepare();
+        try(PokeocrInterface ocrInterface = new PokeocrInterface(env, handle)){
+            List<Path> paths = new ArrayList<>(
+                    Files.readAllLines(cacheDir.resolve("ocr-victim"))
+                            .stream()
+                            .filter(line -> !line.isBlank()) // Skip empty lines
+                            .map(Path::of)
+                            .toList()
+            );
+            List<PokeocrInterface.Card> cards = ocrInterface.process(paths);
+            for (var c : cards) {
+                if (c.ok())
+                    System.out.printf("card %d rot=%d top=[%s] bottom=[%s]%n",
+                            c.index(), c.rotation(), c.top(), c.bottom());
+                else
+                    System.out.printf("card %d ERROR: %s%n", c.index(), c.error());
+            }
+        }catch(Exception e){
+            e.printStackTrace();
+        }
+    }
+
+    public void oneOcr(){
+
     }
 
     public List<CardImports> getImports() { return imports; }

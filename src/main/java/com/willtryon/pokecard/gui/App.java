@@ -28,6 +28,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
+import static com.willtryon.pokecard.PokeocrEnv.defaultCacheDir;
+
 public class App extends Application {
 
     private Config config;
@@ -228,7 +230,8 @@ public class App extends Application {
         Button scan = new Button("Scan folder...");
         scan.setOnAction(e -> {
             scan.setDisable(true);
-            Task<Void> scanTask = new Task<>() {
+
+            Task<Void> orbTask = new Task<>() {
                 @Override
                 protected Void call() {
                     ctx.cardDB.scanImports(ctx.importDB(), (msg, frac) -> {
@@ -240,9 +243,29 @@ public class App extends Application {
                     return null;
                 }
             };
-            runTask(scanTask, v -> {
+
+            runTask(orbTask, v -> {});
+            orbTask.setOnSucceeded(event -> {
+                Task<Void> ocrTask = new Task<>() {
+                    @Override
+                    protected Void call() {
+                        try{
+                            ctx.importDB.runOcr(cacheDir, (msg, frac) -> {
+                                updateMessage(msg);
+                                updateProgress(frac, 1.0);
+                            });
+                        }catch(Exception e){
+                            showError(e);
+                        }
+                        refreshImports(ctx.importDB());
+                        scan.setDisable(false);
+                        return null;
+                    }
+                };
+                runTask(ocrTask, v -> {});
             });
         });
+
         HBox imageView = new HBox(20, view1, view2);
         VBox center = new VBox(12, title, imageView, result, scan);
         center.setAlignment(Pos.CENTER);
@@ -907,9 +930,12 @@ class InitTask extends Task<App.AppContext>{
                 cardDB.writeToDisk(cacheDir);
             }
         }
-        PokemonCardNameCleaner cleaner = new PokemonCardNameCleaner(dbPath, false);
+        updateMessage("Verifying python env...");
+        PokeocrEnv env = new PokeocrEnv(defaultCacheDir());
+        PokeocrEnv.EnvHandle handle = env.prepare();
         updateMessage("Rebulding database...");
-        updateMessage("Indexing imports...");
+        new PokemonCardNameCleaner(dbPath, false);
+        updateMessage("Starting...");
         CardImportsIndex importDB = cardDB.newImportsIndex(compareDir, cacheDir);
         return new App.AppContext(cardDB, importDB, size);
     }

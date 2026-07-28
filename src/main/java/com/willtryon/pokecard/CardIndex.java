@@ -437,7 +437,7 @@ public class CardIndex{
     }
 
     public void scanImports(CardImportsIndex importDB, ScanProgress progress){
-        List<CardImports> fresh = importDB.scan(progress);
+        List<CardImports> fresh = importDB.scan(progress, cacheDir);
         if (fresh.isEmpty()) return;
         List<String[]> rows = new ArrayList<>();
         for(CardImports ci : fresh){
