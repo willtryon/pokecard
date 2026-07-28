@@ -36,6 +36,7 @@ public class CardImportsIndex {
 
     public synchronized List<CardImports> scan(ScanProgress progress){
         guess = "";
+        List<CardImports> ocrCanidates =  new ArrayList<>();
         long beginOrbJob = System.currentTimeMillis();
         List<CardImports> fresh = new ArrayList<>();
         System.out.println("Scanning "+ compareDir+" for new images...");
@@ -72,7 +73,9 @@ public class CardImportsIndex {
                     imports.add(result);
                     //System.out.println(result.getHashedRecordHistory());
                     //System.out.println(result.getORBRecordHistory());
-
+                }
+                if(result.getARecordScore(0, "orb") - result.getARecordScore(1, "orb") < 10){
+                    ocrCanidates.add(result);
                 }
             }
         }catch(IOException e){

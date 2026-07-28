@@ -8,12 +8,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.*;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
@@ -336,7 +331,7 @@ public final class PokeocrEnv{
         return proc.waitFor();
     }
 
-    /** Returns true iff the command runs and exits 0 (used for GPU probing). */
+    /** Returns true if the command runs and exits 0 (used for GPU probing). */
     private static boolean commandSucceeds(String... cmd) {
         try {
             Process p = new ProcessBuilder(cmd).redirectErrorStream(true).start();
@@ -366,7 +361,6 @@ public final class PokeocrEnv{
         pokeArgs.add("-o");
         pokeArgs.add(handle.baseDir().resolve("out").toString());
         pokeArgs.addAll(List.of(args));
-
         int code = env.run(handle, pokeArgs);
         System.out.println("pokeocr exited with " + code);
     }
