@@ -4,7 +4,7 @@ import java.math.BigInteger;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.sql.SQLException;
 import java.util.*;
 import java.util.stream.Stream;
 
@@ -14,6 +14,7 @@ import dev.brachtendorf.jimagehash.hashAlgorithms.PerceptiveHash;
 import org.bytedeco.opencv.opencv_features2d.ORB;
 
 import static com.willtryon.pokecard.PokeocrEnv.defaultCacheDir;
+import static com.willtryon.pokecard.CardIndex.timer;
 
 public class CardImportsIndex {
     private String guess;
@@ -186,6 +187,7 @@ public class CardImportsIndex {
     public void runOcr(Path cacheDir, ScanProgress progress) throws IOException, URISyntaxException, InterruptedException {
         System.out.println("I work!");
         progress.report("OCR bullshit now", -1);
+        long startTime = System.currentTimeMillis();
         PokeocrEnv env = new PokeocrEnv(defaultCacheDir());
         PokeocrEnv.EnvHandle handle = env.prepare();
         try(PokeocrInterface ocrInterface = new PokeocrInterface(env, handle)){
@@ -196,21 +198,33 @@ public class CardImportsIndex {
                             .map(Path::of)
                             .toList()
             );
-            List<PokeocrInterface.Card> cards = ocrInterface.process(paths);
+            List<PokeocrInterface.Card> cards = ocrInterface.process(paths, progress);
+            Map<String, CardImports> byPath = new HashMap<>();
+            for (CardImports ci : imports) {
+                byPath.put(ci.getQueryImage().toAbsolutePath().toString(), ci);
+            }
             for (var c : cards) {
-                if (c.ok())
+                if (c.ok()) {
                     System.out.printf("card %d rot=%d top=[%s] bottom=[%s]%n",
                             c.index(), c.rotation(), c.top(), c.bottom());
-                else
+                    CardImports parent = byPath.get(c.path());
+                    if (parent == null) continue;
+                    //CardImports.Match m = resolveViaSql(c.top(), c.bottom());
+                    CardImports.Match m = new CardImports.Match(c.top(), parent.getQueryImage().toString(), 67.0);
+                    if (m != null) parent.setOcrWinner(m);
+                }else
                     System.out.printf("card %d ERROR: %s%n", c.index(), c.error());
             }
+            System.out.println("The operation completed successfully.");
+            System.out.println("Total time: " + timer(startTime));
         }catch(Exception e){
             e.printStackTrace();
         }
     }
 
-    public void oneOcr(){
+    public CardImports.Match resolveViaSql(String top, String bottom) throws SQLException, IOException, URISyntaxException {
 
+        return null;
     }
 
     public List<CardImports> getImports() { return imports; }

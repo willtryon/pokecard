@@ -40,6 +40,7 @@ public class App extends Application {
     private String currentSession;
     private boolean saved;
     private final SimpleBooleanProperty isOrb = new SimpleBooleanProperty(false);
+    private final SimpleBooleanProperty isHash = new SimpleBooleanProperty(false);
     private AppContext ctx;
 
     private Label statusBar;
@@ -180,7 +181,7 @@ public class App extends Application {
         initStage.setScene(splashScene);
         initStage.show();
 
-        isOrb.set(false);
+        isOrb.set(false); isHash.set(false);
 
         initTask.setOnSucceeded(event -> Platform.runLater(() -> {
             ctx = initTask.getValue();
@@ -290,7 +291,7 @@ public class App extends Application {
         }
 
         mainStage.setScene(new Scene(root, 700, 600));
-        mainStage.getScene().getRoot().setStyle("-fx-base: #2a2a2a;");
+        //mainStage.getScene().getRoot().setStyle("-fx-base: #2a2a2a;");
         mainStage.show();
 
 
@@ -345,16 +346,21 @@ public class App extends Application {
         ToolBar toolBar = new ToolBar();
         Image hash1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/hash1a.png")));
         Button hash1Button = buildTooBarButton(hash1);
+        hash1Button.disableProperty().bind(isHash.not());
         Image cv1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/cv1a.png")));
         Button cv1Button = buildTooBarButton(cv1);
         cv1Button.disableProperty().bind(isOrb.not());
         Image ocr1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/ocr1a.png")));
         Button ocr1Button = buildTooBarButton(ocr1);
 
-        cv1Button.setOnAction(event -> {
-            openSpreadSheetTab(currentImport());
+        hash1Button.setOnAction(event -> {
+            openSpreadSheetTab(currentImport(), "hash");
         });
-        toolBar.getItems().addAll(hash1Button, cv1Button,  ocr1Button);
+
+        cv1Button.setOnAction(event -> {
+            openSpreadSheetTab(currentImport(), "orb");
+        });
+        toolBar.getItems().addAll(hash1Button, cv1Button, ocr1Button);
 
 
         //Menu bar operations...
@@ -624,7 +630,7 @@ public class App extends Application {
     }
 
     private void openCardTab(CardSignature sig) {
-        isOrb.set(false);
+        isOrb.set(false); isHash.set(false);
         if (focusExistingTab("card:" + sig.getCardID())) return;
         Tab tab = new Tab(sig.getCardID(), buildCardDetail(sig));
         tab.setId("card:" + sig.getCardID());
@@ -633,7 +639,7 @@ public class App extends Application {
     }
 
     private void openImportTab(CardImports imp) {
-        isOrb.set(true);
+        isOrb.set(true); isHash.set(true);
         Path q = imp.getQueryImage();
         String key = "import:" + (q == null ? String.valueOf(imp.hashCode()) : q.toString());
         if (focusExistingTab(key)) return;
@@ -644,13 +650,13 @@ public class App extends Application {
         detailTabs.getSelectionModel().select(tab);
     }
 
-    private void openSpreadSheetTab(CardImports imp) {
-        isOrb.set(false);
+    private void openSpreadSheetTab(CardImports imp, String args) {
+        isOrb.set(false); isHash.set(false);
         Path q = imp.getQueryImage();
         String key = "spreadsheet:" + (q == null ? String.valueOf(imp.hashCode()) : q.toString());
         if (focusExistingTab(key)) return;
         String title = (q == null ? "Import" : q.getFileName().toString()) + " \u2013 ORB matches";
-        Tab tab = new Tab(title, buildSpreadsheet(imp));
+        Tab tab = new Tab(title, buildSpreadsheet(imp, args));
         tab.setId(key);
         detailTabs.getTabs().add(tab);
         detailTabs.getSelectionModel().select(tab);
@@ -707,6 +713,7 @@ public class App extends Application {
 
         Label orbLabel  = new Label();
         Label hashLabel = new Label();
+        Label ocrLabel = new Label();
 
         ImageView image1 = new ImageView(); image1.setPreserveRatio(true); image1.setFitHeight(300);
         ImageView image2 = new ImageView(); image2.setPreserveRatio(true); image2.setFitHeight(300);
@@ -737,6 +744,7 @@ public class App extends Application {
             if (size == 0) {
                 orbLabel.setText("ORB match: -");
                 hashLabel.setText("pHash match: -");
+                ocrLabel.setText("OCR match: -");
                 count.setText("(0 of 0)");
                 previous.setDisable(true);
                 next.setDisable(true);
@@ -752,9 +760,11 @@ public class App extends Application {
                 showError(e);
             }
             CardSignature hashSig = imp.getARecordRecord(p, "hash");
+            CardImports.Match ocrSig = imp.getOcrWinner();
 
             orbLabel.setText ("ORB match: "   + (orbSig  == null ? "-" : orbSig.getCardID()  + "  (" + imp.getARecordScore(p, "orb")  + ")"));
             hashLabel.setText("pHash match: " + (hashSig == null ? "-" : hashSig.getCardID() + "  (" + imp.getARecordScore(p, "hash") + ")"));
+            ocrLabel.setText("OCR match: " + (ocrSig == null ? "-" : ocrSig.cardID()));
 
             Path orbImg = (orbSig != null) ? orbSig.getImgPath() : null;
             image2.setImage((orbImg != null && Files.exists(orbImg)) ? new Image(orbImg.toUri().toString()) : null);
@@ -780,7 +790,7 @@ public class App extends Application {
         render.run();
 
         VBox imgStack = new VBox(10);
-        imgStack.getChildren().addAll(orbLabel, hashLabel, images, new HBox(16, previous, count, next));
+        imgStack.getChildren().addAll(orbLabel, hashLabel, ocrLabel, images, new HBox(16, previous, count, next));
         box.getChildren().addAll(imgStack, info);
         return box;
     }
@@ -792,11 +802,11 @@ public class App extends Application {
         return iv;
     }
 
-    private SpreadsheetView buildSpreadsheet(CardImports imp) {
+    private SpreadsheetView buildSpreadsheet(CardImports imp, String args) {
         int rows = imp.getRecordSize2();
 
         GridBase grid = new GridBase(rows, 3);
-        grid.getColumnHeaders().addAll("Card image", "Card ID (recordRecord2)", "Score (recordScore2)");
+        grid.getColumnHeaders().addAll("Card image", "Card ID", "Score");
 
         Map<Integer, Double> heights = new HashMap<>();
         for(int i = 0; i < rows; i++){
@@ -804,8 +814,11 @@ public class App extends Application {
         }
         ObservableList<ObservableList<SpreadsheetCell>> data = FXCollections.observableArrayList();
         for(int r = 0; r < rows; r++){
-            CardSignature sig = imp.getARecordRecord(r, "orb");
-            Double score = imp.getARecordScore(r, "orb");
+            if(args.equals("ocr")){
+                imp.getOcrWinner();
+            }
+            CardSignature sig = imp.getARecordRecord(r, args);
+            Double score = imp.getARecordScore(r, args);
 
             SpreadsheetCell imgCell = SpreadsheetCellType.STRING.createCell(r, 0, 1, 1, "");
             Path p = (sig == null) ? null : sig.getImgPath();

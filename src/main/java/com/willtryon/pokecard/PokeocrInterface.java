@@ -6,6 +6,7 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
+
 public final class PokeocrInterface implements AutoCloseable{
 
     public record Card(int index, boolean ok, int rotation, String top, String bottom, String path, String error){}
@@ -55,9 +56,11 @@ public final class PokeocrInterface implements AutoCloseable{
         throw new IOException("pokeocr exited before READY (exit " + proc.waitFor() + ")");
     }
 
-    public List<Card> process(List<Path> imagePaths) throws IOException{
+    public List<Card> process(List<Path> imagePaths, ScanProgress progress) throws IOException{
         Path manifest = Files.createTempFile("pokeocr-candidates", ".txt");
         try{
+            int total = imagePaths.size();
+
             List<String> lines = new ArrayList<>();
             for(Path p : imagePaths){
                 lines.add(p.toAbsolutePath().toString());
@@ -66,6 +69,9 @@ public final class PokeocrInterface implements AutoCloseable{
             bw.write(manifest.toAbsolutePath().toString());
             bw.newLine();
             bw.flush();
+            if(progress != null){
+                progress.report("Reading cards (0/"+total+")...", 0.0);
+            }
 
             List<Card> cards = new ArrayList<>();
             for(String line; (line = br.readLine()) != null; ){
@@ -73,7 +79,15 @@ public final class PokeocrInterface implements AutoCloseable{
                 // empty fields so an empty band can't shift the path column.
                 String[] split = line.split("\t", -1);
                 switch(split[0]){
-                    case "CARD" -> cards.add(parseCard(split));
+                    case "CARD" -> {
+                        cards.add(parseCard(split));
+                        // One CARD line == one card finished (OK or ERR both count).
+                        if(progress != null && total > 0){
+                            int done = cards.size();
+                            progress.report("Reading cards ("+done+"/"+total+")...",
+                                    (double) done / total);
+                        }
+                    }
                     case "BATCH" -> {return cards;}
                     case "MANIFEST_ERR" -> throw new IOException("manifest: " + b64(split[1]));
                     default -> {}

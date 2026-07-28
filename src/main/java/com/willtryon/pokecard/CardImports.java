@@ -17,6 +17,7 @@ public class CardImports {
     private final Hash qHash;
     private final Match hashMatch;
     private final Match orbMatch;
+    private Match ocrMatch;
     private final List<Double> recordScore;
     private final List<CardSignature> recordRecord;
     private final List<Double> recordScore2;
@@ -47,6 +48,22 @@ public class CardImports {
 
     public Match getOrbWinner(){
         return orbMatch;
+    }
+
+    public Match getOcrWinner(){
+        return ocrMatch;
+    }
+
+    public void setOcrWinner(Match m){
+        this.ocrMatch = m;
+    }
+
+    public boolean hasOcr(){
+        return ocrMatch != null;
+    }
+
+    public Match bestMatch(){
+        return ocrMatch != null ? ocrMatch : orbMatch;
     }
     
     public int getRecordSize(){
