@@ -82,7 +82,7 @@ public class CardImportsIndex {
                     //System.out.println(result.getHashedRecordHistory());
                     //System.out.println(result.getORBRecordHistory());
                 }
-                if(result.getARecordScore(0, "orb") - result.getARecordScore(1, "orb") < 1000){
+                if(result.getARecordScore(0, "orb") - result.getARecordScore(1, "orb") < 10){
                     ocrCandidates.add(result);
                 }
             }
@@ -224,21 +224,24 @@ public class CardImportsIndex {
     }
 
     public CardImports.Match resolveViaSql(String top, String bottom, String url) throws SQLException {
-        Integer number = parseCardNumber(bottom);   // "…36/106●" -> 36, or null
-
-        // We never parse the name: the OCR string goes on the LEFT of LIKE, and we
-        // ask which stored name occurs inside it. expCardNumber is zero-padded TEXT
-        // ('036'), so we must compare it as an int, not as the raw string.
+        Integer number = parseCardNumber(bottom);   // "…36/106●" -> 36,   or null
+        String  year   = parseYear(bottom);// "©2014"    -> "2014", or null
+        System.out.println(number + " " + year);
+        // Year is a TIEBREAKER, not a filter: rows whose release year matches the
+        // copyright year sort first, but a missing / off-by-one / null year never
+        // drops a row. expCardNumber is zero-padded TEXT, so compare it as an int.
         String sql =
                 "SELECT cardId, img FROM cards " +
                         "WHERE ? LIKE '%' || name || '%' " +
                         (number != null ? "AND CAST(expCardNumber AS INTEGER) = ? " : "") +
-                        "ORDER BY LENGTH(name) DESC LIMIT 1";
+                        "ORDER BY (substr(releaseDate, 1, 4) = ?) DESC, LENGTH(name) DESC LIMIT 1";
 
         try (Connection conn = DriverManager.getConnection(url);
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, top);
-            if (number != null) ps.setInt(2, number);
+            int i = 1;
+            ps.setString(i++, top);
+            if (number != null) ps.setInt(i++, number);
+            ps.setString(i, year);   // null is fine: (substr = NULL) is NULL for every row
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return new CardImports.Match(rs.getString("cardId"), rs.getString("img"), 100.0);
@@ -246,6 +249,15 @@ public class CardImportsIndex {
             }
         }
         return null;
+    }
+
+    /** Copyright year from an OCR bottom line, e.g. "… ©2014 …" -> "2014". */
+    private static String parseYear(String bottom) {
+        if (bottom == null) return null;
+        var m = java.util.regex.Pattern.compile("©\\s*((?:19|20)\\d{2})").matcher(bottom);
+        if (m.find()) return m.group(1);                        // prefer the year after ©
+        m = java.util.regex.Pattern.compile("\\b((?:19|20)\\d{2})\\b").matcher(bottom);
+        return m.find() ? m.group(1) : null;                    // else any 1900–2099 year
     }
 
     private static Integer parseCardNumber(String bottom) {
