@@ -4,7 +4,7 @@ import java.math.BigInteger;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.*;
 import java.util.stream.Stream;
 
@@ -82,7 +82,7 @@ public class CardImportsIndex {
                     //System.out.println(result.getHashedRecordHistory());
                     //System.out.println(result.getORBRecordHistory());
                 }
-                if(result.getARecordScore(0, "orb") - result.getARecordScore(1, "orb") < 10){
+                if(result.getARecordScore(0, "orb") - result.getARecordScore(1, "orb") < 1000){
                     ocrCandidates.add(result);
                 }
             }
@@ -184,7 +184,7 @@ public class CardImportsIndex {
 		return new CardImports(path, test, hashMatch, orbMatch, recordScore, recordRecord, recordScore2, recordRecord2);
     }
 
-    public void runOcr(Path cacheDir, ScanProgress progress) throws IOException, URISyntaxException, InterruptedException {
+    public void runOcr(Path cacheDir, Path dbPath,ScanProgress progress) throws IOException, URISyntaxException, InterruptedException {
         System.out.println("I work!");
         progress.report("OCR bullshit now", -1);
         long startTime = System.currentTimeMillis();
@@ -209,8 +209,9 @@ public class CardImportsIndex {
                             c.index(), c.rotation(), c.top(), c.bottom());
                     CardImports parent = byPath.get(c.path());
                     if (parent == null) continue;
-                    //CardImports.Match m = resolveViaSql(c.top(), c.bottom());
-                    CardImports.Match m = new CardImports.Match(c.top(), parent.getQueryImage().toString(), 67.0);
+                    String url = "jdbc:sqlite:" + dbPath;
+                    CardImports.Match m = resolveViaSql(c.top(), c.bottom(), url);
+                    //CardImports.Match m = new CardImports.Match(c.top(), parent.getQueryImage().toString(), 67.0);
                     if (m != null) parent.setOcrWinner(m);
                 }else
                     System.out.printf("card %d ERROR: %s%n", c.index(), c.error());
@@ -222,9 +223,35 @@ public class CardImportsIndex {
         }
     }
 
-    public CardImports.Match resolveViaSql(String top, String bottom) throws SQLException, IOException, URISyntaxException {
+    public CardImports.Match resolveViaSql(String top, String bottom, String url) throws SQLException {
+        Integer number = parseCardNumber(bottom);   // "…36/106●" -> 36, or null
 
+        // We never parse the name: the OCR string goes on the LEFT of LIKE, and we
+        // ask which stored name occurs inside it. expCardNumber is zero-padded TEXT
+        // ('036'), so we must compare it as an int, not as the raw string.
+        String sql =
+                "SELECT cardId, img FROM cards " +
+                        "WHERE ? LIKE '%' || name || '%' " +
+                        (number != null ? "AND CAST(expCardNumber AS INTEGER) = ? " : "") +
+                        "ORDER BY LENGTH(name) DESC LIMIT 1";
+
+        try (Connection conn = DriverManager.getConnection(url);
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, top);
+            if (number != null) ps.setInt(2, number);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return new CardImports.Match(rs.getString("cardId"), rs.getString("img"), 100.0);
+                }
+            }
+        }
         return null;
+    }
+
+    private static Integer parseCardNumber(String bottom) {
+        if (bottom == null) return null;
+        var m = java.util.regex.Pattern.compile("(\\d{1,4})\\s*/\\s*\\d{1,4}").matcher(bottom);
+        return m.find() ? Integer.parseInt(m.group(1)) : null;
     }
 
     public List<CardImports> getImports() { return imports; }

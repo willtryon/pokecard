@@ -239,8 +239,13 @@ public class App extends Application {
                         updateMessage(msg);
                         updateProgress(frac, 1.0);
                     });
-                    refreshImports(ctx.importDB());
-                    scan.setDisable(false);
+                    // Scene-graph mutations must run on the FX thread: refreshImports
+                    // rebuilds the live TreeView's items, and doing it from this background
+                    // thread races the FX layout pass -> ConcurrentModificationException.
+                    Platform.runLater(() -> {
+                        refreshImports(ctx.importDB());
+                        scan.setDisable(false);
+                    });
                     return null;
                 }
             };
@@ -251,15 +256,18 @@ public class App extends Application {
                     @Override
                     protected Void call() {
                         try{
-                            ctx.importDB.runOcr(cacheDir, (msg, frac) -> {
+                            ctx.importDB.runOcr(cacheDir, dbPath, (msg, frac) -> {
                                 updateMessage(msg);
                                 updateProgress(frac, 1.0);
                             });
                         }catch(Exception e){
-                            showError(e);
+                            Platform.runLater(() -> showError(e));
                         }
-                        refreshImports(ctx.importDB());
-                        scan.setDisable(false);
+                        // FX-thread only (see orbTask): refreshImports touches the live tree.
+                        Platform.runLater(() -> {
+                            refreshImports(ctx.importDB());
+                            scan.setDisable(false);
+                        });
                         return null;
                     }
                 };
