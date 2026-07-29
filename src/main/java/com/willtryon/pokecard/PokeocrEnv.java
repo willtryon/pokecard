@@ -123,8 +123,10 @@ public final class PokeocrEnv{
             //case MPS  -> List.of("--engine", "trocr", "--device", "mps");
             case MPS  -> List.of("--engine", "qwen2.5-vl", "--device", "mps", "--batch", "1");
             //case MPS  -> List.of("--engine", "got-ocr2", "--device", "mps", "--batch", "1");
-            // CPU runs the VLM in fp32 (~12-14GB) and is very slow -> prefer the light detector.
-            case CPU  -> List.of("--engine", "easyocr", "--device", "cpu");
+            // CPU: serve/split needs a whole-image VLM (easyocr is single-line and argparse
+            // rejects it), so fall back to got-ocr2 — the smallest VLM (0.58B, ~2.3GB fp32)
+            // rather than qwen (~12-14GB fp32). Functional but slow; real use wants a GPU.
+            case CPU  -> List.of("--engine", "got-ocr2", "--device", "cpu");
         };
     }
 
@@ -161,8 +163,13 @@ public final class PokeocrEnv{
         if(platform == Platform.MAC_ARM) return Accel.MPS;
         if(platform == Platform.MAC_X86) return Accel.CPU;
         if(commandSucceeds("nvidia-smi", "-L")) return Accel.CUDA;
+        // ROCm probes: /opt/rocm is the Ubuntu/official-installer layout; Fedora/Nobara
+        // package ROCm under /usr instead, so also probe the CLI tools. rocminfo returning
+        // 0 means the ROCm runtime actually sees a supported GPU (was misspelled "rocm.info").
         if(platform == Platform.LINUX
-        && (Files.isDirectory(Path.of("/opt/rocm"))|| commandSucceeds("rocm.info"))) return Accel.ROCM;
+        && (Files.isDirectory(Path.of("/opt/rocm"))
+            || commandSucceeds("rocminfo")
+            || commandSucceeds("rocm-smi"))) return Accel.ROCM;
         return Accel.CPU;
     }
 

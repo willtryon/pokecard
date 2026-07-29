@@ -4,7 +4,7 @@ import java.math.BigInteger;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.*;
 import java.util.stream.Stream;
 
@@ -184,7 +184,7 @@ public class CardImportsIndex {
 		return new CardImports(path, test, hashMatch, orbMatch, recordScore, recordRecord, recordScore2, recordRecord2);
     }
 
-    public void runOcr(Path cacheDir, ScanProgress progress) throws IOException, URISyntaxException, InterruptedException {
+    public void runOcr(Path cacheDir, Path dbPath,ScanProgress progress) throws IOException, URISyntaxException, InterruptedException {
         System.out.println("I work!");
         progress.report("OCR bullshit now", -1);
         long startTime = System.currentTimeMillis();
@@ -209,8 +209,9 @@ public class CardImportsIndex {
                             c.index(), c.rotation(), c.top(), c.bottom());
                     CardImports parent = byPath.get(c.path());
                     if (parent == null) continue;
-                    //CardImports.Match m = resolveViaSql(c.top(), c.bottom());
-                    CardImports.Match m = new CardImports.Match(c.top(), parent.getQueryImage().toString(), 67.0);
+                    String url = "jdbc:sqlite:" + dbPath;
+                    CardImports.Match m = resolveViaSql(c.top(), c.bottom(), url);
+                    //CardImports.Match m = new CardImports.Match(c.top(), parent.getQueryImage().toString(), 67.0);
                     if (m != null) parent.setOcrWinner(m);
                 }else
                     System.out.printf("card %d ERROR: %s%n", c.index(), c.error());
@@ -222,9 +223,47 @@ public class CardImportsIndex {
         }
     }
 
-    public CardImports.Match resolveViaSql(String top, String bottom) throws SQLException, IOException, URISyntaxException {
+    public CardImports.Match resolveViaSql(String top, String bottom, String url) throws SQLException {
+        Integer number = parseCardNumber(bottom);   // "…36/106●" -> 36,   or null
+        String  year   = parseYear(bottom);// "©2014"    -> "2014", or null
+        System.out.println(number + " " + year);
+        // Year is a TIEBREAKER, not a filter: rows whose release year matches the
+        // copyright year sort first, but a missing / off-by-one / null year never
+        // drops a row. expCardNumber is zero-padded TEXT, so compare it as an int.
+        String sql =
+                "SELECT cardId, img FROM cards " +
+                        "WHERE ? LIKE '%' || name || '%' " +
+                        (number != null ? "AND CAST(expCardNumber AS INTEGER) = ? " : "") +
+                        "ORDER BY (substr(releaseDate, 1, 4) = ?) DESC, LENGTH(name) DESC LIMIT 1";
 
+        try (Connection conn = DriverManager.getConnection(url);
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            int i = 1;
+            ps.setString(i++, top);
+            if (number != null) ps.setInt(i++, number);
+            ps.setString(i, year);   // null is fine: (substr = NULL) is NULL for every row
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return new CardImports.Match(rs.getString("cardId"), rs.getString("img"), 100.0);
+                }
+            }
+        }
         return null;
+    }
+
+    /** Copyright year from an OCR bottom line, e.g. "… ©2014 …" -> "2014". */
+    private static String parseYear(String bottom) {
+        if (bottom == null) return null;
+        var m = java.util.regex.Pattern.compile("©\\s*((?:19|20)\\d{2})").matcher(bottom);
+        if (m.find()) return m.group(1);                        // prefer the year after ©
+        m = java.util.regex.Pattern.compile("\\b((?:19|20)\\d{2})\\b").matcher(bottom);
+        return m.find() ? m.group(1) : null;                    // else any 1900–2099 year
+    }
+
+    private static Integer parseCardNumber(String bottom) {
+        if (bottom == null) return null;
+        var m = java.util.regex.Pattern.compile("(\\d{1,4})\\s*/\\s*\\d{1,4}").matcher(bottom);
+        return m.find() ? Integer.parseInt(m.group(1)) : null;
     }
 
     public List<CardImports> getImports() { return imports; }

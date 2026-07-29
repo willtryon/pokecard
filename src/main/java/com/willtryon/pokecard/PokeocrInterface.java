@@ -73,6 +73,8 @@ public final class PokeocrInterface implements AutoCloseable{
                 progress.report("Reading cards (0/"+total+")...", 0.0);
             }
 
+            long startTime = System.currentTimeMillis();
+
             List<Card> cards = new ArrayList<>();
             for(String line; (line = br.readLine()) != null; ){
                 // Protocol is TAB-delimited (CARD\ti\tOK\t...); -1 keeps trailing
@@ -84,7 +86,9 @@ public final class PokeocrInterface implements AutoCloseable{
                         // One CARD line == one card finished (OK or ERR both count).
                         if(progress != null && total > 0){
                             int done = cards.size();
-                            progress.report("Reading cards ("+done+"/"+total+")...",
+                            String eta = niceTimer(startTime, done, total);
+                            progress.report(
+                                    "Reading cards (" + done + "/" + total + ") \u2014 " + eta,
                                     (double) done / total);
                         }
                     }
@@ -109,6 +113,31 @@ public final class PokeocrInterface implements AutoCloseable{
 
     private static String b64(String s){
         return new String(Base64.getDecoder().decode(s),  StandardCharsets.UTF_8);
+    }
+
+    private static String niceTimer(long startTime, int done, int total) {
+        if (done <= 0) {
+            return "estimating time remaining";
+        }
+        long elapsed = System.currentTimeMillis() - startTime;
+        long avgPerItem = elapsed / done;
+        long remainingItems = Math.max(0, total - done);
+        long guess = avgPerItem * remainingItems;
+
+        long hours   = guess / 3_600_000;
+        long minutes = (guess % 3_600_000) / 60_000;
+        long seconds = (guess % 60_000) / 1_000;
+
+        StringBuilder sb = new StringBuilder("about ");
+        if (hours > 0) {
+            sb.append(hours).append(hours == 1 ? " hour " : " hours ");
+        } else if (minutes > 0) {
+            sb.append(minutes).append(minutes == 1 ? " minute " : " minutes ");
+        } else {
+            sb.append(seconds).append(seconds == 1 ? " second " : " seconds ");
+        }
+        sb.append("remaining");
+        return sb.toString();
     }
 
     @Override
