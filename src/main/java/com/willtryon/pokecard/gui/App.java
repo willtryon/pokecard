@@ -738,11 +738,12 @@ public class App extends Application {
         Label cardName = new Label();
         Label collectorNum = new Label();
         Label series = new Label();
+        Label idTCGP = new Label();
         Label cardType = new Label();
         Label rarity = new Label();
         Label price = new Label();
         Label description = new Label();
-        VBox info = new VBox(10, cardInfomation, cardName, collectorNum, series, cardType, rarity, price, description);
+        VBox info = new VBox(10, cardInfomation, cardName, collectorNum, series, idTCGP, cardType, rarity, price, description);
         info.setPadding(new Insets(16));
         info.setSpacing(10);
 
@@ -784,6 +785,7 @@ public class App extends Application {
             cardName.setText("Name: " + (orbSig == null ? "" : orbSig.getName()));
             collectorNum.setText("Collection Number: "+(orbSig == null ? "" : orbSig.getExpCardNumber()));
             series.setText("Series: "+(orbSig == null ? "" : orbSig.getExpName()));
+            idTCGP.setText("TCGP ID: "+(orbSig == null ? "" : orbSig.getIdTCGP()));
             cardType.setText("Type: "+(orbSig == null ? "" : orbSig.getCardType()));
             rarity.setText("Rarity: "+(orbSig == null ? "" : orbSig.getRarity()));
             price.setText("Price (Not valid)"+(orbSig == null ? "" : String.valueOf(orbSig.getPrice())));
