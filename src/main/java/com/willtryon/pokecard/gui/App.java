@@ -3,6 +3,7 @@ package com.willtryon.pokecard.gui;
 import com.willtryon.pokecard.*;
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -13,6 +14,9 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import javafx.stage.*;
+import org.controlsfx.control.spreadsheet.*;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 
 import java.io.File;
 import java.io.IOException;
@@ -24,6 +28,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
+import static com.willtryon.pokecard.PokeocrEnv.defaultCacheDir;
+
 public class App extends Application {
 
     private Config config;
@@ -33,6 +39,8 @@ public class App extends Application {
     private Path sessionPath;
     private String currentSession;
     private boolean saved;
+    private final SimpleBooleanProperty isOrb = new SimpleBooleanProperty(false);
+    private final SimpleBooleanProperty isHash = new SimpleBooleanProperty(false);
     private AppContext ctx;
 
     private Label statusBar;
@@ -173,6 +181,8 @@ public class App extends Application {
         initStage.setScene(splashScene);
         initStage.show();
 
+        isOrb.set(false); isHash.set(false);
+
         initTask.setOnSucceeded(event -> Platform.runLater(() -> {
             ctx = initTask.getValue();
             showMainStage();
@@ -198,21 +208,6 @@ public class App extends Application {
 
     public void showMainStage() {
         Stage mainStage = new Stage();
-        //Menu Bar init...
-        MenuItem newSessionItem = new MenuItem("New session");
-        MenuItem saveSessionItem = new MenuItem("Save session");
-        MenuItem loadSessionItem = new MenuItem("Load session");
-        MenuItem importItem = new MenuItem("Import an image to scan...");
-        MenuItem settingsItem = new MenuItem("Settings...");
-        MenuItem exitItem = new MenuItem("Quit");
-        Menu fileMenu = new Menu("File");
-        fileMenu.getItems().addAll(newSessionItem, saveSessionItem, loadSessionItem, importItem, settingsItem, new SeparatorMenuItem(), exitItem);
-        Menu editMenu = new Menu("Edit");
-        Menu helpMenu = new Menu("Help");
-        MenuItem aboutItem = new MenuItem("About");
-        helpMenu.getItems().addAll(aboutItem);
-        MenuBar menuBar = new MenuBar(fileMenu, editMenu, helpMenu);
-        menuBar.setUseSystemMenuBar(true);
         //Main init...
         Label title = new Label("Pokecard");
         ImageView view1 = new ImageView();
@@ -236,7 +231,8 @@ public class App extends Application {
         Button scan = new Button("Scan folder...");
         scan.setOnAction(e -> {
             scan.setDisable(true);
-            Task<Void> scanTask = new Task<>() {
+
+            Task<Void> orbTask = new Task<>() {
                 @Override
                 protected Void call() {
                     ctx.cardDB.scanImports(ctx.importDB(), (msg, frac) -> {
@@ -248,13 +244,124 @@ public class App extends Application {
                     return null;
                 }
             };
-            runTask(scanTask, v -> {
+
+            runTask(orbTask, v -> {});
+            orbTask.setOnSucceeded(event -> {
+                Task<Void> ocrTask = new Task<>() {
+                    @Override
+                    protected Void call() {
+                        try{
+                            ctx.importDB.runOcr(cacheDir, (msg, frac) -> {
+                                updateMessage(msg);
+                                updateProgress(frac, 1.0);
+                            });
+                        }catch(Exception e){
+                            showError(e);
+                        }
+                        refreshImports(ctx.importDB());
+                        scan.setDisable(false);
+                        return null;
+                    }
+                };
+                runTask(ocrTask, v -> {});
             });
         });
+
         HBox imageView = new HBox(20, view1, view2);
         VBox center = new VBox(12, title, imageView, result, scan);
         center.setAlignment(Pos.CENTER);
         center.setPadding(new Insets(16));
+
+
+        //build window...
+        BorderPane root = new BorderPane();
+        detailTabs = new TabPane();
+        Tab scannerTab = new Tab("Scanner", center);
+        root.setTop(buildTop(mainStage, detailTabs, view1, view2));
+        scannerTab.setClosable(false);              // the home tab stays put
+        detailTabs.getTabs().add(scannerTab);
+        root.setCenter(detailTabs);
+        root.setBottom(buildStatusBar());
+        root.setLeft(buildSideTree(ctx.cardDB, ctx.importDB()));
+        mainStage.setTitle("Pokecard");
+
+        if(!(sessionPath.getFileName().toString().isEmpty())) {
+            loadSession(mainStage, true);
+            mainStage.setTitle("Pokecard - "+sessionPath.getFileName());
+        }
+
+        mainStage.setScene(new Scene(root, 700, 600));
+        mainStage.getScene().getRoot().setStyle("-fx-base: #2a2a2a;");
+        mainStage.show();
+
+
+        /*ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "pokecard-scheduled-scan");
+            t.setDaemon(true);          // don't keep the JVM alive after the window closes
+            return t;
+        });
+
+        scheduler.scheduleAtFixedRate(() -> Platform.runLater(() -> {
+            if (!scanRunning.compareAndSet(false, true)) return;
+            Task<Void> tick = new Task<>() {
+                @Override
+                protected Void call() {
+                    ctx.cardDB.scanImports(ctx.importDB(), (msg, frac) -> {
+                        updateMessage(msg);
+                        updateProgress(frac, 1.0);
+                    });
+                    return null;
+                }
+            };
+            tick.setOnSucceeded(e -> scanRunning.set(false));
+            tick.setOnFailed(e -> scanRunning.set(false));
+            tick.setOnCancelled(e -> scanRunning.set(false));
+            runTask(tick, v -> {
+            });
+        }), 0, 1, TimeUnit.MINUTES);*/
+        //isOrb = false;
+    }
+
+    private VBox buildTop(Stage mainStage, TabPane detailTabs, ImageView view1, ImageView view2){
+
+        //Menu Bar init...
+        MenuItem newSessionItem = new MenuItem("New session");
+        MenuItem saveSessionItem = new MenuItem("Save session");
+        MenuItem loadSessionItem = new MenuItem("Load session");
+        MenuItem importItem = new MenuItem("Import an image to scan...");
+        MenuItem closeTabsItem = new MenuItem("Close tabs");
+        MenuItem settingsItem = new MenuItem("Settings...");
+        MenuItem exitItem = new MenuItem("Quit");
+        Menu fileMenu = new Menu("File");
+        fileMenu.getItems().addAll(newSessionItem, saveSessionItem, loadSessionItem, importItem, settingsItem, new SeparatorMenuItem(),closeTabsItem, new SeparatorMenuItem(), exitItem);
+        Menu editMenu = new Menu("Edit");
+        Menu helpMenu = new Menu("Help");
+        MenuItem aboutItem = new MenuItem("About");
+        helpMenu.getItems().addAll(aboutItem);
+        MenuBar menuBar = new MenuBar(fileMenu, editMenu, helpMenu);
+        menuBar.setUseSystemMenuBar(true);
+
+        //toolbar init...
+
+        ToolBar toolBar = new ToolBar();
+        Image hash1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/hash1a.png")));
+        Button hash1Button = buildTooBarButton(hash1);
+        hash1Button.disableProperty().bind(isHash.not());
+        Image cv1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/cv1a.png")));
+        Button cv1Button = buildTooBarButton(cv1);
+        cv1Button.disableProperty().bind(isOrb.not());
+        Image ocr1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/ocr1a.png")));
+        Button ocr1Button = buildTooBarButton(ocr1);
+
+        hash1Button.setOnAction(event -> {
+            openSpreadSheetTab(currentImport(), "hash");
+        });
+
+        cv1Button.setOnAction(event -> {
+            openSpreadSheetTab(currentImport(), "orb");
+        });
+        toolBar.getItems().addAll(hash1Button, cv1Button, ocr1Button);
+
 
         //Menu bar operations...
 
@@ -309,6 +416,15 @@ public class App extends Application {
             });
         });
 
+        closeTabsItem.setOnAction(e -> {
+            Tab activeTab = detailTabs.getSelectionModel().getSelectedItem();
+            if (activeTab != null) {
+                detailTabs.getTabs().retainAll(activeTab);
+            }else{
+                detailTabs.getTabs().clear();
+            }
+        });
+
         settingsItem.setOnAction(e -> {
             if (new ConfigEditor(config).showAndWait(mainStage)) {
                 new Alert(Alert.AlertType.INFORMATION, "Path changes apply next launch.", ButtonType.OK).showAndWait();
@@ -335,56 +451,20 @@ public class App extends Application {
             close.setOnAction(e1 -> aboutStage.close());
             aboutStage.show();
         });
-
-        //build window...
-        BorderPane root = new BorderPane();
-        root.setTop(menuBar);
-        detailTabs = new TabPane();
-        Tab scannerTab = new Tab("Scanner", center);
-        scannerTab.setClosable(false);              // the home tab stays put
-        detailTabs.getTabs().add(scannerTab);
-        root.setCenter(detailTabs);
-        root.setBottom(buildStatusBar());
-        root.setLeft(buildSideTree(ctx.cardDB, ctx.importDB()));
-        Alert a = new Alert(Alert.AlertType.INFORMATION, "To safely exit the program, click 'Quit' in the file menu. \nIf you click the x, the program will halt and you'll have to kill the program in the terminal.", ButtonType.OK);
-        a.setHeaderText("Notice");
-        a.showAndWait();
-        mainStage.setTitle("Pokecard");
-
-        if(!(sessionPath.getFileName().toString().isEmpty())) {
-            loadSession(mainStage, true);
-            mainStage.setTitle("Pokecard - "+sessionPath.getFileName());
-        }
-
-        mainStage.setScene(new Scene(root, 700, 600));
-        mainStage.show();
-
-
-        /*ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "pokecard-scheduled-scan");
-            t.setDaemon(true);          // don't keep the JVM alive after the window closes
-            return t;
-        });
-
-        scheduler.scheduleAtFixedRate(() -> Platform.runLater(() -> {
-            if (!scanRunning.compareAndSet(false, true)) return;
-            Task<Void> tick = new Task<>() {
-                @Override
-                protected Void call() {
-                    ctx.cardDB.scanImports(ctx.importDB(), (msg, frac) -> {
-                        updateMessage(msg);
-                        updateProgress(frac, 1.0);
-                    });
-                    return null;
-                }
-            };
-            tick.setOnSucceeded(e -> scanRunning.set(false));
-            tick.setOnFailed(e -> scanRunning.set(false));
-            tick.setOnCancelled(e -> scanRunning.set(false));
-            runTask(tick, v -> {
-            });
-        }), 0, 1, TimeUnit.MINUTES);*/
+        return new VBox(15, menuBar, toolBar);
     }
+
+    private Button buildTooBarButton(Image img){
+        ImageView view = new ImageView(img);
+        view.setFitHeight(24);
+        view.setFitWidth(24);
+        view.setPreserveRatio(true);
+        Button button = new Button();
+        button.setGraphic(view);
+        button.setStyle("-fx-background-color: transparent; -fx-padding: 5;");
+        return button;
+    }
+
 
     private void saveSession(Stage owner){
         System.out.println("Saving imports to disk:");
@@ -452,13 +532,15 @@ public class App extends Application {
         }
         System.out.println("Loaded " + restored.size() + " imports.");
         refreshImports(ctx.importDB());
+        /*
         if (!restored.isEmpty()) {
             System.out.println(restored.getFirst().getORBRecordHistory() + "\n" + restored.get(0).getOrbWinner());
-        }
+        }*/
         System.out.println("Done.");
         statusBar.setText("Ready.");
         statusProgress.setVisible(false);
     }
+
 
     private HBox buildStatusBar() {
         statusBar = new Label("Ready.");
@@ -548,6 +630,7 @@ public class App extends Application {
     }
 
     private void openCardTab(CardSignature sig) {
+        isOrb.set(false); isHash.set(false);
         if (focusExistingTab("card:" + sig.getCardID())) return;
         Tab tab = new Tab(sig.getCardID(), buildCardDetail(sig));
         tab.setId("card:" + sig.getCardID());
@@ -556,10 +639,24 @@ public class App extends Application {
     }
 
     private void openImportTab(CardImports imp) {
+        isOrb.set(true); isHash.set(true);
         Path q = imp.getQueryImage();
         String key = "import:" + (q == null ? String.valueOf(imp.hashCode()) : q.toString());
         if (focusExistingTab(key)) return;
         Tab tab = new Tab(q == null ? "Import" : q.getFileName().toString(), buildImportDetail(imp));
+        tab.setId(key);
+        tab.setUserData(imp);
+        detailTabs.getTabs().add(tab);
+        detailTabs.getSelectionModel().select(tab);
+    }
+
+    private void openSpreadSheetTab(CardImports imp, String args) {
+        isOrb.set(false); isHash.set(false);
+        Path q = imp.getQueryImage();
+        String key = "spreadsheet:" + (q == null ? String.valueOf(imp.hashCode()) : q.toString());
+        if (focusExistingTab(key)) return;
+        String title = (q == null ? "Import" : q.getFileName().toString()) + " \u2013 ORB matches";
+        Tab tab = new Tab(title, buildSpreadsheet(imp, args));
         tab.setId(key);
         detailTabs.getTabs().add(tab);
         detailTabs.getSelectionModel().select(tab);
@@ -573,6 +670,14 @@ public class App extends Application {
             }
         }
         return false;
+    }
+
+    private CardImports currentImport() {
+        Tab tab = detailTabs.getSelectionModel().getSelectedItem();
+        if (tab != null && tab.getUserData() instanceof CardImports imp) {
+            return imp;
+        }
+        return null;
     }
 
     private Node buildCardDetail(CardSignature sig) {
@@ -608,6 +713,7 @@ public class App extends Application {
 
         Label orbLabel  = new Label();
         Label hashLabel = new Label();
+        Label ocrLabel = new Label();
 
         ImageView image1 = new ImageView(); image1.setPreserveRatio(true); image1.setFitHeight(300);
         ImageView image2 = new ImageView(); image2.setPreserveRatio(true); image2.setFitHeight(300);
@@ -638,6 +744,7 @@ public class App extends Application {
             if (size == 0) {
                 orbLabel.setText("ORB match: -");
                 hashLabel.setText("pHash match: -");
+                ocrLabel.setText("OCR match: -");
                 count.setText("(0 of 0)");
                 previous.setDisable(true);
                 next.setDisable(true);
@@ -653,9 +760,11 @@ public class App extends Application {
                 showError(e);
             }
             CardSignature hashSig = imp.getARecordRecord(p, "hash");
+            CardImports.Match ocrSig = imp.getOcrWinner();
 
             orbLabel.setText ("ORB match: "   + (orbSig  == null ? "-" : orbSig.getCardID()  + "  (" + imp.getARecordScore(p, "orb")  + ")"));
             hashLabel.setText("pHash match: " + (hashSig == null ? "-" : hashSig.getCardID() + "  (" + imp.getARecordScore(p, "hash") + ")"));
+            ocrLabel.setText("OCR match: " + (ocrSig == null ? "-" : ocrSig.cardID()));
 
             Path orbImg = (orbSig != null) ? orbSig.getImgPath() : null;
             image2.setImage((orbImg != null && Files.exists(orbImg)) ? new Image(orbImg.toUri().toString()) : null);
@@ -681,7 +790,7 @@ public class App extends Application {
         render.run();
 
         VBox imgStack = new VBox(10);
-        imgStack.getChildren().addAll(orbLabel, hashLabel, images, new HBox(16, previous, count, next));
+        imgStack.getChildren().addAll(orbLabel, hashLabel, ocrLabel, images, new HBox(16, previous, count, next));
         box.getChildren().addAll(imgStack, info);
         return box;
     }
@@ -691,6 +800,47 @@ public class App extends Application {
         iv.setPreserveRatio(true);
         iv.setFitHeight(300);
         return iv;
+    }
+
+    private SpreadsheetView buildSpreadsheet(CardImports imp, String args) {
+        int rows = imp.getRecordSize2();
+
+        GridBase grid = new GridBase(rows, 3);
+        grid.getColumnHeaders().addAll("Card image", "Card ID", "Score");
+
+        Map<Integer, Double> heights = new HashMap<>();
+        for(int i = 0; i < rows; i++){
+            heights.put(i, 140.0);
+        }
+        ObservableList<ObservableList<SpreadsheetCell>> data = FXCollections.observableArrayList();
+        for(int r = 0; r < rows; r++){
+            if(args.equals("ocr")){
+                imp.getOcrWinner();
+            }
+            CardSignature sig = imp.getARecordRecord(r, args);
+            Double score = imp.getARecordScore(r, args);
+
+            SpreadsheetCell imgCell = SpreadsheetCellType.STRING.createCell(r, 0, 1, 1, "");
+            Path p = (sig == null) ? null : sig.getImgPath();
+            if(p != null && Files.exists(p)){
+                Image thumb = new Image(p.toUri().toString(), 120, 0, true, true, true);
+                ImageView iv = new ImageView(thumb);
+                iv.setPreserveRatio(true);
+                imgCell.setGraphic(iv);
+            }
+            SpreadsheetCell idCell = SpreadsheetCellType.STRING.createCell(
+                    r, 1, 1, 1, sig == null ? "-" : sig.getCardID());
+            SpreadsheetCell scoreCell = SpreadsheetCellType.DOUBLE.createCell(r, 2, 1, 1, score);
+            data.add(FXCollections.observableArrayList(imgCell, idCell, scoreCell));
+        }
+        grid.setRows(data);
+
+        SpreadsheetView sv = new SpreadsheetView(grid);
+        sv.setEditable(false);
+        sv.getColumns().get(0).setMinWidth(130);
+        sv.getColumns().get(1).setMinWidth(200);
+        sv.getColumns().get(2).setMinWidth(120);
+        return sv;
     }
 
     private Task<?> currentStatusTask;
@@ -793,9 +943,13 @@ class InitTask extends Task<App.AppContext>{
                 cardDB.writeToDisk(cacheDir);
             }
         }
-        updateMessage("Indexing imports...");
+        updateMessage("Verifying python env...");
+        PokeocrEnv env = new PokeocrEnv(defaultCacheDir());
+        PokeocrEnv.EnvHandle handle = env.prepare();
+        updateMessage("Rebulding database...");
+        new PokemonCardNameCleaner(dbPath, false);
+        updateMessage("Starting...");
         CardImportsIndex importDB = cardDB.newImportsIndex(compareDir, cacheDir);
-        ;
         return new App.AppContext(cardDB, importDB, size);
     }
 }

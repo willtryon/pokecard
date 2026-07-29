@@ -4,6 +4,10 @@ import dev.brachtendorf.jimagehash.hash.Hash;
 
 import java.nio.file.Path;
 import java.util.List;
+import org.controlsfx.control.spreadsheet.SpreadsheetView;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+
 
 public class CardImports {
     // one match against the DB (pHash or ORB)
@@ -13,10 +17,13 @@ public class CardImports {
     private final Hash qHash;
     private final Match hashMatch;
     private final Match orbMatch;
+    private Match ocrMatch;
     private final List<Double> recordScore;
     private final List<CardSignature> recordRecord;
     private final List<Double> recordScore2;
     private final List<CardSignature> recordRecord2;
+
+
 
     public CardImports(Path img, Hash qHash, Match hashMatch, Match orbMatch, List<Double> recordScore, List<CardSignature> recordRecord, List<Double> recordScore2, List<CardSignature> recordRecord2) {
         this.img = img;
@@ -42,9 +49,29 @@ public class CardImports {
     public Match getOrbWinner(){
         return orbMatch;
     }
+
+    public Match getOcrWinner(){
+        return ocrMatch;
+    }
+
+    public void setOcrWinner(Match m){
+        this.ocrMatch = m;
+    }
+
+    public boolean hasOcr(){
+        return ocrMatch != null;
+    }
+
+    public Match bestMatch(){
+        return ocrMatch != null ? ocrMatch : orbMatch;
+    }
     
     public int getRecordSize(){
         return recordScore.size();
+    }
+
+    public int getRecordSize2(){
+        return recordScore2.size();
     }
 
     public Double getARecordScore(int loc, String args){
@@ -99,5 +126,4 @@ public class CardImports {
             {}
         };
     }
-
 }

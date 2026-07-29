@@ -23,7 +23,7 @@ public class Main {
     //code paths to dirs and files manually.
     public static void main(String[] args) throws Exception {
         try (Scanner in = new Scanner(System.in)) {
-            Config config = new Config(Path.of("/Users/willtryon/VSCode/PokeImageComp/pokecard/pokecard.properties"));
+            Config config = new Config(Path.of("/Users/willtryon/.pokecard/pokecard.properties"));
             Path dbPath    = config.require(Config.DB_PATH,    "Path to data.sqlite",         Files::isRegularFile, in);
             Path imagesDir = config.require(Config.IMAGES_DIR, "Path to images/cards folder", Files::isDirectory,   in);
             Path compareDir = config.require(Config.COMPARE_DIR, "Path to images to compare to", Files::isDirectory, in);

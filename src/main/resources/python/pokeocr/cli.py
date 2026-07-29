@@ -106,9 +106,76 @@ def _process(path, out_dir, formats, langs, min_conf, dpi, recognizer) -> bool:
     return True
 
 
+def _serve(recognizer, langs, max_new_tokens) -> int:
+    """Daemon loop for a long-lived Java (or any) caller.
+
+    Reads manifest ``.txt`` paths from stdin, one per line. Each manifest lists
+    image paths (one per line; blank lines and ``#`` comments ignored). For every
+    image we run split-mode OCR and write ONE line to real stdout, in the
+    manifest's order. The wire format is tab-delimited so Java can parse it with
+    no JSON dependency; the free-text fields (band text, error messages) are
+    base64 so they never contain a tab or newline:
+
+        READY                                             (once, after model load)
+        CARD <TAB> i <TAB> OK  <TAB> rotation <TAB> b64(top) <TAB> b64(bottom) <TAB> path
+        CARD <TAB> i <TAB> ERR <TAB> b64(message) <TAB> path
+        BATCH <TAB> count <TAB> manifest_path             (terminator per manifest)
+        MANIFEST_ERR <TAB> b64(message) <TAB> manifest_path
+
+    A card that can't be read yields a CARD ... ERR line and does NOT abort the
+    batch. Wait for the READY line before sending the first manifest. Library
+    chatter (EasyOCR notices, warnings, progress) is redirected to stderr so
+    stdout carries only the protocol lines. Send an empty line to skip;
+    ``quit``/``exit`` or closing stdin (EOF) stops the loop.
+    """
+    import base64
+    from . import run_split
+
+    real_out = sys.stdout
+    sys.stdout = sys.stderr  # keep the protocol stream free of library prints
+
+    def send(line: str) -> None:
+        real_out.write(line + "\n")
+        real_out.flush()
+
+    def b64(s: str) -> str:
+        return base64.b64encode((s or "").encode("utf-8")).decode("ascii")
+
+    try:
+        send("READY")
+        while True:
+            line = sys.stdin.readline()
+            if not line:                       # EOF: caller closed stdin
+                break
+            manifest = line.strip()
+            if not manifest:
+                continue
+            if manifest in ("quit", "exit"):
+                break
+            if not os.path.isfile(manifest):
+                send(f"MANIFEST_ERR\t{b64('manifest not found: ' + manifest)}\t{manifest}")
+                continue
+            with open(manifest, encoding="utf-8") as fh:
+                paths = [ln.strip() for ln in fh
+                         if ln.strip() and not ln.lstrip().startswith("#")]
+            for i, p in enumerate(paths):
+                if not os.path.isfile(p):
+                    send(f"CARD\t{i}\tERR\t{b64('not found')}\t{p}")
+                    continue
+                try:
+                    res = run_split(p, recognizer, langs=langs, max_new_tokens=max_new_tokens)
+                    send(f"CARD\t{i}\tOK\t{res.rotation}\t{b64(res.top)}\t{b64(res.bottom)}\t{p}")
+                except Exception as exc:        # keep the daemon alive across bad cards
+                    send(f"CARD\t{i}\tERR\t{b64(repr(exc))}\t{p}")
+            send(f"BATCH\t{len(paths)}\t{manifest}")
+    finally:
+        sys.stdout = real_out
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="pokeocr", description="OCR Pokémon card scans, PDF-style.")
-    ap.add_argument("images", nargs="+", help="image path(s) or glob(s)")
+    ap.add_argument("images", nargs="*", help="image path(s) or glob(s); omit when --serve")
     ap.add_argument("-o", "--out", default="out", help="output directory (default: out)")
     ap.add_argument(
         "-f", "--formats", nargs="+", default=["all"],
@@ -139,10 +206,22 @@ def main(argv=None) -> int:
     ap.add_argument("--model", default=None, help="override the HuggingFace model id for the chosen VLM engine")
     ap.add_argument("--load-4bit", action="store_true", help="load qwen2.5-vl in 4-bit (NF4) to fit an 8GB GPU (~1.8GB weights); needs bitsandbytes + CUDA")
     ap.add_argument("--csv", default="results.csv", help="split mode: filename (in --out) of the aggregated per-batch CSV (default: results.csv)")
+    ap.add_argument(
+        "--serve", action="store_true",
+        help="daemon mode: load the model once, then read manifest .txt paths from stdin "
+             "(one per line). For each manifest, emit one tab-delimited line per card with "
+             "its TOP/BOTTOM band text (base64), in file order, then a BATCH terminator. "
+             "Implies --mode split.",
+    )
     args = ap.parse_args(argv)
 
     formats = ALL_FORMATS if "all" in args.formats else args.formats
     os.makedirs(args.out, exist_ok=True)
+
+    if args.serve:
+        args.mode = "split"   # serve emits TOP/BOTTOM bands, i.e. split mode
+    elif not args.images:
+        ap.error("need at least one image path (or use --serve to read manifests from stdin)")
 
     if args.mode in ("page", "split") and args.engine in ("easyocr", "trocr"):
         ap.error(f"--mode {args.mode} needs a whole-image VLM; --engine {args.engine} is single-line. Use --engine qwen2.5-vl.")
@@ -172,8 +251,12 @@ def main(argv=None) -> int:
                 kw["min_pixels"] = mp
             if xp:
                 kw["max_pixels"] = xp
-        print(f">> loading {args.engine} recognizer on device={args.device} (first run downloads weights)...")
+        print(f">> loading {args.engine} recognizer on device={args.device} (first run downloads weights)...",
+              file=sys.stderr if args.serve else sys.stdout)
         recognizer = get_recognizer(args.engine, **kw)
+
+    if args.serve:
+        return _serve(recognizer, tuple(args.langs), args.max_new_tokens)
 
     images = _expand(args.images)
     ok = 0

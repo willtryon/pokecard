@@ -437,7 +437,7 @@ public class CardIndex{
     }
 
     public void scanImports(CardImportsIndex importDB, ScanProgress progress){
-        List<CardImports> fresh = importDB.scan(progress);
+        List<CardImports> fresh = importDB.scan(progress, cacheDir);
         if (fresh.isEmpty()) return;
         List<String[]> rows = new ArrayList<>();
         for(CardImports ci : fresh){
@@ -564,7 +564,7 @@ public class CardIndex{
 
             int version = dis.readInt();
             if (version != METADATA_FORMAT_VERSION) {
-                System.out.println("Metadata cache version mismatch; please rebuild the cache.");
+                System.out.println("Metadata cache version mismatch; please delete and ");
                 return new CardSignature[0];
             }
             int count  = dis.readInt();
@@ -686,7 +686,7 @@ public class CardIndex{
         return cardDB.length;
     }
 
-    public String timer(long args){
+    public static String timer(long args){
         long elapsed = System.currentTimeMillis()- args;
         long hours = elapsed/3600000;
         long minutes = (elapsed%3600000)/60000;
@@ -694,7 +694,7 @@ public class CardIndex{
         return String.format("%02d:%02d:%02d", hours, minutes, seconds);
     }
 
-    private String getTime(){
+    private static String getTime(){
         LocalDateTime currentDateTime = LocalDateTime.now();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-HH:mm:ss");
         return currentDateTime.format(formatter);
