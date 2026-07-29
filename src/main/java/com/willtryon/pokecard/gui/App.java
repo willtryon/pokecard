@@ -291,7 +291,7 @@ public class App extends Application {
         }
 
         mainStage.setScene(new Scene(root, 700, 600));
-        //mainStage.getScene().getRoot().setStyle("-fx-base: #2a2a2a;");
+        mainStage.getScene().getRoot().setStyle("-fx-base: #2a2a2a;");
         mainStage.show();
 
 
