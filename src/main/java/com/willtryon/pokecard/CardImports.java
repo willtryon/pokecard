@@ -25,11 +25,12 @@ public class CardImports {
 
 
 
-    public CardImports(Path img, Hash qHash, Match hashMatch, Match orbMatch, List<Double> recordScore, List<CardSignature> recordRecord, List<Double> recordScore2, List<CardSignature> recordRecord2) {
+    public CardImports(Path img, Hash qHash, Match hashMatch, Match orbMatch, Match ocrMatch, List<Double> recordScore, List<CardSignature> recordRecord, List<Double> recordScore2, List<CardSignature> recordRecord2) {
         this.img = img;
         this.qHash = qHash;
         this.hashMatch  = hashMatch;
         this.orbMatch   = orbMatch;
+        this.ocrMatch = ocrMatch;
         this.recordScore = recordScore;
         this.recordRecord = recordRecord;
         this.recordScore2 = recordScore2;
@@ -59,7 +60,7 @@ public class CardImports {
     }
 
     public boolean hasOcr(){
-        return ocrMatch != null;
+        return ocrMatch.cardID() != null;
     }
 
     public Match bestMatch(){

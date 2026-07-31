@@ -349,6 +349,8 @@ public class App extends Application {
         cv1Button.disableProperty().bind(isOrb.not());
         Image ocr1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/ocr1a.png")));
         Button ocr1Button = buildTooBarButton(ocr1);
+        Image imp1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/imp1a.png")));
+        Button imp1Button = buildTooBarButton(imp1);
 
         hash1Button.setOnAction(event -> {
             openSpreadSheetTab(currentImport(), "hash");
@@ -357,7 +359,14 @@ public class App extends Application {
         cv1Button.setOnAction(event -> {
             openSpreadSheetTab(currentImport(), "orb");
         });
-        toolBar.getItems().addAll(hash1Button, cv1Button, ocr1Button);
+        ocr1Button.setOnAction(event -> {
+            openSpreadSheetTab(currentImport(), "ocr");
+        });
+        imp1Button.setOnAction(event -> {
+            openSpreadSheetTab(null, "session");
+        });
+
+        toolBar.getItems().addAll(hash1Button, cv1Button, ocr1Button,  imp1Button);
 
 
         //Menu bar operations...
@@ -649,7 +658,8 @@ public class App extends Application {
 
     private void openSpreadSheetTab(CardImports imp, String args) {
         isOrb.set(false); isHash.set(false);
-        Path q = imp.getQueryImage();
+        Path q = sessionPath;
+        if(!args.equals("session")) q = imp.getQueryImage();
         String key = "spreadsheet:" + (q == null ? String.valueOf(imp.hashCode()) : q.toString());
         if (focusExistingTab(key)) return;
         String title = (q == null ? "Import" : q.getFileName().toString()) + " \u2013 ORB matches";
@@ -802,22 +812,40 @@ public class App extends Application {
     }
 
     private SpreadsheetView buildSpreadsheet(CardImports imp, String args) {
-        int rows = imp.getRecordSize2();
-
-        GridBase grid = new GridBase(rows, 3);
-        grid.getColumnHeaders().addAll("Card image", "Card ID", "Score");
+        int rows;
+        if(!args.equals("session")) rows = imp.getRecordSize2();
+        else rows = ctx.importDB.getImports().size();
 
         Map<Integer, Double> heights = new HashMap<>();
+        GridBase grid = new GridBase(rows, 3);
+
+        grid.getColumnHeaders().addAll("Card image", "Card ID", "Score");
+
+
         for(int i = 0; i < rows; i++){
             heights.put(i, 140.0);
         }
         ObservableList<ObservableList<SpreadsheetCell>> data = FXCollections.observableArrayList();
+        List<CardImports> imports = ctx.importDB.getImports();
         for(int r = 0; r < rows; r++){
-            if(args.equals("ocr")){
-                imp.getOcrWinner();
+            CardSignature sig = null; Double score = 0.0;
+            switch (args){
+                case "session" -> {
+                    CardImports card = imports.get(r);
+                    CardImports.Match show = card.bestMatch();
+                    sig = ctx.cardDB.findCardId(show.cardID());
+                    score = 0.0;
+                }
+                case "orb", "hash" -> {
+                    sig = imp.getARecordRecord(r, args);
+                    score = imp.getARecordScore(r, args);
+                }
+                case "ocr" ->  {
+                    CardImports.Match show = imp.getOcrWinner();
+                    sig = ctx.cardDB.findCardId(show.cardID());
+                    score = 100.0;
+                }
             }
-            CardSignature sig = imp.getARecordRecord(r, args);
-            Double score = imp.getARecordScore(r, args);
 
             SpreadsheetCell imgCell = SpreadsheetCellType.STRING.createCell(r, 0, 1, 1, "");
             Path p = (sig == null) ? null : sig.getImgPath();

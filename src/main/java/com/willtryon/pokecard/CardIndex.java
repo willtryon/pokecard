@@ -252,6 +252,18 @@ public class CardIndex{
         }
     }
 
+    public CardSignature findCardId(String args){
+        for (CardSignature cardSignature : cardDB) {
+            if (cardSignature == null) {
+                continue;
+            }
+            if (cardSignature.getCardID().equals(args)) {
+                return cardSignature;
+            }
+        }
+        return null;
+    }
+
     public void testHash() throws IOException {
         /*Some card objects will have null hash vars if a file is not found or not accepted by the program,
         or will not even exist in the cardDB at all if the image is corrupt, which leads to a null value

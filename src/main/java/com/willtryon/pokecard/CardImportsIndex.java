@@ -171,13 +171,14 @@ public class CardImportsIndex {
 		System.out.println("\nUploaded image " + victim + " appears to be closest to " + bestOrb.sig.getStringImgPath() + ". (ORB)");
 		System.out.println(bestOrb.score());
 		CardImports.Match orbMatch = new CardImports.Match(bestOrb.sig.getCardID(), bestOrb.sig.getStringImgPath(), bestOrb.score());
+        CardImports.Match ocrMatch = new CardImports.Match(null, null, 100.0);
 		List<CardSignature> recordRecord2 = new ArrayList<>();
 		List<Double> recordScore2 = new ArrayList<>();
         for (Scored scored : orbSorted) {
             recordRecord2.add(scored.sig());
             recordScore2.add(scored.score());
         }
-		return new CardImports(path, test, hashMatch, orbMatch, recordScore, recordRecord, recordScore2, recordRecord2);
+		return new CardImports(path, test, hashMatch, orbMatch, ocrMatch, recordScore, recordRecord, recordScore2, recordRecord2);
     }
 
     public void runOcr(ScanProgress progress) throws IOException, URISyntaxException, InterruptedException {
@@ -278,7 +279,7 @@ public class CardImportsIndex {
 
 
     //I write session information to the disk
-    private static final int IMPORTS_FORMAT_VERSION = 2;
+    private static final int IMPORTS_FORMAT_VERSION = 3;
 
     public void writeImportsToDisk(String currentSession) {
         Path path = settings.outputDir().resolve(currentSession);
@@ -305,6 +306,7 @@ public class CardImportsIndex {
 
                 writeMatch(dos, ci.getHashWinner());
                 writeMatch(dos, ci.getOrbWinner());
+                writeMatch(dos, ci.getOcrWinner());
 
                 writeRanking(dos, ci, "hash");
                 writeRanking(dos, ci, "orb");   // same length as hash side by construction
@@ -367,6 +369,7 @@ public class CardImportsIndex {
 
                 CardImports.Match hashMatch = readMatch(dis);
                 CardImports.Match orbMatch  = readMatch(dis);
+                CardImports.Match ocrMatch = readMatch(dis);
 
                 List<CardSignature> recordRecord  = new ArrayList<>();
                 List<Double>        recordScore   = new ArrayList<>();
@@ -376,7 +379,7 @@ public class CardImportsIndex {
                 List<Double>        recordScore2  = new ArrayList<>();
                 readRanking(dis, byId, recordRecord2, recordScore2);
 
-                loaded.add(new CardImports(q, qHash, hashMatch, orbMatch,
+                loaded.add(new CardImports(q, qHash, hashMatch, orbMatch, ocrMatch,
                         recordScore, recordRecord, recordScore2, recordRecord2));
                 if (qHash != null) loadedHashes.add(qHash);
             }
