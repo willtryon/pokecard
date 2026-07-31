@@ -8,11 +8,11 @@ import org.bytedeco.opencv.opencv_core.Mat;
 import dev.brachtendorf.jimagehash.hash.Hash;
 
 public class CardSignature{
-    private String cardID;
-    private Path img;
-    private Hash hash;
-    private Mat mat;
-    private KeyPointVector keypoints;
+    private final String cardID;
+    private final Path img;
+    private final Hash hash;
+    private final Mat mat;
+    private final KeyPointVector keypoints;
     
     public CardSignature(String cardID, Path img, Hash hash, Mat mat, KeyPointVector keypoints){
         this.cardID = cardID;

@@ -22,6 +22,23 @@ public class Config {
     private final Path file;
     private final Properties props = new Properties();
 
+    public record Settings(
+            Path dbPath, Path imagesDir, Path compareDir, Path outputDir,
+            Path cacheDir, int scanThreads, String eBayApiKey
+    ){
+        public static Settings from (Config c){
+            return new Settings(
+                    Path.of(c.get(Config.DB_PATH)),
+                    Path.of(c.get(Config.IMAGES_DIR)),
+                    Path.of(c.get(Config.COMPARE_DIR)),
+                    Path.of(c.get(Config.OUTPUT_DIR)),
+                    Path.of(c.get(Config.CACHE_DIR)),
+                    c.getScanThreads(),
+                    c.get(Config.EBAY_API_KEY)
+            );
+        }
+    }
+
     public Config(Path file) throws IOException {
         this.file = file;
         if (Files.exists(file)) {

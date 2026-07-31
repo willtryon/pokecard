@@ -25,11 +25,11 @@ public class Main {
         try (Scanner in = new Scanner(System.in)) {
             Config config = new Config(Path.of("/Users/willtryon/.pokecard/pokecard.properties"));
             Path dbPath    = config.require(Config.DB_PATH,    "Path to data.sqlite",         Files::isRegularFile, in);
-            Path imagesDir = config.require(Config.IMAGES_DIR, "Path to images/cards folder", Files::isDirectory,   in);
+            config.require(Config.IMAGES_DIR, "Path to images/cards folder", Files::isDirectory,   in);
             Path compareDir = config.require(Config.COMPARE_DIR, "Path to images to compare to", Files::isDirectory, in);
-            Path outputDir = config.require(Config.OUTPUT_DIR, "Path to output log files", Files::isDirectory, in);
+            config.require(Config.OUTPUT_DIR, "Path to output log files", Files::isDirectory, in);
             Path cacheDir = config.require(Config.CACHE_DIR, "Path to cache directory", Files::isDirectory, in);
-            int orbThreads = config.getScanThreads();
+            Config.Settings settings = Config.Settings.from(config);
             String url = "jdbc:sqlite:" + dbPath;
             try (Connection conn = DriverManager.getConnection(url);
                 Statement st = conn.createStatement();
@@ -42,12 +42,12 @@ public class Main {
                     CardIndex cardDB;
                     if(Files.isRegularFile(cacheFile)){
                         System.out.println("Loading cache, please wait...\n");
-                        cardDB = new CardIndex(imagesDir, outputDir, cacheDir, orbThreads);
+                        cardDB = new CardIndex(settings);
                     }else{
                         System.out.println("Calculating image data, please wait...");
-                        cardDB = new CardIndex(size, url, imagesDir, outputDir, cacheDir, orbThreads);
+                        cardDB = new CardIndex(size, url, settings);
                     }
-                    CardImportsIndex importDB = cardDB.newImportsIndex(compareDir, cacheDir);
+                    CardImportsIndex importDB = cardDB.newImportsIndex();
                     int choice;
                     ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
                     do{

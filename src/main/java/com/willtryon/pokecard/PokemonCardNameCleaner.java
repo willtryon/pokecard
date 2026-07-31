@@ -45,11 +45,10 @@ public class PokemonCardNameCleaner {
     private final boolean dryRun;
     private final Path dbPath;
 
-    /** A pending name change (collected during the read phase, applied afterward). */
-    private static final class Update {
-        final long rowid;
-        final String newName;
-        Update(long rowid, String newName) { this.rowid = rowid; this.newName = newName; }
+    /**
+     * A pending name change (collected during the read phase, applied afterward).
+     */
+        private record Update(long rowid, String newName) {
     }
 
     public PokemonCardNameCleaner(Path dbPath, boolean dryRun) {

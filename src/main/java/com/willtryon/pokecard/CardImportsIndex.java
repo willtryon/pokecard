@@ -18,9 +18,9 @@ import static com.willtryon.pokecard.CardIndex.timer;
 
 public class CardImportsIndex {
     private String guess;
-    private final Path compareDir;
     private final List<CardSignature> hashed;
     private final CardIndex cardDB;
+    private final Config.Settings settings;
     private final List<Hash> seenHashes = new ArrayList<>();
     private final HashingAlgorithm hasher = new PerceptiveHash(64);
     private final List<CardImports> imports = new ArrayList<>();
@@ -29,26 +29,22 @@ public class CardImportsIndex {
 
     private record Scored(CardSignature sig, double score){}
 
-    public CardImportsIndex(Path compareDir, List<CardSignature> hashed, CardIndex cardDB){
-        this.compareDir = compareDir;
+    public CardImportsIndex(List<CardSignature> hashed, CardIndex cardDB, Config.Settings settings){
         this.hashed = hashed;
         this.cardDB = cardDB;
+        this.settings = settings;
     }
 
-    public List<CardImports> scan(Path cacheDir){
-        return scan(null, cacheDir);
-    }
-
-    public synchronized List<CardImports> scan(ScanProgress progress, Path cacheDir){
+    public synchronized List<CardImports> scan(ScanProgress progress){
         guess = "";
         List<CardImports> ocrCandidates =  new ArrayList<>();
-        Path ocrDir = cacheDir.resolve("ocr-victim");
+        Path ocrDir = settings.cacheDir().resolve("ocr-victim");
         try{
             Files.delete(ocrDir);
         }catch(IOException ignore){}
         long beginOrbJob = System.currentTimeMillis();
-        System.out.println("Scanning "+ compareDir+" for new images...");
-        try (Stream<Path> stream = Files.walk(compareDir)){
+        System.out.println("Scanning "+ settings.compareDir()+" for new images...");
+        try (Stream<Path> stream = Files.walk(settings.compareDir())){
             List<Path> imgList = stream
                 .filter(path -> {
                     String s = path.toString().toLowerCase();
@@ -184,7 +180,7 @@ public class CardImportsIndex {
 		return new CardImports(path, test, hashMatch, orbMatch, recordScore, recordRecord, recordScore2, recordRecord2);
     }
 
-    public void runOcr(Path cacheDir, Path dbPath,ScanProgress progress) throws IOException, URISyntaxException, InterruptedException {
+    public void runOcr(ScanProgress progress) throws IOException, URISyntaxException, InterruptedException {
         System.out.println("I work!");
         progress.report("OCR bullshit now", -1);
         long startTime = System.currentTimeMillis();
@@ -192,7 +188,7 @@ public class CardImportsIndex {
         PokeocrEnv.EnvHandle handle = env.prepare();
         try(PokeocrInterface ocrInterface = new PokeocrInterface(env, handle)){
             List<Path> paths = new ArrayList<>(
-                    Files.readAllLines(cacheDir.resolve("ocr-victim"))
+                    Files.readAllLines(settings.cacheDir().resolve("ocr-victim"))
                             .stream()
                             .filter(line -> !line.isBlank()) // Skip empty lines
                             .map(Path::of)
@@ -209,7 +205,7 @@ public class CardImportsIndex {
                             c.index(), c.rotation(), c.top(), c.bottom());
                     CardImports parent = byPath.get(c.path());
                     if (parent == null) continue;
-                    String url = "jdbc:sqlite:" + dbPath;
+                    String url = "jdbc:sqlite:" + settings.dbPath();
                     CardImports.Match m = resolveViaSql(c.top(), c.bottom(), url);
                     //CardImports.Match m = new CardImports.Match(c.top(), parent.getQueryImage().toString(), 67.0);
                     if (m != null) parent.setOcrWinner(m);
@@ -275,9 +271,7 @@ public class CardImportsIndex {
     public List<String[]> toCsvData() {
         List<String[]> data = new ArrayList<>();
         for (CardImports ci : imports) {
-            for (String[] row : ci.toCsvRows()) {
-                data.add(row);
-            }
+            Collections.addAll(data, ci.toCsvRows());
         }
         return data;
     }
@@ -286,8 +280,8 @@ public class CardImportsIndex {
     //I write session information to the disk
     private static final int IMPORTS_FORMAT_VERSION = 2;
 
-    public void writeImportsToDisk(Path outputDir, String currentSession) {
-        Path path = outputDir.resolve(currentSession);
+    public void writeImportsToDisk(String currentSession) {
+        Path path = settings.outputDir().resolve(currentSession);
         try (DataOutputStream dos = new DataOutputStream(
                 new BufferedOutputStream(new FileOutputStream(path.toFile())))) {
 

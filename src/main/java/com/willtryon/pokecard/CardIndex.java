@@ -1,61 +1,55 @@
 package com.willtryon.pokecard;
-import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.stream.Stream;
+
+import com.opencsv.CSVWriter;
+import dev.brachtendorf.jimagehash.hash.Hash;
+import dev.brachtendorf.jimagehash.hashAlgorithms.HashingAlgorithm;
+import dev.brachtendorf.jimagehash.hashAlgorithms.PerceptiveHash;
+import org.bytedeco.javacpp.BytePointer;
+import org.bytedeco.javacpp.indexer.FloatIndexer;
+import org.bytedeco.javacpp.indexer.UByteIndexer;
+import org.bytedeco.opencv.opencv_core.*;
+import org.bytedeco.opencv.opencv_features2d.BFMatcher;
+import org.bytedeco.opencv.opencv_features2d.ORB;
+
 import java.io.*;
+import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.*;
+import java.util.Arrays;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.stream.Stream;
 
-import com.opencsv.*;
-import dev.brachtendorf.jimagehash.hash.Hash;
-import dev.brachtendorf.jimagehash.hashAlgorithms.HashingAlgorithm;
-import dev.brachtendorf.jimagehash.hashAlgorithms.PerceptiveHash;
-import org.bytedeco.opencv.opencv_core.Mat;
-import org.bytedeco.opencv.opencv_core.Point2f;
-import org.bytedeco.opencv.opencv_core.KeyPointVector;
-import org.bytedeco.opencv.opencv_core.DMatchVector;
-import org.bytedeco.opencv.opencv_core.DMatchVectorVector;
-import org.bytedeco.opencv.opencv_core.FileNode;
-import org.bytedeco.javacpp.indexer.FloatIndexer;
-import org.bytedeco.javacpp.indexer.UByteIndexer;
-import org.bytedeco.opencv.opencv_core.DMatch;
-import org.bytedeco.opencv.opencv_features2d.ORB;
-import org.bytedeco.opencv.opencv_features2d.BFMatcher;
-import static org.bytedeco.opencv.global.opencv_imgcodecs.imread;
-import static org.bytedeco.opencv.global.opencv_imgcodecs.IMREAD_GRAYSCALE;
+import static org.bytedeco.opencv.global.opencv_calib3d.RANSAC;
+import static org.bytedeco.opencv.global.opencv_calib3d.findHomography;
 import static org.bytedeco.opencv.global.opencv_core.CV_32FC2;
 import static org.bytedeco.opencv.global.opencv_core.NORM_HAMMING;
-import static org.bytedeco.opencv.global.opencv_calib3d.findHomography;
-import static org.bytedeco.opencv.global.opencv_calib3d.RANSAC;
-import java.math.BigInteger;
-import org.bytedeco.javacpp.BytePointer;
-import java.util.concurrent.*;
+import static org.bytedeco.opencv.global.opencv_imgcodecs.IMREAD_GRAYSCALE;
+import static org.bytedeco.opencv.global.opencv_imgcodecs.imread;
+import com.willtryon.pokecard.Config.Settings;
 
 public class CardIndex{
     private final CardSignature [] cardDB;
-    private final Path imagesDir;
-    private final Path outputDir;
-    private final Path cacheDir;
     private final ExecutorService executor;
     private boolean firstScan = true;
-    private final int orbThreads;
+    private final Settings settings;
+
 
     /*Approach so far is the query sql db and dump its contents for every hit to a new Card obj, which is stored
     in an array of cards...*/
-    public CardIndex(int size, String url, Path imagesDir, Path outputDir, Path cacheDir, int orbThreads) throws SQLException, FileNotFoundException {
+    public CardIndex(int size, String url, Settings settings) throws SQLException, FileNotFoundException {
+        this.settings = settings;
         int line = 0;
         int failed = 0;
         int passed = 0;
         int corrupt = 0;
-        this.imagesDir = imagesDir;
-        this.outputDir = outputDir;
-        this.cacheDir = cacheDir;
-        this.orbThreads = orbThreads;
-        this.executor = Executors.newFixedThreadPool(orbThreads);
+        this.executor = Executors.newFixedThreadPool(this.settings.scanThreads());
         List<String[]> data = new ArrayList<>();
         HashingAlgorithm hasher = new PerceptiveHash(64);
         Scanner scan = new Scanner(System.in);
@@ -70,7 +64,7 @@ public class CardIndex{
                 String cardId  = rs.getString("cardId");
                 String expName = rs.getString("expName");
                 String expCardNumber = rs.getString("expCardNumber");
-                Path img = resolveImage(imagesDir, expName, cardId, expCardNumber);
+                Path img = resolveImage(expName, cardId, expCardNumber);
                 String percent = String.format("%.0f", ((double) line / size) * 100);
                 System.out.print("\033[3A\033[J");
                 System.out.println("Hashing:  " + cardId + "...");
@@ -101,8 +95,8 @@ public class CardIndex{
                     }
                 } else{
                     // NOTE: larp for the log. The real lookup happens in resolveImage();
-                    // the file may actually exist under a different number format. 
-                    Path expected = imagesDir
+                    // the file may actually exist under a different number format.
+                    Path expected = this.settings.imagesDir()
                             .resolve(expName == null ? "" : expName.replace(" ", "-"))
                             .resolve(cardId.replace("/", "-") + ".jpg");
                     data.add(new String[]{"File " + cardId + " cannot be found by the program.\nLocation searched (folder): " + expected.getParent()});
@@ -112,24 +106,21 @@ public class CardIndex{
                 line++;
                 }
             }
-        System.out.println("\n\nPassed: " + passed + "\nFailed: " + failed + "\nCorrupt: " + corrupt + "\nOut of: " + line + "");
+        System.out.println("\n\nPassed: " + passed + "\nFailed: " + failed + "\nCorrupt: " + corrupt + "\nOut of: " + line);
         String result = String.format("%.0f", ((double) line / size) * 100);
         System.out.println(result + "% passed.\n\n");
         writeToTxt("log.txt", data);
     }
 
-   public CardIndex(Path imagesDir, Path outputDir, Path cacheDir, int orbThreads) {
-        this.imagesDir = imagesDir;
-        this.outputDir = outputDir;
-        this.cacheDir = cacheDir;
-        this.cardDB = readFromDisk(cacheDir);
-        this.orbThreads = orbThreads;
-        this.executor = Executors.newFixedThreadPool(orbThreads);
+   public CardIndex(Settings settings) {
+        this.settings = settings;
+        this.cardDB = readFromDisk();
+        this.executor = Executors.newFixedThreadPool(settings.scanThreads());
     }
 
-    private Path resolveImage(Path imagesDir, String expName, String cardId, String expCardNumber){
+    private Path resolveImage(String expName, String cardId, String expCardNumber){
         String folder = (expName == null ? "" : expName.replace(" ", "-"));
-        Path dir = imagesDir.resolve("cards/"+folder);
+        Path dir = settings.imagesDir().resolve("cards/"+folder);
        //bail out if normal file path is correct (about 77% chance it is)
         Path exact = dir.resolve(cardId.replace("/", "-") + ".jpg");
         if (Files.exists(exact)){
@@ -139,7 +130,7 @@ public class CardIndex{
             return null;
         }
         final String wantName = nameKey(cardId);
-        final Integer wantNum = collectorNumber(expCardNumber, cardId); 
+        final Integer wantNum = collectorNumber(expCardNumber, cardId);
         try (Stream<Path> stream = Files.list(dir)){
             List<Path> candidates = stream
                     .filter(p -> {
@@ -294,14 +285,14 @@ public class CardIndex{
                 }
                 if (i % 500 == 0) {
                     System.out.println(i + "/" + hashed.size() + "  (" + pairCount + " comparisons...)");
-                }   
+                }
             }
         }
     long ms = System.currentTimeMillis() - startTime;
     System.out.println("\nDone: " + pairCount + " comparisons in " + ms + " ms");
     System.out.println("\nClosest pair: " + recordHolderA + " vs " + recordHolderB + " @ " + record);
     }
-    
+
     public static final class Features{
         final KeyPointVector keypoints;
         final Mat descriptors;
@@ -392,13 +383,13 @@ public class CardIndex{
     public double[] scoreOrbParallel(Features query, List<CardSignature> candidates) {
         int n = candidates.size();
         if (firstScan){
-            System.out.println("Using " + orbThreads + " threads...");
+            System.out.println("Using " + settings.scanThreads() + " threads...");
             firstScan = false;
         }
         double[] scores = new double[n];
         List<Future<?>> futures = new ArrayList<>();
         // chunk the work so each task scores a contiguous range (less task overhead than one-per-card)
-        int chunk = Math.max(1, n / (orbThreads * 4));
+        int chunk = Math.max(1, n / (settings.scanThreads() * 4));
         for (int start = 0; start < n; start += chunk) {
             final int s = start;
             final int e = Math.min(n, start + chunk);
@@ -424,30 +415,30 @@ public class CardIndex{
         return scores;
     }
 
-    public CardImportsIndex newImportsIndex(Path compareDir, Path cacheDir){
+    public CardImportsIndex newImportsIndex(){
         List<CardSignature> hashed = new ArrayList<>();
         for(int c = 0; c < cardDB.length; c++){
             if(cardDB[c] != null && cardDB[c].getBinaryHash() != null) hashed.add(cardDB[c]);
         }
-        return new CardImportsIndex(compareDir, hashed, this);
-    }   
-    
+        return new CardImportsIndex(hashed, this, settings);
+    }
+
     public void scanImports(CardImportsIndex importDB){
         scanImports(importDB, null);
     }
 
     public void scanImports(CardImportsIndex importDB, ScanProgress progress){
-        List<CardImports> fresh = importDB.scan(progress, cacheDir);
+        List<CardImports> fresh = importDB.scan(progress);
         if (fresh.isEmpty()) return;
         List<String[]> rows = new ArrayList<>();
         for(CardImports ci : fresh){
-            for(String[]r : ci.toCsvRows()) rows.add(r); 
+            Collections.addAll(rows, ci.toCsvRows());
         }
-        csvOutput("ImageComparisonOutput.csv", outputDir, rows);
+        csvOutput("ImageComparisonOutput.csv", rows);
     }
 
     /*public void retrieveFileStructure(String args){
-        Path masterPath = imagesDir.resolve(args);
+        Path masterPath = settings.imagesDir().resolve(args);
 
         try {
             long subfolderCount;
@@ -477,9 +468,9 @@ public class CardIndex{
     }*/
     private static final int METADATA_FORMAT_VERSION = 1;
 
-    public void writeToDisk(Path cacheDir) {
-        Path xmlPath = cacheDir.resolve("cache.xml");
-        Path orbPath = cacheDir.resolve("cache_orb.dat");
+    public void writeToDisk() {
+        Path xmlPath = settings.cacheDir().resolve("cache.xml");
+        Path orbPath = settings.cacheDir().resolve("cache_orb.dat");
 
         // Write ORB binary data first — if this fails, skip the XML
         try (DataOutputStream dos = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(orbPath.toFile())))) {
@@ -518,7 +509,7 @@ public class CardIndex{
         }
 
         // Write XML — metadata only, no Mats
-        Path metaPath = cacheDir.resolve("cache_meta.dat");
+        Path metaPath = settings.cacheDir().resolve("cache_meta.dat");
         try (DataOutputStream dos = new DataOutputStream(
                 new BufferedOutputStream(new FileOutputStream(metaPath.toFile()), 1 << 20))) {
 
@@ -552,12 +543,12 @@ public class CardIndex{
         }
     }
 
-    private CardSignature[] readFromDisk(Path cacheDir) {
-        Path xmlPath = cacheDir.resolve("cache.xml");
-        Path orbPath = cacheDir.resolve("cache_orb.dat");
+    private CardSignature[] readFromDisk() {
+        Path xmlPath = settings.cacheDir().resolve("cache.xml");
+        Path orbPath = settings.cacheDir().resolve("cache_orb.dat");
 
         // Read XML metadata
-        Path metaPath = cacheDir.resolve("cache_meta.dat");
+        Path metaPath = settings.cacheDir().resolve("cache_meta.dat");
         CardSignature[] db;
         try (DataInputStream dis = new DataInputStream(
                 new BufferedInputStream(new FileInputStream(metaPath.toFile()), 1 << 20))) {
@@ -642,8 +633,8 @@ public class CardIndex{
         return bp != null ? bp.getString() : "";
     }
 
-    private void csvOutput(String fileName, Path outputDir, List<String[]> data){
-        Path dir  = outputDir.resolve("csv");
+    private void csvOutput(String fileName, List<String[]> data){
+        Path dir  = settings.outputDir().resolve("csv");
         Path file = dir.resolve(fileName);              // standardized name, no getTime()
         try {
             Files.createDirectories(dir);               // FileWriter won't make the dir for you
@@ -661,7 +652,7 @@ public class CardIndex{
     }
     /*
     private void OLDcsvOutput(String args, Path outputDir, List<String[]> data){
-        Path dir = outputDir.resolve("csv/"+getTime()+args);
+        Path dir = settings.outputDir().resolve("csv/"+getTime()+args);
         try(CSVWriter writer = new CSVWriter(new FileWriter(dir.toFile()))){
             writer.writeAll(data);
         }catch(IOException e){
@@ -670,7 +661,7 @@ public class CardIndex{
     }
     */
     private void writeToTxt(String args, List<String[]> data){
-        Path dir = outputDir.resolve("logs/"+getTime()+args);
+        Path dir = settings.outputDir().resolve("logs/"+getTime()+args);
         try(PrintWriter pw = new PrintWriter(new FileWriter(dir.toFile()))){
            data.forEach(i -> pw.println(Arrays.toString(i)));
         }catch(IOException e){

@@ -15,7 +15,7 @@ public class FullCardSignature extends CardSignature {
     private final String expCodeTCGP;
     private final String rarity;
     private final String img;
-    private float price;
+    private final float price;
     private final String description;
     private final String releaseDate;
     private final String energyType;

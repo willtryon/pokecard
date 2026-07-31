@@ -29,15 +29,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import static com.willtryon.pokecard.PokeocrEnv.defaultCacheDir;
+import com.willtryon.pokecard.Config.Settings;
 
 public class App extends Application {
 
     private Config config;
-    private Path cacheDir;
-    private Path outputDir;
-    private Path dbPath;
     private Path sessionPath;
     private String currentSession;
+    private Settings settings;
     private boolean saved;
     private final SimpleBooleanProperty isOrb = new SimpleBooleanProperty(false);
     private final SimpleBooleanProperty isHash = new SimpleBooleanProperty(false);
@@ -151,20 +150,10 @@ public class App extends Application {
             return;
         }
 
-        dbPath = Path.of(config.get(Config.DB_PATH));
-        Path imagesDir = Path.of(config.get(Config.IMAGES_DIR));
-        Path compareDir = Path.of(config.get(Config.COMPARE_DIR));
-        outputDir = Path.of(config.get(Config.OUTPUT_DIR));
-        cacheDir = Path.of(config.get(Config.CACHE_DIR));
         sessionPath = Path.of(config.get(Config.SESSION_PATH));
-        int orbThreads = 1;
-        try{
-            orbThreads = Integer.parseInt(config.get(Config.SCAN_THREADS));
-        }catch(NumberFormatException e){
-            config.set(Config.SCAN_THREADS, String.valueOf(config.getScanThreads()));
-        }
+        settings = Settings.from(config);
 
-        InitTask initTask = new InitTask(dbPath, imagesDir, compareDir, outputDir, cacheDir, orbThreads);
+        InitTask initTask = new InitTask(settings);
         ProgressBar progressBar = new ProgressBar();
         progressBar.setPrefWidth(300);
         progressBar.progressProperty().bind(initTask.progressProperty());
@@ -256,7 +245,7 @@ public class App extends Application {
                     @Override
                     protected Void call() {
                         try{
-                            ctx.importDB.runOcr(cacheDir, dbPath, (msg, frac) -> {
+                            ctx.importDB.runOcr((msg, frac) -> {
                                 updateMessage(msg);
                                 updateProgress(frac, 1.0);
                             });
@@ -381,7 +370,7 @@ public class App extends Application {
             refreshImports(ctx.importDB());
             currentSession = "";
             mainStage.setTitle("Pokecard - "+currentSession);
-            sessionPath = Path.of(outputDir+"/"+ currentSession);
+            sessionPath = Path.of(settings.outputDir()+"/"+ currentSession);
             config.set(Config.SESSION_PATH, String.valueOf(sessionPath));
         });
 
@@ -476,7 +465,7 @@ public class App extends Application {
 
     private void saveSession(Stage owner){
         System.out.println("Saving imports to disk:");
-        if(saved) ctx.importDB.writeImportsToDisk(outputDir, currentSession);
+        if(saved) ctx.importDB.writeImportsToDisk(currentSession);
         if (!saved) {
             FileChooser fc = new FileChooser();
             fc.setTitle("Save Session");
@@ -497,7 +486,7 @@ public class App extends Application {
                 File fixedFile = new File(filePath);
                 sessionPath = fixedFile.toPath();
                 currentSession = sessionPath.getFileName().toString();
-                ctx.importDB.writeImportsToDisk(outputDir, currentSession);
+                ctx.importDB.writeImportsToDisk(currentSession);
                 config.set(Config.SESSION_PATH, fixedFile.getAbsolutePath());
                 try {
                     config.save();
@@ -763,7 +752,7 @@ public class App extends Application {
             CardSignature orbSigVictim  = imp.getARecordRecord(p, "orb");
             FullCardSignature orbSig = null;
             try {
-                orbSig = new FullCardSignature(orbSigVictim, dbPath);
+                orbSig = new FullCardSignature(orbSigVictim, settings.dbPath());
                 System.out.println(orbSig.getName());
             } catch (SQLException e) {
                 showError(e);
@@ -846,7 +835,7 @@ public class App extends Application {
         grid.setRows(data);
 
         SpreadsheetView sv = new SpreadsheetView(grid);
-        sv.setEditable(false);
+        sv.setEditable(true);
         sv.getColumns().get(0).setMinWidth(130);
         sv.getColumns().get(1).setMinWidth(200);
         sv.getColumns().get(2).setMinWidth(120);
@@ -899,21 +888,15 @@ public class App extends Application {
 
 class InitTask extends Task<App.AppContext>{
 
-    private final Path dbPath, imagesDir, compareDir, outputDir, cacheDir;
-    private final int orbThreads;
+    private Config.Settings settings;
 
-    protected InitTask(Path dbPath, Path imagesDir, Path compareDir, Path outputDir, Path cacheDir, int orbThreads) {
-        this.dbPath = dbPath;
-        this.imagesDir = imagesDir;
-        this.compareDir = compareDir;
-        this.outputDir = outputDir;
-        this.cacheDir = cacheDir;
-        this.orbThreads = orbThreads;
+    protected InitTask(Settings settings) {
+        this.settings = settings;
     }
 
     @Override
     protected App.AppContext call() throws Exception{
-        String url = "jdbc:sqlite:" + dbPath;
+        String url = "jdbc:sqlite:" + settings.dbPath();
         updateMessage("Connecting to database...");
         int size;
         try (Connection conn = DriverManager.getConnection(url);
@@ -923,14 +906,14 @@ class InitTask extends Task<App.AppContext>{
         }
         Main.size = size;
 
-        Path cacheFile = cacheDir.resolve("cache_meta.dat");
+        Path cacheFile = settings.cacheDir().resolve("cache_meta.dat");
         CardIndex cardDB;
         if (Files.isRegularFile(cacheFile)) {
             updateMessage("Loading cache (" + size + " cards)...");
-            cardDB = new CardIndex(imagesDir, outputDir, cacheDir, orbThreads);
+            cardDB = new CardIndex(settings);
         } else {
             updateMessage("Computing image data for " + size + " cards...");
-            cardDB = new CardIndex(size, url, imagesDir, outputDir, cacheDir,orbThreads);
+            cardDB = new CardIndex(size, url, settings);
             final CardIndex finalCardDB = cardDB;
             CountDownLatch latch = new CountDownLatch(1);
             AtomicBoolean saveChoice = new AtomicBoolean(false);
@@ -950,16 +933,16 @@ class InitTask extends Task<App.AppContext>{
             latch.await(); // block the background thread until the user answers
 
             if (saveChoice.get()) {
-                cardDB.writeToDisk(cacheDir);
+                cardDB.writeToDisk();
             }
         }
         updateMessage("Verifying python env...");
         PokeocrEnv env = new PokeocrEnv(defaultCacheDir());
         PokeocrEnv.EnvHandle handle = env.prepare();
         updateMessage("Rebulding database...");
-        new PokemonCardNameCleaner(dbPath, false);
+        new PokemonCardNameCleaner(settings.dbPath(), false);
         updateMessage("Starting...");
-        CardImportsIndex importDB = cardDB.newImportsIndex(compareDir, cacheDir);
+        CardImportsIndex importDB = cardDB.newImportsIndex();
         return new App.AppContext(cardDB, importDB, size);
     }
 }
