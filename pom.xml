@@ -104,7 +104,20 @@
                 <version>0.0.8</version>
                 <configuration>
                     <mainClass>com.willtryon.pokecard.gui.Launcher</mainClass>
-            </configuration>
+                    <options>
+                        <option>--add-exports=javafx.base/com.sun.javafx.event=ALL-UNNAMED</option>
+                        <option>--add-exports=javafx.base/com.sun.javafx.collections=ALL-UNNAMED</option>
+                        <option>--add-exports=javafx.base/com.sun.javafx.runtime=ALL-UNNAMED</option>
+                        <option>--add-exports=javafx.base/com.sun.javafx.binding=ALL-UNNAMED</option>
+                        <option>--add-exports=javafx.graphics/com.sun.javafx.scene=ALL-UNNAMED</option>
+                        <option>--add-exports=javafx.graphics/com.sun.javafx.scene.traversal=ALL-UNNAMED</option>
+                        <option>--add-exports=javafx.graphics/com.sun.javafx.css=ALL-UNNAMED</option>
+                        <option>--add-exports=javafx.controls/com.sun.javafx.scene.control=ALL-UNNAMED</option>
+                        <option>--add-exports=javafx.controls/com.sun.javafx.scene.control.behavior=ALL-UNNAMED</option>
+                        <option>--add-exports=javafx.controls/com.sun.javafx.scene.control.inputmap=ALL-UNNAMED</option>
+                        <option>--add-opens=javafx.controls/javafx.scene.control.skin=ALL-UNNAMED</option>
+                    </options>
+                </configuration>
             </plugin>
         </plugins>
     </build>
