@@ -333,7 +333,7 @@ public class App extends Application {
             mainStage.setTitle("Pokecard - "+sessionPath.getFileName());
         }
 
-        mainStage.setScene(new Scene(root, 700, 600));
+        mainStage.setScene(new Scene(root, 1200, 600));
         mainStage.getScene().getRoot().setStyle("-fx-base: #2a2a2a;");
         mainStage.show();
 
