@@ -1,12 +1,10 @@
 package com.willtryon.pokecard;
 
 import dev.brachtendorf.jimagehash.hash.Hash;
+import lombok.Getter;
 
 import java.nio.file.Path;
 import java.util.List;
-import org.controlsfx.control.spreadsheet.SpreadsheetView;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
 
 
 public class CardImports {
@@ -14,6 +12,8 @@ public class CardImports {
     public record Match(String cardID, String img, double winner) {}
 
     private final Path img;
+    @Getter
+    private String cardVersion;
     private final Hash qHash;
     private final Match hashMatch;
     private final Match orbMatch;
@@ -25,8 +25,9 @@ public class CardImports {
 
 
 
-    public CardImports(Path img, Hash qHash, Match hashMatch, Match orbMatch, Match ocrMatch, List<Double> recordScore, List<CardSignature> recordRecord, List<Double> recordScore2, List<CardSignature> recordRecord2) {
+    public CardImports(Path img, String cardVersion, Hash qHash, Match hashMatch, Match orbMatch, Match ocrMatch, List<Double> recordScore, List<CardSignature> recordRecord, List<Double> recordScore2, List<CardSignature> recordRecord2) {
         this.img = img;
+        this.cardVersion = cardVersion;
         this.qHash = qHash;
         this.hashMatch  = hashMatch;
         this.orbMatch   = orbMatch;
@@ -60,11 +61,10 @@ public class CardImports {
     }
 
     public boolean hasOcr(){
-        return ocrMatch.cardID() != null;
+        return ocrMatch != null && ocrMatch.cardID() != null;
     }
-
     public Match bestMatch(){
-        return ocrMatch != null ? ocrMatch : orbMatch;
+        return (ocrMatch != null && ocrMatch.cardID() != null) ? ocrMatch : orbMatch;
     }
     
     public int getRecordSize(){

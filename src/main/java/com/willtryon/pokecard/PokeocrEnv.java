@@ -12,8 +12,6 @@ import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
-import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
-
 public final class PokeocrEnv{
 
     private static final String RESOURCE_ROOT = "/python";
@@ -42,6 +40,7 @@ public final class PokeocrEnv{
     public EnvHandle prepare() throws IOException, InterruptedException, URISyntaxException{
         Platform platform = detectPlatform();
         Accel accel = detectAccel(platform);
+        log.accept("\npokeocr Environment");
         log.accept("Detected platform:" + platform + " accelerator:"+accel);
 
         Path appDir = baseDir.resolve("app");
@@ -130,7 +129,7 @@ public final class PokeocrEnv{
         };
     }
 
-    public static Path defaultCacheDir(){
+    public static Path ocrDefaultCacheDir(){
         String home = System.getProperty("user.home");
         String os =  System.getProperty("os.name").toLowerCase(Locale.ROOT);
         Path base;
@@ -354,7 +353,7 @@ public final class PokeocrEnv{
 
     /** Minimal example. Pass image files/globs (absolute paths) as program arguments. */
     public static void main(String[] args) throws Exception {
-        PokeocrEnv env = new PokeocrEnv(defaultCacheDir());
+        PokeocrEnv env = new PokeocrEnv(ocrDefaultCacheDir());
         EnvHandle handle = env.prepare();            // first run downloads torch + weights (slow)
 
         if (args.length == 0) {

@@ -13,7 +13,7 @@ import dev.brachtendorf.jimagehash.hashAlgorithms.HashingAlgorithm;
 import dev.brachtendorf.jimagehash.hashAlgorithms.PerceptiveHash;
 import org.bytedeco.opencv.opencv_features2d.ORB;
 
-import static com.willtryon.pokecard.PokeocrEnv.defaultCacheDir;
+import static com.willtryon.pokecard.PokeocrEnv.ocrDefaultCacheDir;
 import static com.willtryon.pokecard.CardIndex.timer;
 
 public class CardImportsIndex {
@@ -25,6 +25,7 @@ public class CardImportsIndex {
     private final HashingAlgorithm hasher = new PerceptiveHash(64);
     private final List<CardImports> imports = new ArrayList<>();
     private final List<CardImports> fresh = new ArrayList<>();
+    public static String globalCardVersion = "NORMAL";
     private static final double DUP_THRESHOLD = 0.0;
 
     private record Scored(CardSignature sig, double score){}
@@ -178,14 +179,14 @@ public class CardImportsIndex {
             recordRecord2.add(scored.sig());
             recordScore2.add(scored.score());
         }
-		return new CardImports(path, test, hashMatch, orbMatch, ocrMatch, recordScore, recordRecord, recordScore2, recordRecord2);
+		return new CardImports(path, globalCardVersion, test, hashMatch, orbMatch, ocrMatch, recordScore, recordRecord, recordScore2, recordRecord2);
     }
 
     public void runOcr(ScanProgress progress) throws IOException, URISyntaxException, InterruptedException {
         System.out.println("I work!");
         progress.report("OCR bullshit now", -1);
         long startTime = System.currentTimeMillis();
-        PokeocrEnv env = new PokeocrEnv(defaultCacheDir());
+        PokeocrEnv env = new PokeocrEnv(ocrDefaultCacheDir());
         PokeocrEnv.EnvHandle handle = env.prepare();
         try(PokeocrInterface ocrInterface = new PokeocrInterface(env, handle)){
             List<Path> paths = new ArrayList<>(
@@ -219,6 +220,8 @@ public class CardImportsIndex {
             e.printStackTrace();
         }
     }
+
+
 
     public CardImports.Match resolveViaSql(String top, String bottom, String url) throws SQLException {
         Integer number = parseCardNumber(bottom);   // "…36/106●" -> 36,   or null
@@ -279,7 +282,7 @@ public class CardImportsIndex {
 
 
     //I write session information to the disk
-    private static final int IMPORTS_FORMAT_VERSION = 3;
+    private static final int IMPORTS_FORMAT_VERSION = 4;
 
     public void writeImportsToDisk(String currentSession) {
         Path path = settings.outputDir().resolve(currentSession);
@@ -300,7 +303,8 @@ public class CardImportsIndex {
             for (CardImports ci : imports) {
                 Path q = ci.getQueryImage();
                 dos.writeUTF(q != null ? q.toString() : "");
-
+                String v = ci.getCardVersion();
+                dos.writeUTF(v != null ? v : "");
                 Hash qh = ci.getQueryHash();
                 dos.writeUTF(qh != null ? qh.getHashValue().toString(16) : "");
 
@@ -363,6 +367,8 @@ public class CardImportsIndex {
             for (int j = 0; j < importCount; j++) {
                 String qStr = dis.readUTF();
                 Path q = qStr.isEmpty() ? null : Path.of(qStr);
+                String vStr = dis.readUTF();
+                String v =  vStr.isEmpty() ? null : vStr;
 
                 String qHex = dis.readUTF();
                 Hash qHash = qHex.isEmpty() ? null : new Hash(new BigInteger(qHex, 16), bits, algo);
@@ -379,7 +385,7 @@ public class CardImportsIndex {
                 List<Double>        recordScore2  = new ArrayList<>();
                 readRanking(dis, byId, recordRecord2, recordScore2);
 
-                loaded.add(new CardImports(q, qHash, hashMatch, orbMatch, ocrMatch,
+                loaded.add(new CardImports(q, v, qHash, hashMatch, orbMatch, ocrMatch,
                         recordScore, recordRecord, recordScore2, recordRecord2));
                 if (qHash != null) loadedHashes.add(qHash);
             }

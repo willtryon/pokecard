@@ -20,6 +20,9 @@ import javafx.collections.ObservableList;
 
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.*;
@@ -28,7 +31,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
-import static com.willtryon.pokecard.PokeocrEnv.defaultCacheDir;
+import static com.willtryon.pokecard.CardImportsIndex.globalCardVersion;
+import static com.willtryon.pokecard.PokeocrEnv.ocrDefaultCacheDir;
+import static com.willtryon.pokecard.TcgdbEnv.tcgdbDefaultCacheDir;
 import com.willtryon.pokecard.Config.Settings;
 
 public class App extends Application {
@@ -46,6 +51,7 @@ public class App extends Application {
     private ProgressBar statusProgress;
     private TabPane detailTabs;
     private TreeItem<SideNode> importsBranch;
+    public static boolean firstRun = true;
 
 
 
@@ -220,6 +226,46 @@ public class App extends Application {
         Button scan = new Button("Scan folder...");
         scan.setOnAction(e -> {
             scan.setDisable(true);
+
+            Stage dialogStage = new Stage();
+            dialogStage.initOwner(mainStage);
+            dialogStage.initModality(Modality.WINDOW_MODAL);
+            dialogStage.setTitle("Scan...");
+            Label instructions = new Label("Please select the type of cards you want to scan:");
+            ToggleGroup toggleGroup = new ToggleGroup();
+            RadioButton normal = new RadioButton("Normal");
+            normal.setToggleGroup(toggleGroup);
+            RadioButton revHolo = new RadioButton("R.Holo");
+            revHolo.setToggleGroup(toggleGroup);
+            RadioButton holo = new RadioButton("Holo");
+            holo.setToggleGroup(toggleGroup);
+            toggleGroup.selectedToggleProperty().addListener((observable, oldToggle, newToggle) -> {
+                if (newToggle != null) {
+                    RadioButton selectedRb = (RadioButton) newToggle;
+                    switch (selectedRb.getText()){
+                        case "Normal" -> {
+                            globalCardVersion = "NORMAL";
+                            System.out.println(globalCardVersion);
+                        }
+                        case "R.Holo" -> globalCardVersion = "REVERSE HOLOFOIL";
+                        case "Holo" -> globalCardVersion = "HOLOFOIL";
+                    }
+                }
+            });
+            Button start = new Button("Start");
+            start.setOnAction(event -> {
+                dialogStage.close();
+            });
+            VBox setup = new VBox(10, instructions, normal, revHolo, holo, start);
+            setup.setAlignment(Pos.CENTER);
+            setup.setSpacing(10);
+            Scene setupScene = new Scene(setup, 300, 200);
+            dialogStage.setScene(setupScene);
+            dialogStage.showAndWait();
+            dialogStage.setOnCloseRequest(event -> {
+                return;
+            });
+
 
             Task<Void> orbTask = new Task<>() {
                 @Override
@@ -667,6 +713,12 @@ public class App extends Application {
         tab.setId(key);
         detailTabs.getTabs().add(tab);
         detailTabs.getSelectionModel().select(tab);
+        if(firstRun){
+            Alert a = new Alert(Alert.AlertType.INFORMATION, "In the score column, a value of 100 means my program selected it, and a value of 0 means yours did.");
+            a.showAndWait();
+            firstRun = false;
+        }
+
     }
 
     private boolean focusExistingTab(String id) {
@@ -762,7 +814,7 @@ public class App extends Application {
             CardSignature orbSigVictim  = imp.getARecordRecord(p, "orb");
             FullCardSignature orbSig = null;
             try {
-                orbSig = new FullCardSignature(orbSigVictim, settings.dbPath());
+                orbSig = new FullCardSignature(orbSigVictim, settings.dbPath(), settings.cacheDir(), imp.getCardVersion());
                 System.out.println(orbSig.getName());
             } catch (SQLException e) {
                 showError(e);
@@ -772,7 +824,7 @@ public class App extends Application {
 
             orbLabel.setText ("ORB match: "   + (orbSig  == null ? "-" : orbSig.getCardID()  + "  (" + imp.getARecordScore(p, "orb")  + ")"));
             hashLabel.setText("pHash match: " + (hashSig == null ? "-" : hashSig.getCardID() + "  (" + imp.getARecordScore(p, "hash") + ")"));
-            ocrLabel.setText("OCR match: " + (ocrSig == null ? "-" : ocrSig.cardID()));
+            ocrLabel.setText("OCR match: " + (ocrSig == null || ocrSig.cardID() == null ? "-" : ocrSig.cardID()));
 
             Path orbImg = (orbSig != null) ? orbSig.getImgPath() : null;
             image2.setImage((orbImg != null && Files.exists(orbImg)) ? new Image(orbImg.toUri().toString()) : null);
@@ -787,7 +839,7 @@ public class App extends Application {
             idTCGP.setText("TCGP ID: "+(orbSig == null ? "" : orbSig.getIdTCGP()));
             cardType.setText("Type: "+(orbSig == null ? "" : orbSig.getCardType()));
             rarity.setText("Rarity: "+(orbSig == null ? "" : orbSig.getRarity()));
-            price.setText("Price (Not valid)"+(orbSig == null ? "" : String.valueOf(orbSig.getPrice())));
+            price.setText("Price: "+(orbSig == null ? "" : String.valueOf(orbSig.getPrice())));
             description.setText((orbSig == null ? "" : orbSig.getDescription()));
 
 
@@ -813,13 +865,14 @@ public class App extends Application {
 
     private SpreadsheetView buildSpreadsheet(CardImports imp, String args) {
         int rows;
-        if(!args.equals("session")) rows = imp.getRecordSize2();
-        else rows = ctx.importDB.getImports().size();
+        if(args.equals("session")) rows = ctx.importDB.getImports().size();
+        else if (args.equals("ocr")) rows = 1;
+        else rows = imp.getRecordSize2();
 
         Map<Integer, Double> heights = new HashMap<>();
-        GridBase grid = new GridBase(rows, 3);
+        GridBase grid = new GridBase(rows, 7);
 
-        grid.getColumnHeaders().addAll("Card image", "Card ID", "Score");
+        grid.getColumnHeaders().addAll("Subject", "DB image", "Card ID", "TCGP ID", "Price", "Score", "Release Date");
 
 
         for(int i = 0; i < rows; i++){
@@ -827,38 +880,66 @@ public class App extends Application {
         }
         ObservableList<ObservableList<SpreadsheetCell>> data = FXCollections.observableArrayList();
         List<CardImports> imports = ctx.importDB.getImports();
-        for(int r = 0; r < rows; r++){
-            CardSignature sig = null; Double score = 0.0;
+        for (int r = 0; r < rows; r++) {
+            CardSignature subSig = null; Double score = 0.0;
+            CardImports rowImp = imp;
             switch (args){
                 case "session" -> {
-                    CardImports card = imports.get(r);
-                    CardImports.Match show = card.bestMatch();
-                    sig = ctx.cardDB.findCardId(show.cardID());
-                    score = 0.0;
+                    rowImp = imports.get(r);
+                    CardImports.Match show = rowImp.bestMatch();
+                    subSig = ctx.cardDB.findCardId(show.cardID());
+                    score = rowImp.hasOcr() ? 0.0 : 100.0;
                 }
                 case "orb", "hash" -> {
-                    sig = imp.getARecordRecord(r, args);
+                    subSig = imp.getARecordRecord(r, args);
                     score = imp.getARecordScore(r, args);
                 }
                 case "ocr" ->  {
                     CardImports.Match show = imp.getOcrWinner();
-                    sig = ctx.cardDB.findCardId(show.cardID());
+                    subSig = ctx.cardDB.findCardId(show.cardID());
                     score = 100.0;
                 }
             }
-
-            SpreadsheetCell imgCell = SpreadsheetCellType.STRING.createCell(r, 0, 1, 1, "");
-            Path p = (sig == null) ? null : sig.getImgPath();
-            if(p != null && Files.exists(p)){
-                Image thumb = new Image(p.toUri().toString(), 120, 0, true, true, true);
-                ImageView iv = new ImageView(thumb);
-                iv.setPreserveRatio(true);
-                imgCell.setGraphic(iv);
+            try{
+                SpreadsheetCell subCell = SpreadsheetCellType.STRING.createCell(r, 0, 1, 1, "");
+                Path p1 = (rowImp == null) ? null : rowImp.getQueryImage();
+                if(p1 != null && Files.exists(p1)){
+                    Image thumb = new Image(p1.toUri().toString(), 120, 0, true, true, true);
+                    ImageView iv = new ImageView(thumb);
+                    iv.setPreserveRatio(true);
+                    subCell.setGraphic(iv);
+                }
+                SpreadsheetCell imgCell = SpreadsheetCellType.STRING.createCell(r, 1, 1, 1, "");
+                Path p = (subSig == null) ? null : subSig.getImgPath();
+                if(p != null && Files.exists(p)){
+                    Image thumb = new Image(p.toUri().toString(), 120, 0, true, true, true);
+                    ImageView iv = new ImageView(thumb);
+                    iv.setPreserveRatio(true);
+                    imgCell.setGraphic(iv);
+                }
+                SpreadsheetCell idCell = SpreadsheetCellType.STRING.createCell(
+                        r, 2, 1, 1, subSig == null ? "-" : subSig.getCardID());
+                int tcgp = 0;
+                double roundedValue = 0.0;
+                String release = "";
+                if (subSig != null) {
+                    FullCardSignature domSig = new FullCardSignature(
+                            subSig, settings.dbPath(), settings.cacheDir(),
+                            rowImp == null ? globalCardVersion : rowImp.getCardVersion());
+                    tcgp = domSig.getIdTCGP();
+                    roundedValue = new BigDecimal(Double.toString(domSig.getPrice()))
+                            .setScale(3, RoundingMode.DOWN).doubleValue();
+                    release = domSig.getReleaseDate();
+                }
+                SpreadsheetCell numCell = SpreadsheetCellType.INTEGER.createCell(r, 3, 1, 1, tcgp);
+                SpreadsheetCell priceCell = SpreadsheetCellType.DOUBLE.createCell(r, 4, 1, 1, roundedValue+0.60);
+                SpreadsheetCell scoreCell = SpreadsheetCellType.DOUBLE.createCell(r, 5, 1, 1, score);
+                SpreadsheetCell yearCell = SpreadsheetCellType.STRING.createCell(r, 6, 1, 1, release);
+                data.add(FXCollections.observableArrayList(subCell, imgCell, idCell, numCell, priceCell, scoreCell,  yearCell));
+            }catch (SQLException e){
+                showError(e);
             }
-            SpreadsheetCell idCell = SpreadsheetCellType.STRING.createCell(
-                    r, 1, 1, 1, sig == null ? "-" : sig.getCardID());
-            SpreadsheetCell scoreCell = SpreadsheetCellType.DOUBLE.createCell(r, 2, 1, 1, score);
-            data.add(FXCollections.observableArrayList(imgCell, idCell, scoreCell));
+
         }
         grid.setRows(data);
 
@@ -965,13 +1046,22 @@ class InitTask extends Task<App.AppContext>{
             }
         }
         updateMessage("Verifying python env...");
-        PokeocrEnv env = new PokeocrEnv(defaultCacheDir());
+        PokeocrEnv env = new PokeocrEnv(ocrDefaultCacheDir());
         PokeocrEnv.EnvHandle handle = env.prepare();
-        updateMessage("Rebulding database...");
+        updateMessage("Rebuilding database...");
+        syncPrices(false);
         new PokemonCardNameCleaner(settings.dbPath(), false);
         updateMessage("Starting...");
         CardImportsIndex importDB = cardDB.newImportsIndex();
         return new App.AppContext(cardDB, importDB, size);
+    }
+
+    public void syncPrices(boolean force) throws IOException, InterruptedException, URISyntaxException {
+        Path db = settings.cacheDir().resolve("tcg.db");      // stable, known location
+        TcgdbEnv env = new TcgdbEnv(tcgdbDefaultCacheDir());
+        TcgdbEnv.EnvHandle handle = env.prepare();            // first run: venv + pip install requests
+        int code = env.sync(handle, db, force);               // pulls only if upstream is newer
+        System.out.println("tcgdb sync exited " + code + "; db at " + db);
     }
 }
 
