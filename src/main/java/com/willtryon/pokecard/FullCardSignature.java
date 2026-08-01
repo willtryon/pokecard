@@ -6,6 +6,9 @@ import org.bytedeco.opencv.opencv_core.Mat;
 
 import java.sql.*;
 import java.nio.file.Path;
+
+import static com.willtryon.pokecard.CardImportsIndex.globalCardVersion;
+
 public class FullCardSignature extends CardSignature {
     private final int idTCGP;
     private final String name;
@@ -23,10 +26,12 @@ public class FullCardSignature extends CardSignature {
     private final int pokedex;
     private final String variants;
     private final String variantMap;
+    private final String cardVersion;
 
-    public FullCardSignature(CardSignature cardSignature, Path dbPath) throws SQLException {
+    public FullCardSignature(CardSignature cardSignature, Path dbPath, Path cacheDir, String cardVersion) throws SQLException {
         super(cardSignature.getCardID(), cardSignature.getImgPath(), cardSignature.getBinaryHash(),
                 cardSignature.getMatData(), cardSignature.getKeypoints());
+        this.cardVersion = cardVersion;
         String url = "jdbc:sqlite:" + dbPath;
         String cardID = getCardID();
         try (Connection conn = DriverManager.getConnection(url);
@@ -44,7 +49,7 @@ public class FullCardSignature extends CardSignature {
                 expCodeTCGP = rs.getString("expCodeTCGP");
                 rarity = rs.getString("rarity");
                 img = rs.getString("img");
-                price = rs.getFloat("price");
+                price = calculatePrice(cacheDir, dbPath);
                 description = rs.getString("description");
                 releaseDate = rs.getString("releaseDate");
                 energyType = rs.getString("energyType");
@@ -108,6 +113,45 @@ public class FullCardSignature extends CardSignature {
         return price;
     }
 
+    public float calculatePrice(Path cacheDir, Path dbPath) throws SQLException{
+        String url = "jdbc:sqlite:" + cacheDir.resolve("tcg.db");
+        System.out.println(cardVersion);
+
+        String sql = "SELECT pr.sub_type, pr.market_price, pr.mid_price, pr.low_price " +
+                "FROM iddb.cards ic " + // Added 'ic' alias here
+                "JOIN products p ON p.product_id = ic.idTCGP " +
+                "JOIN prices pr ON pr.product_id = p.product_id " +
+                "WHERE ic.idTCGP = ?"+
+                "   AND pr.sub_type = ? COLLATE NOCASE";
+
+        try (Connection conn = DriverManager.getConnection(url);
+             Statement st = conn.createStatement()) {
+
+            st.execute("ATTACH DATABASE '" + dbPath + "' AS iddb");
+
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, String.valueOf(getIdTCGP()));
+                ps.setString(2, getCardVersion());
+
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        String subType = rs.getString("sub_type");
+                        //System.out.println(subType);
+                        float marketPrice = rs.getFloat("market_price");
+                        //System.out.println(marketPrice);
+                        float lowPrice = rs.getFloat("low_price");
+                        //System.out.println(lowPrice);
+                        float midPrice = rs.getFloat("mid_price");
+                        //System.out.println(midPrice);
+                        //System.out.println("Hello");
+                        price = Math.max(marketPrice, Math.max(lowPrice, midPrice));
+                    }
+                }
+            }
+        }
+        return price;
+    }
+
     public String getDescription() {
         return description;
     }
@@ -135,6 +179,8 @@ public class FullCardSignature extends CardSignature {
     public String getVariantMap() {
         return variantMap;
     }
+
+    public String getCardVersion() {return cardVersion;}
 
     public String toString() {
         return super.toString() + "\n" + "ID TGP = " + idTCGP + "\n" + "Name = " + name + "\n" + "Price = " + price;

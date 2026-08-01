@@ -13,42 +13,39 @@ import dev.brachtendorf.jimagehash.hashAlgorithms.HashingAlgorithm;
 import dev.brachtendorf.jimagehash.hashAlgorithms.PerceptiveHash;
 import org.bytedeco.opencv.opencv_features2d.ORB;
 
-import static com.willtryon.pokecard.PokeocrEnv.defaultCacheDir;
+import static com.willtryon.pokecard.PokeocrEnv.ocrDefaultCacheDir;
 import static com.willtryon.pokecard.CardIndex.timer;
 
 public class CardImportsIndex {
     private String guess;
-    private final Path compareDir;
     private final List<CardSignature> hashed;
     private final CardIndex cardDB;
+    private final Config.Settings settings;
     private final List<Hash> seenHashes = new ArrayList<>();
     private final HashingAlgorithm hasher = new PerceptiveHash(64);
     private final List<CardImports> imports = new ArrayList<>();
     private final List<CardImports> fresh = new ArrayList<>();
+    public static String globalCardVersion = "NORMAL";
     private static final double DUP_THRESHOLD = 0.0;
 
     private record Scored(CardSignature sig, double score){}
 
-    public CardImportsIndex(Path compareDir, List<CardSignature> hashed, CardIndex cardDB){
-        this.compareDir = compareDir;
+    public CardImportsIndex(List<CardSignature> hashed, CardIndex cardDB, Config.Settings settings){
         this.hashed = hashed;
         this.cardDB = cardDB;
+        this.settings = settings;
     }
 
-    public List<CardImports> scan(Path cacheDir){
-        return scan(null, cacheDir);
-    }
-
-    public synchronized List<CardImports> scan(ScanProgress progress, Path cacheDir){
+    public synchronized List<CardImports> scan(ScanProgress progress){
         guess = "";
         List<CardImports> ocrCandidates =  new ArrayList<>();
-        Path ocrDir = cacheDir.resolve("ocr-victim");
+        Path ocrDir = settings.cacheDir().resolve("ocr-victim");
         try{
             Files.delete(ocrDir);
         }catch(IOException ignore){}
         long beginOrbJob = System.currentTimeMillis();
-        System.out.println("Scanning "+ compareDir+" for new images...");
-        try (Stream<Path> stream = Files.walk(compareDir)){
+        System.out.println("Scanning "+ settings.compareDir()+" for new images...");
+        try (Stream<Path> stream = Files.walk(settings.compareDir())){
             List<Path> imgList = stream
                 .filter(path -> {
                     String s = path.toString().toLowerCase();
@@ -175,24 +172,25 @@ public class CardImportsIndex {
 		System.out.println("\nUploaded image " + victim + " appears to be closest to " + bestOrb.sig.getStringImgPath() + ". (ORB)");
 		System.out.println(bestOrb.score());
 		CardImports.Match orbMatch = new CardImports.Match(bestOrb.sig.getCardID(), bestOrb.sig.getStringImgPath(), bestOrb.score());
+        CardImports.Match ocrMatch = new CardImports.Match(null, null, 100.0);
 		List<CardSignature> recordRecord2 = new ArrayList<>();
 		List<Double> recordScore2 = new ArrayList<>();
         for (Scored scored : orbSorted) {
             recordRecord2.add(scored.sig());
             recordScore2.add(scored.score());
         }
-		return new CardImports(path, test, hashMatch, orbMatch, recordScore, recordRecord, recordScore2, recordRecord2);
+		return new CardImports(path, globalCardVersion, test, hashMatch, orbMatch, ocrMatch, recordScore, recordRecord, recordScore2, recordRecord2);
     }
 
-    public void runOcr(Path cacheDir, Path dbPath,ScanProgress progress) throws IOException, URISyntaxException, InterruptedException {
+    public void runOcr(ScanProgress progress) throws IOException, URISyntaxException, InterruptedException {
         System.out.println("I work!");
         progress.report("OCR bullshit now", -1);
         long startTime = System.currentTimeMillis();
-        PokeocrEnv env = new PokeocrEnv(defaultCacheDir());
+        PokeocrEnv env = new PokeocrEnv(ocrDefaultCacheDir());
         PokeocrEnv.EnvHandle handle = env.prepare();
         try(PokeocrInterface ocrInterface = new PokeocrInterface(env, handle)){
             List<Path> paths = new ArrayList<>(
-                    Files.readAllLines(cacheDir.resolve("ocr-victim"))
+                    Files.readAllLines(settings.cacheDir().resolve("ocr-victim"))
                             .stream()
                             .filter(line -> !line.isBlank()) // Skip empty lines
                             .map(Path::of)
@@ -209,7 +207,7 @@ public class CardImportsIndex {
                             c.index(), c.rotation(), c.top(), c.bottom());
                     CardImports parent = byPath.get(c.path());
                     if (parent == null) continue;
-                    String url = "jdbc:sqlite:" + dbPath;
+                    String url = "jdbc:sqlite:" + settings.dbPath();
                     CardImports.Match m = resolveViaSql(c.top(), c.bottom(), url);
                     //CardImports.Match m = new CardImports.Match(c.top(), parent.getQueryImage().toString(), 67.0);
                     if (m != null) parent.setOcrWinner(m);
@@ -222,6 +220,8 @@ public class CardImportsIndex {
             e.printStackTrace();
         }
     }
+
+
 
     public CardImports.Match resolveViaSql(String top, String bottom, String url) throws SQLException {
         Integer number = parseCardNumber(bottom);   // "…36/106●" -> 36,   or null
@@ -275,19 +275,17 @@ public class CardImportsIndex {
     public List<String[]> toCsvData() {
         List<String[]> data = new ArrayList<>();
         for (CardImports ci : imports) {
-            for (String[] row : ci.toCsvRows()) {
-                data.add(row);
-            }
+            Collections.addAll(data, ci.toCsvRows());
         }
         return data;
     }
 
 
     //I write session information to the disk
-    private static final int IMPORTS_FORMAT_VERSION = 2;
+    private static final int IMPORTS_FORMAT_VERSION = 4;
 
-    public void writeImportsToDisk(Path outputDir, String currentSession) {
-        Path path = outputDir.resolve(currentSession);
+    public void writeImportsToDisk(String currentSession) {
+        Path path = settings.outputDir().resolve(currentSession);
         try (DataOutputStream dos = new DataOutputStream(
                 new BufferedOutputStream(new FileOutputStream(path.toFile())))) {
 
@@ -305,12 +303,14 @@ public class CardImportsIndex {
             for (CardImports ci : imports) {
                 Path q = ci.getQueryImage();
                 dos.writeUTF(q != null ? q.toString() : "");
-
+                String v = ci.getCardVersion();
+                dos.writeUTF(v != null ? v : "");
                 Hash qh = ci.getQueryHash();
                 dos.writeUTF(qh != null ? qh.getHashValue().toString(16) : "");
 
                 writeMatch(dos, ci.getHashWinner());
                 writeMatch(dos, ci.getOrbWinner());
+                writeMatch(dos, ci.getOcrWinner());
 
                 writeRanking(dos, ci, "hash");
                 writeRanking(dos, ci, "orb");   // same length as hash side by construction
@@ -367,12 +367,15 @@ public class CardImportsIndex {
             for (int j = 0; j < importCount; j++) {
                 String qStr = dis.readUTF();
                 Path q = qStr.isEmpty() ? null : Path.of(qStr);
+                String vStr = dis.readUTF();
+                String v =  vStr.isEmpty() ? null : vStr;
 
                 String qHex = dis.readUTF();
                 Hash qHash = qHex.isEmpty() ? null : new Hash(new BigInteger(qHex, 16), bits, algo);
 
                 CardImports.Match hashMatch = readMatch(dis);
                 CardImports.Match orbMatch  = readMatch(dis);
+                CardImports.Match ocrMatch = readMatch(dis);
 
                 List<CardSignature> recordRecord  = new ArrayList<>();
                 List<Double>        recordScore   = new ArrayList<>();
@@ -382,7 +385,7 @@ public class CardImportsIndex {
                 List<Double>        recordScore2  = new ArrayList<>();
                 readRanking(dis, byId, recordRecord2, recordScore2);
 
-                loaded.add(new CardImports(q, qHash, hashMatch, orbMatch,
+                loaded.add(new CardImports(q, v, qHash, hashMatch, orbMatch, ocrMatch,
                         recordScore, recordRecord, recordScore2, recordRecord2));
                 if (qHash != null) loadedHashes.add(qHash);
             }
