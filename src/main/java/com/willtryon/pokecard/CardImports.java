@@ -12,7 +12,6 @@ public class CardImports {
     public record Match(String cardID, String img, double winner) {}
 
     private final Path img;
-    @Getter
     private String cardVersion;
     private final Hash qHash;
     private final Match hashMatch;
@@ -40,6 +39,10 @@ public class CardImports {
 
     public Path getQueryImage() {
         return img; 
+    }
+
+    public String getCardVersion() {
+        return cardVersion;
     }
 
     public Hash getQueryHash() {return qHash;}
