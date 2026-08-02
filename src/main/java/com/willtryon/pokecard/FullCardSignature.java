@@ -26,12 +26,14 @@ public class FullCardSignature extends CardSignature {
     private final int pokedex;
     private final String variants;
     private final String variantMap;
-    private final String cardVersion;
+    private String cardVersion;
+    private final boolean firstEdition;
 
-    public FullCardSignature(CardSignature cardSignature, Path dbPath, Path cacheDir, String cardVersion) throws SQLException {
+    public FullCardSignature(CardSignature cardSignature, Path dbPath, Path cacheDir, String cardVersion, boolean firstEdition) throws SQLException {
         super(cardSignature.getCardID(), cardSignature.getImgPath(), cardSignature.getBinaryHash(),
                 cardSignature.getMatData(), cardSignature.getKeypoints());
         this.cardVersion = cardVersion;
+        this.firstEdition = firstEdition;
         String url = "jdbc:sqlite:" + dbPath;
         String cardID = getCardID();
         try (Connection conn = DriverManager.getConnection(url);
@@ -115,10 +117,16 @@ public class FullCardSignature extends CardSignature {
 
     public float calculatePrice(Path cacheDir, Path dbPath) throws SQLException{
         String url = "jdbc:sqlite:" + cacheDir.resolve("tcg.db");
+        if(firstEdition){
+            switch (cardVersion){
+                case "NORMAL" -> cardVersion = "1ST EDITION";
+                case "HOLOFOIL" -> cardVersion = "1ST EDITION HOLOFOIL";
+            }
+        }
         System.out.println(cardVersion);
 
         String sql = "SELECT pr.sub_type, pr.market_price, pr.mid_price, pr.low_price " +
-                "FROM iddb.cards ic " + // Added 'ic' alias here
+                "FROM iddb.cards ic " +
                 "JOIN products p ON p.product_id = ic.idTCGP " +
                 "JOIN prices pr ON pr.product_id = p.product_id " +
                 "WHERE ic.idTCGP = ?"+
@@ -134,17 +142,43 @@ public class FullCardSignature extends CardSignature {
                 ps.setString(2, getCardVersion());
 
                 try (ResultSet rs = ps.executeQuery()) {
-                    while (rs.next()) {
+                    if (rs.next()) {
                         String subType = rs.getString("sub_type");
-                        //System.out.println(subType);
+                        System.out.println(subType);
                         float marketPrice = rs.getFloat("market_price");
-                        //System.out.println(marketPrice);
+                        System.out.println(marketPrice);
                         float lowPrice = rs.getFloat("low_price");
-                        //System.out.println(lowPrice);
+                        System.out.println(lowPrice);
                         float midPrice = rs.getFloat("mid_price");
-                        //System.out.println(midPrice);
-                        //System.out.println("Hello");
+                        System.out.println(midPrice);
+                        System.out.println("Hello");
                         price = Math.max(marketPrice, Math.max(lowPrice, midPrice));
+                    }else{
+                        rs.close();
+                        System.out.println("No data found, trying unlimited...");
+                        switch(cardVersion){
+                            case "NORMAL" -> cardVersion = "UNLIMITED";
+                            case "HOLOFOIL" -> cardVersion = "UNLIMITED HOLOFOIL";
+                        }
+                        ps.setString(2, getCardVersion());
+                        try(ResultSet rs2 = ps.executeQuery()) {
+                            if (rs2.next()) {
+                                String subType = rs.getString("sub_type");
+                                System.out.println(subType);
+                                float marketPrice = rs.getFloat("market_price");
+                                System.out.println(marketPrice);
+                                float lowPrice = rs.getFloat("low_price");
+                                System.out.println(lowPrice);
+                                float midPrice = rs.getFloat("mid_price");
+                                System.out.println(midPrice);
+                                System.out.println("Hello");
+                                price = Math.max(marketPrice, Math.max(lowPrice, midPrice));
+                            }else {
+                                rs2.close();
+                                System.out.println("No price found...");
+                            }
+                        }
+
                     }
                 }
             }
@@ -181,6 +215,7 @@ public class FullCardSignature extends CardSignature {
     }
 
     public String getCardVersion() {return cardVersion;}
+
 
     public String toString() {
         return super.toString() + "\n" + "ID TGP = " + idTCGP + "\n" + "Name = " + name + "\n" + "Price = " + price;
