@@ -12,6 +12,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.*;
 import javafx.stage.*;
 import org.controlsfx.control.spreadsheet.*;
@@ -32,6 +33,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import static com.willtryon.pokecard.CardImportsIndex.globalCardVersion;
+import static com.willtryon.pokecard.CardImportsIndex.globalFirstEdition;
 import static com.willtryon.pokecard.PokeocrEnv.ocrDefaultCacheDir;
 import static com.willtryon.pokecard.TcgdbEnv.tcgdbDefaultCacheDir;
 import com.willtryon.pokecard.Config.Settings;
@@ -252,11 +254,19 @@ public class App extends Application {
                     }
                 }
             });
+            CheckBox firstEdition = new CheckBox("First Edition");
+            firstEdition.setOnAction(event -> {
+                globalFirstEdition = firstEdition.isSelected();
+                System.out.println(globalFirstEdition);
+            });
+            VBox mcq =  new VBox(10, normal, revHolo, holo);
+            HBox options =  new HBox(10, mcq, firstEdition);
+            options.setAlignment(Pos.CENTER);
             Button start = new Button("Start");
             start.setOnAction(event -> {
                 dialogStage.close();
             });
-            VBox setup = new VBox(10, instructions, normal, revHolo, holo, start);
+            VBox setup = new VBox(10, instructions, options, start);
             setup.setAlignment(Pos.CENTER);
             setup.setSpacing(10);
             Scene setupScene = new Scene(setup, 300, 200);
@@ -709,7 +719,8 @@ public class App extends Application {
         String key = "spreadsheet:" + (q == null ? String.valueOf(imp.hashCode()) : q.toString());
         if (focusExistingTab(key)) return;
         String title = (q == null ? "Import" : q.getFileName().toString()) + " \u2013 ORB matches";
-        Tab tab = new Tab(title, buildSpreadsheet(imp, args));
+        SpreadsheetView sv = buildSpreadsheet(imp, args);
+        Tab tab = new Tab(title, sv);
         tab.setId(key);
         detailTabs.getTabs().add(tab);
         detailTabs.getSelectionModel().select(tab);
@@ -718,6 +729,14 @@ public class App extends Application {
             a.showAndWait();
             firstRun = false;
         }
+
+        Platform.runLater(() ->{
+            sv.setOnKeyPressed(event -> {
+                if(event.isShortcutDown() && event.getCode() == KeyCode.C) {
+                    sv.copyClipboard();
+                }
+            });
+        });
 
     }
 
@@ -814,7 +833,7 @@ public class App extends Application {
             CardSignature orbSigVictim  = imp.getARecordRecord(p, "orb");
             FullCardSignature orbSig = null;
             try {
-                orbSig = new FullCardSignature(orbSigVictim, settings.dbPath(), settings.cacheDir(), imp.getCardVersion());
+                orbSig = new FullCardSignature(orbSigVictim, settings.dbPath(), settings.cacheDir(), imp.getCardVersion(), imp.getFirstEdition());
                 System.out.println(orbSig.getName());
             } catch (SQLException e) {
                 showError(e);
@@ -873,11 +892,10 @@ public class App extends Application {
         GridBase grid = new GridBase(rows, 7);
 
         grid.getColumnHeaders().addAll("Subject", "DB image", "Card ID", "TCGP ID", "Price", "Score", "Release Date");
-
-
         for(int i = 0; i < rows; i++){
             heights.put(i, 140.0);
         }
+        grid.setRowHeightCallback(new GridBase.MapBasedRowHeightFactory(heights));
         ObservableList<ObservableList<SpreadsheetCell>> data = FXCollections.observableArrayList();
         List<CardImports> imports = ctx.importDB.getImports();
         for (int r = 0; r < rows; r++) {
@@ -905,8 +923,9 @@ public class App extends Application {
                 Path p1 = (rowImp == null) ? null : rowImp.getQueryImage();
                 if(p1 != null && Files.exists(p1)){
                     Image thumb = new Image(p1.toUri().toString(), 120, 0, true, true, true);
-                    ImageView iv = new ImageView(thumb);
+                    ImageView iv = new ImageView(thumb);;
                     iv.setPreserveRatio(true);
+                    iv.setFitHeight(130);
                     subCell.setGraphic(iv);
                 }
                 SpreadsheetCell imgCell = SpreadsheetCellType.STRING.createCell(r, 1, 1, 1, "");
@@ -915,6 +934,7 @@ public class App extends Application {
                     Image thumb = new Image(p.toUri().toString(), 120, 0, true, true, true);
                     ImageView iv = new ImageView(thumb);
                     iv.setPreserveRatio(true);
+                    iv.setFitHeight(130);
                     imgCell.setGraphic(iv);
                 }
                 SpreadsheetCell idCell = SpreadsheetCellType.STRING.createCell(
@@ -925,7 +945,7 @@ public class App extends Application {
                 if (subSig != null) {
                     FullCardSignature domSig = new FullCardSignature(
                             subSig, settings.dbPath(), settings.cacheDir(),
-                            rowImp == null ? globalCardVersion : rowImp.getCardVersion());
+                            rowImp == null ? globalCardVersion : rowImp.getCardVersion(), rowImp.getFirstEdition());
                     tcgp = domSig.getIdTCGP();
                     roundedValue = new BigDecimal(Double.toString(domSig.getPrice()))
                             .setScale(3, RoundingMode.DOWN).doubleValue();
@@ -946,7 +966,7 @@ public class App extends Application {
         SpreadsheetView sv = new SpreadsheetView(grid);
         sv.setEditable(true);
         sv.getColumns().get(0).setMinWidth(130);
-        sv.getColumns().get(1).setMinWidth(200);
+        sv.getColumns().get(1).setMinWidth(130);
         sv.getColumns().get(2).setMinWidth(120);
         return sv;
     }

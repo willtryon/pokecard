@@ -26,6 +26,7 @@ public class CardImportsIndex {
     private final List<CardImports> imports = new ArrayList<>();
     private final List<CardImports> fresh = new ArrayList<>();
     public static String globalCardVersion = "NORMAL";
+    public static boolean globalFirstEdition = false;
     private static final double DUP_THRESHOLD = 0.0;
 
     private record Scored(CardSignature sig, double score){}
@@ -179,7 +180,7 @@ public class CardImportsIndex {
             recordRecord2.add(scored.sig());
             recordScore2.add(scored.score());
         }
-		return new CardImports(path, globalCardVersion, test, hashMatch, orbMatch, ocrMatch, recordScore, recordRecord, recordScore2, recordRecord2);
+		return new CardImports(path, globalCardVersion, globalFirstEdition, test, hashMatch, orbMatch, ocrMatch, recordScore, recordRecord, recordScore2, recordRecord2);
     }
 
     public void runOcr(ScanProgress progress) throws IOException, URISyntaxException, InterruptedException {
@@ -282,7 +283,7 @@ public class CardImportsIndex {
 
 
     //I write session information to the disk
-    private static final int IMPORTS_FORMAT_VERSION = 4;
+    private static final int IMPORTS_FORMAT_VERSION = 5;
 
     public void writeImportsToDisk(String currentSession) {
         Path path = settings.outputDir().resolve(currentSession);
@@ -305,6 +306,8 @@ public class CardImportsIndex {
                 dos.writeUTF(q != null ? q.toString() : "");
                 String v = ci.getCardVersion();
                 dos.writeUTF(v != null ? v : "");
+                boolean f = ci.getFirstEdition();
+                dos.writeBoolean(f);
                 Hash qh = ci.getQueryHash();
                 dos.writeUTF(qh != null ? qh.getHashValue().toString(16) : "");
 
@@ -350,7 +353,6 @@ public class CardImportsIndex {
 
         try (DataInputStream dis = new DataInputStream(
                 new BufferedInputStream(new FileInputStream(currentSession.toFile())))) {
-
             int version = dis.readInt();
             if (version != IMPORTS_FORMAT_VERSION) {
                 System.out.println("Imports cache version mismatch (found " + version +
@@ -369,7 +371,7 @@ public class CardImportsIndex {
                 Path q = qStr.isEmpty() ? null : Path.of(qStr);
                 String vStr = dis.readUTF();
                 String v =  vStr.isEmpty() ? null : vStr;
-
+                boolean f = dis.readBoolean();
                 String qHex = dis.readUTF();
                 Hash qHash = qHex.isEmpty() ? null : new Hash(new BigInteger(qHex, 16), bits, algo);
 
@@ -385,7 +387,7 @@ public class CardImportsIndex {
                 List<Double>        recordScore2  = new ArrayList<>();
                 readRanking(dis, byId, recordRecord2, recordScore2);
 
-                loaded.add(new CardImports(q, v, qHash, hashMatch, orbMatch, ocrMatch,
+                loaded.add(new CardImports(q, v, f, qHash, hashMatch, orbMatch, ocrMatch,
                         recordScore, recordRecord, recordScore2, recordRecord2));
                 if (qHash != null) loadedHashes.add(qHash);
             }

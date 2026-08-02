@@ -1,18 +1,19 @@
 package com.willtryon.pokecard;
 
 import dev.brachtendorf.jimagehash.hash.Hash;
-import lombok.Getter;
 
 import java.nio.file.Path;
 import java.util.List;
 
 
+@SuppressWarnings("LombokGetterMayBeUsed")
 public class CardImports {
     // one match against the DB (pHash or ORB)
     public record Match(String cardID, String img, double winner) {}
 
     private final Path img;
     private String cardVersion;
+    private boolean firstEdition;
     private final Hash qHash;
     private final Match hashMatch;
     private final Match orbMatch;
@@ -24,9 +25,10 @@ public class CardImports {
 
 
 
-    public CardImports(Path img, String cardVersion, Hash qHash, Match hashMatch, Match orbMatch, Match ocrMatch, List<Double> recordScore, List<CardSignature> recordRecord, List<Double> recordScore2, List<CardSignature> recordRecord2) {
+    public CardImports(Path img, String cardVersion, boolean firstEdition, Hash qHash, Match hashMatch, Match orbMatch, Match ocrMatch, List<Double> recordScore, List<CardSignature> recordRecord, List<Double> recordScore2, List<CardSignature> recordRecord2) {
         this.img = img;
         this.cardVersion = cardVersion;
+        this.firstEdition = firstEdition;
         this.qHash = qHash;
         this.hashMatch  = hashMatch;
         this.orbMatch   = orbMatch;
@@ -41,8 +43,12 @@ public class CardImports {
         return img; 
     }
 
-    public String getCardVersion() {
+    public String getCardVersion(){
         return cardVersion;
+    }
+
+    public boolean getFirstEdition(){
+        return firstEdition;
     }
 
     public Hash getQueryHash() {return qHash;}
