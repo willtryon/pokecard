@@ -761,9 +761,40 @@ public class App extends Application {
     private Node buildCardDetail(CardSignature sig) {
         VBox box = new VBox(10);
         box.setPadding(new Insets(16));
+        box.setAlignment(Pos.CENTER_LEFT);
 
         Label id = new Label("Card ID: " + sig.getCardID());
         id.setStyle("-fx-font-size: 15px; -fx-font-weight: bold;");
+
+        Label cardInformation = new Label("Card information:");
+        Label cardName = new Label();
+        Label collectorNum = new Label();
+        Label series = new Label();
+        Label idTCGP = new Label();
+        Label cardType = new Label();
+        Label rarity = new Label();
+        Label price = new Label();
+        Label description = new Label();
+        VBox info = new VBox(10, cardInformation, cardName, collectorNum, series, idTCGP, cardType, rarity, price, description);
+        info.setPadding(new Insets(16));
+        info.setAlignment(Pos.CENTER_RIGHT);
+        info.setSpacing(10);
+        FullCardSignature orbSig = null;
+        try {
+            orbSig = new FullCardSignature(sig, settings.dbPath(), settings.cacheDir(), globalCardVersion, globalFirstEdition);
+            System.out.println(orbSig.getName());
+        } catch (SQLException e) {
+            showError(e);
+        }
+
+        cardName.setText("Name: " + (orbSig == null ? "" : orbSig.getName()));
+        collectorNum.setText("Collection Number: "+(orbSig == null ? "" : orbSig.getExpCardNumber()));
+        series.setText("Series: "+(orbSig == null ? "" : orbSig.getExpName()));
+        idTCGP.setText("TCGP ID: "+(orbSig == null ? "" : orbSig.getIdTCGP()));
+        cardType.setText("Type: "+(orbSig == null ? "" : orbSig.getCardType()));
+        rarity.setText("Rarity: "+(orbSig == null ? "" : orbSig.getRarity()));
+        price.setText("Price: "+(orbSig == null ? "" : String.valueOf(orbSig.getPrice())));
+        description.setText((orbSig == null ? "" : orbSig.getDescription()));
 
         Path p = sig.getImgPath();
         boolean hasOrb = sig.getMatData() != null && !sig.getMatData().empty();
@@ -780,7 +811,7 @@ public class App extends Application {
             iv.setFitHeight(360);
             box.getChildren().add(iv);
         }
-        return box;
+        return new HBox(10, box, info);
     }
 
     private Node buildImportDetail(CardImports imp) {
@@ -804,7 +835,7 @@ public class App extends Application {
         Button previous = new Button("Previous");
         Button next = new Button("Next");
 
-        Label cardInfomation = new Label("Card information:");
+        Label cardInformation = new Label("Card information:");
         Label cardName = new Label();
         Label collectorNum = new Label();
         Label series = new Label();
@@ -813,7 +844,7 @@ public class App extends Application {
         Label rarity = new Label();
         Label price = new Label();
         Label description = new Label();
-        VBox info = new VBox(10, cardInfomation, cardName, collectorNum, series, idTCGP, cardType, rarity, price, description);
+        VBox info = new VBox(10, cardInformation, cardName, collectorNum, series, idTCGP, cardType, rarity, price, description);
         info.setPadding(new Insets(16));
         info.setSpacing(10);
 
@@ -860,8 +891,6 @@ public class App extends Application {
             rarity.setText("Rarity: "+(orbSig == null ? "" : orbSig.getRarity()));
             price.setText("Price: "+(orbSig == null ? "" : String.valueOf(orbSig.getPrice())));
             description.setText((orbSig == null ? "" : orbSig.getDescription()));
-
-
         };
 
         previous.setOnAction(e -> { if (pos[0] > 0)        { pos[0]--; render.run(); } });
@@ -874,6 +903,7 @@ public class App extends Application {
         box.getChildren().addAll(imgStack, info);
         return box;
     }
+
 
     private ImageView imageAt(String uri) {
         ImageView iv = new ImageView(new Image(uri));
