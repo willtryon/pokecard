@@ -187,7 +187,7 @@ public class CardImportsIndex {
         System.out.println("I work!");
         progress.report("OCR bullshit now", -1);
         long startTime = System.currentTimeMillis();
-        PokeocrEnv env = new PokeocrEnv(ocrDefaultCacheDir());
+        PokeocrEnv env = new PokeocrEnv(ocrDefaultCacheDir(), settings);
         PokeocrEnv.EnvHandle handle = env.prepare();
         try(PokeocrInterface ocrInterface = new PokeocrInterface(env, handle)){
             List<Path> paths = new ArrayList<>(

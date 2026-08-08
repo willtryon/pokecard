@@ -18,6 +18,7 @@ import javafx.stage.*;
 import org.controlsfx.control.spreadsheet.*;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.scene.control.ComboBox;
 
 import java.io.File;
 import java.io.IOException;
@@ -59,13 +60,13 @@ public class App extends Application {
 
 
     enum Kind {
-        DIRECTORY, FILE, TEXT, SECRET, BOOLEAN;
+        DIRECTORY, FILE, TEXT, SECRET, BOOLEAN, MODE;
 
         boolean isValidValue(String v) {
             return switch (this) {
                 case DIRECTORY -> Files.isDirectory(Path.of(v));
                 case FILE -> Files.isRegularFile(Path.of(v));
-                case TEXT, SECRET -> !v.isBlank();
+                case TEXT, SECRET, MODE -> !v.isBlank();
                 case BOOLEAN -> Boolean.parseBoolean(v);
             };
         }
@@ -98,6 +99,9 @@ public class App extends Application {
             )),
             new Section("Performance", List.of(
                     new Setting(Config.SCAN_THREADS, "Threads", Kind.TEXT, false)
+            )),
+            new Section("pokeocr", List.of(
+                    new Setting(Config.OCR_MODEL, "OCR model", Kind.MODE, false)
             ))
     );
 
@@ -1096,7 +1100,7 @@ class InitTask extends Task<App.AppContext>{
             }
         }
         updateMessage("Verifying python env...");
-        PokeocrEnv env = new PokeocrEnv(ocrDefaultCacheDir());
+        PokeocrEnv env = new PokeocrEnv(ocrDefaultCacheDir(), settings);
         PokeocrEnv.EnvHandle handle = env.prepare();
         updateMessage("Rebuilding database...");
         syncPrices(false);
@@ -1206,35 +1210,73 @@ class ConfigEditor {
         grid.setVgap(10);
         int row = 0;
         for (App.Setting s : sec.settings()) {
-            TextField field = (s.kind() == App.Kind.SECRET) ? new PasswordField() : new TextField();
+            TextField field = new TextField();
+            switch(s.kind()){
+                case SECRET -> {
+
+                }
+                case TEXT -> {
+                    //field = new TextField();
+                }
+                case DIRECTORY,  FILE -> {
+                    //field = new TextField();
+                    Button browse = createBrowse(owner, s, field);
+                    grid.add(browse, 2, row);
+                }
+                case MODE ->{
+                    ObservableList<String> options = FXCollections.observableArrayList(
+                            "Easy Ocr", "Got Ocr", "Trocr", "Qwen Model"
+                    );
+                    ComboBox<String> ocrMode = new ComboBox<>(options);
+                    System.out.println(config.get(s.key()));
+                    if(config.get(s.key()).isBlank()){
+                        ocrMode.setPromptText("Select an OCR model to use...");
+                    }else{
+                        ocrMode.setPromptText(config.get(s.key()));
+                    }
+                    //ocrMode.setVisibleRowCount(4);
+                    ocrMode.setOnAction(e -> {
+                        switch(ocrMode.getValue()){
+                            case "Easy Ocr" -> field.setText("easy-ocr");
+                            case "Got Ocr" -> field.setText("got-ocr2");
+                            case "Trocr" -> field.setText("trocr");
+                            case "Qwen Model" -> field.setText("qwen2.5-vl");
+                        }
+                    });
+
+                    grid.add(ocrMode, 1, row);
+                }
+            }
+
             field.setText(config.get(s.key()));
             field.setPrefColumnCount(30);
             inputs.put(s.key(), field);
-
-            grid.add(new Label(s.label()), 0, row);
-            grid.add(field, 1, row);
-
-            if (s.kind() == App.Kind.DIRECTORY || s.kind() == App.Kind.FILE) {
-                Button browse = new Button("Browse\u2026");
-                browse.setOnAction(e -> {
-                    File f;
-                    if (s.kind() == App.Kind.DIRECTORY) {
-                        DirectoryChooser dc = new DirectoryChooser();
-                        dc.setTitle("Choose " + s.label());
-                        f = dc.showDialog(owner);
-                    } else {
-                        FileChooser fc = new FileChooser();
-                        fc.setTitle("Choose " + s.label());
-                        f = fc.showOpenDialog(owner);
-                    }
-                    if (f != null) field.setText(f.getAbsolutePath());
-                });
-                grid.add(browse, 2, row);
+            if(!(s.kind()==App.Kind.MODE)){
+                grid.add(field, 1, row);
             }
+            grid.add(new Label(s.label()), 0, row);
             row++;
         }
         Label header = new Label(sec.name());
         header.setStyle("-fx-font-size: 15px; -fx-font-weight: bold;");
         return new VBox(12, header, grid);
+    }
+
+    private static Button createBrowse(Window owner, App.Setting s, TextField field) {
+        Button browse = new Button("Browse\u2026");
+        browse.setOnAction(e -> {
+            File f;
+            if (s.kind() == App.Kind.DIRECTORY) {
+                DirectoryChooser dc = new DirectoryChooser();
+                dc.setTitle("Choose " + s.label());
+                f = dc.showDialog(owner);
+            } else {
+                FileChooser fc = new FileChooser();
+                fc.setTitle("Choose " + s.label());
+                f = fc.showOpenDialog(owner);
+            }
+            if (f != null) field.setText(f.getAbsolutePath());
+        });
+        return browse;
     }
 }

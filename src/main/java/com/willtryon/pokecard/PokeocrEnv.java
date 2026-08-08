@@ -27,14 +27,16 @@ public final class PokeocrEnv{
     public record EnvHandle(Path baseDir, Path appDir, Path venvDir, Path python, Platform platform, Accel accel){}
     private final Path baseDir;
     private final Consumer<String> log;
+    private final Config.Settings settings;
 
-    public PokeocrEnv(Path baseDir){
-        this(baseDir, System.out::println);
+    public PokeocrEnv(Path baseDir, Config.Settings settings){
+        this(baseDir, System.out::println, settings);
     }
 
-    public PokeocrEnv(Path baseDir, Consumer<String> log){
+    public PokeocrEnv(Path baseDir, Consumer<String> log,  Config.Settings settings){
         this.baseDir = baseDir;
         this.log = log;
+        this.settings = settings;
     }
 
     public EnvHandle prepare() throws IOException, InterruptedException, URISyntaxException{
@@ -109,7 +111,29 @@ public final class PokeocrEnv{
         return exec(cmd, env.appDir(), extraEnv);
     }
 
-    public List<String> recommendedArgs(Accel accel){
+    public List<String> recommendedArgs(Accel accel) {
+        String model;
+        if (!(settings.ocrModel().isBlank())) {
+            model = settings.ocrModel();
+            System.out.println("Loaded based off of saved settings...");
+            return switch (accel) {
+                case CUDA -> {
+                    yield List.of("--engine", model, "--device", "cuda", "--load-4bit");
+                }
+                case ROCM -> {
+                    yield List.of("--engine", model, "--device", "cuda");
+                }
+                case MPS -> {
+                    yield List.of("--engine", model, "--device", "mps", "--batch", "1");
+                }
+                case CPU -> {
+                    if (!model.equals("easy-ocr")) {
+                        throw new IllegalArgumentException("Only CPU models are supported");
+                    }
+                    yield List.of("--engine", model, "--device", "cpu");
+                }
+            };
+        }
         return switch (accel) {
             // 4-bit NF4 ~1.8GB, negligible OCR accuracy loss -> best memory/accuracy tradeoff.
             case CUDA -> List.of("--engine", "qwen2.5-vl", "--device", "cuda", "--load-4bit");
@@ -120,12 +144,12 @@ public final class PokeocrEnv{
             // CUDA uses, so that matrix is materialized in full. Force batch=1 to keep
             // the peak to a single image's worth (batch 2 spikes past ~14GB).
             //case MPS  -> List.of("--engine", "trocr", "--device", "mps");
-            case MPS  -> List.of("--engine", "qwen2.5-vl", "--device", "mps", "--batch", "1");
+            case MPS -> List.of("--engine", "qwen2.5-vl", "--device", "mps", "--batch", "1");
             //case MPS  -> List.of("--engine", "got-ocr2", "--device", "mps", "--batch", "1");
             // CPU: serve/split needs a whole-image VLM (easyocr is single-line and argparse
             // rejects it), so fall back to got-ocr2 — the smallest VLM (0.58B, ~2.3GB fp32)
             // rather than qwen (~12-14GB fp32). Functional but slow; real use wants a GPU.
-            case CPU  -> List.of("--engine", "got-ocr2", "--device", "cpu");
+            case CPU -> List.of("--engine", "got-ocr2", "--device", "cpu");
         };
     }
 
@@ -352,8 +376,8 @@ public final class PokeocrEnv{
     // --------------------------------------------------------------- demo
 
     /** Minimal example. Pass image files/globs (absolute paths) as program arguments. */
-    public static void main(String[] args) throws Exception {
-        PokeocrEnv env = new PokeocrEnv(ocrDefaultCacheDir());
+    /*public static void main(String[] args) throws Exception {
+        PokeocrEnv env = new PokeocrEnv(ocrDefaultCacheDir(), settings);
         EnvHandle handle = env.prepare();            // first run downloads torch + weights (slow)
 
         if (args.length == 0) {
@@ -369,7 +393,7 @@ public final class PokeocrEnv{
         pokeArgs.addAll(List.of(args));
         int code = env.run(handle, pokeArgs);
         System.out.println("pokeocr exited with " + code);
-    }
+    }*/
 
 
 
