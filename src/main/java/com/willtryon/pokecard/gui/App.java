@@ -10,12 +10,16 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.control.cell.CheckBoxListCell;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.*;
 import javafx.stage.*;
+import javafx.util.StringConverter;
 import org.controlsfx.control.spreadsheet.*;
+import org.controlsfx.control.PropertySheet;
+import org.controlsfx.property.BeanPropertyUtils;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.control.ComboBox;
@@ -392,6 +396,8 @@ public class App extends Application {
         Menu fileMenu = new Menu("File");
         fileMenu.getItems().addAll(newSessionItem, saveSessionItem, loadSessionItem, importItem, settingsItem, new SeparatorMenuItem(),closeTabsItem, new SeparatorMenuItem(), exitItem);
         Menu editMenu = new Menu("Edit");
+        MenuItem editImportItem = new MenuItem("Edit import...");
+        editMenu.getItems().addAll(editImportItem);
         Menu helpMenu = new Menu("Help");
         MenuItem aboutItem = new MenuItem("About");
         helpMenu.getItems().addAll(aboutItem);
@@ -402,15 +408,17 @@ public class App extends Application {
 
         ToolBar toolBar = new ToolBar();
         Image hash1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/hash1a.png")));
-        Button hash1Button = buildTooBarButton(hash1);
+        Button hash1Button = buildToolBarButton(hash1);
         hash1Button.disableProperty().bind(isHash.not());
         Image cv1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/cv1a.png")));
-        Button cv1Button = buildTooBarButton(cv1);
+        Button cv1Button = buildToolBarButton(cv1);
         cv1Button.disableProperty().bind(isOrb.not());
         Image ocr1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/ocr1a.png")));
-        Button ocr1Button = buildTooBarButton(ocr1);
+        Button ocr1Button = buildToolBarButton(ocr1);
         Image imp1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/imp1a.png")));
-        Button imp1Button = buildTooBarButton(imp1);
+        Button imp1Button = buildToolBarButton(imp1);
+        Image cd1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/cd1a.png")));
+        Button cd1Button = buildToolBarButton(cd1);
 
         hash1Button.setOnAction(event -> {
             openSpreadSheetTab(currentImport(), "hash");
@@ -425,8 +433,12 @@ public class App extends Application {
         imp1Button.setOnAction(event -> {
             openSpreadSheetTab(null, "session");
         });
+        cd1Button.setOnAction(event -> {
+            new Finalize(ctx).finalizeImports(mainStage);
+        });
+        Separator sep = new Separator();
 
-        toolBar.getItems().addAll(hash1Button, cv1Button, ocr1Button,  imp1Button);
+        toolBar.getItems().addAll(hash1Button, cv1Button, ocr1Button, imp1Button, sep, cd1Button);
 
 
         //Menu bar operations...
@@ -503,6 +515,13 @@ public class App extends Application {
             System.exit(0);
         });
 
+        editImportItem.setOnAction(e -> {
+            if(currentImport() == null){
+                showError(new IllegalArgumentException("No current import"));
+            }
+            buildEditor(mainStage);
+        });
+
         aboutItem.setOnAction(e -> {
             Stage aboutStage = new Stage();
             aboutStage.setTitle("About Pokecard");
@@ -520,7 +539,7 @@ public class App extends Application {
         return new VBox(15, menuBar, toolBar);
     }
 
-    private Button buildTooBarButton(Image img){
+    private Button buildToolBarButton(Image img){
         ImageView view = new ImageView(img);
         view.setFitHeight(24);
         view.setFitWidth(24);
@@ -607,6 +626,19 @@ public class App extends Application {
         statusProgress.setVisible(false);
     }
 
+    public void buildEditor(Stage mainStage){
+        Stage editor = new Stage();
+        editor.initModality(Modality.APPLICATION_MODAL);
+        editor.initOwner(mainStage);
+        editor.setTitle("Editing "+currentImport());
+        ObservableList<PropertySheet.Item> properties = BeanPropertyUtils.getProperties(currentImport());
+        PropertySheet propertySheet = new PropertySheet(properties);
+        VBox test = new VBox(10, propertySheet);
+        test.setAlignment(Pos.CENTER);
+        test.setPadding(new Insets(10));
+        editor.setScene(new Scene(test));
+        editor.show();
+    }
 
     private HBox buildStatusBar() {
         statusBar = new Label("Ready.");
@@ -1279,4 +1311,42 @@ class ConfigEditor {
         });
         return browse;
     }
+}
+
+class Finalize{
+    private App.AppContext ctx;
+
+    Finalize(App.AppContext ctx) {
+        this.ctx = ctx;
+    }
+
+    void finalizeImports(Stage mainStage){
+        Stage stage = new Stage();
+        stage.initModality(Modality.APPLICATION_MODAL);
+        stage.initOwner(mainStage);
+        stage.setTitle("Finalize Imports");
+
+        ObservableList<CardImports> candidates = FXCollections.observableArrayList();
+        for(CardImports c : ctx.importDB().getImports()){
+            candidates.add(c);
+        }
+        ListView<CardImports> listView = new ListView<>(candidates);
+        StringConverter<CardImports> converter = new StringConverter<>() {
+            @Override
+            public String toString(CardImports item) {
+                return(item == null ? "" : String.valueOf(item.getQueryImage().getFileName()));
+            }
+            @Override
+            public CardImports fromString(String item) {return null;}
+        };
+        listView.setCellFactory(CheckBoxListCell.forListView(
+                CardImports::selectedProperty, converter
+        ));
+        VBox root = new VBox(listView);
+        Scene scene = new Scene(root, 350, 200);
+        stage.setTitle("String-Based Object Checklist");
+        stage.setScene(scene);
+        stage.show();
+    }
+
 }

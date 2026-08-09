@@ -1,6 +1,8 @@
 package com.willtryon.pokecard;
 
 import dev.brachtendorf.jimagehash.hash.Hash;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -12,8 +14,8 @@ public class CardImports {
     public record Match(String cardID, String img, double winner) {}
 
     private final Path img;
-    private String cardVersion;
-    private boolean firstEdition;
+    private final String cardVersion;
+    private final boolean firstEdition;
     private final Hash qHash;
     private final Match hashMatch;
     private final Match orbMatch;
@@ -22,6 +24,7 @@ public class CardImports {
     private final List<CardSignature> recordRecord;
     private final List<Double> recordScore2;
     private final List<CardSignature> recordRecord2;
+    private final BooleanProperty selected = new SimpleBooleanProperty(false);
 
 
 
@@ -124,6 +127,8 @@ public class CardImports {
         }
         return -1;
     }
+
+    public BooleanProperty selectedProperty() { return selected; }
 
     public String[][] toCsvRows() {
         String q = img.toString();
