@@ -116,6 +116,7 @@
                         <option>--add-exports=javafx.controls/com.sun.javafx.scene.control.behavior=ALL-UNNAMED</option>
                         <option>--add-exports=javafx.controls/com.sun.javafx.scene.control.inputmap=ALL-UNNAMED</option>
                         <option>--add-opens=javafx.controls/javafx.scene.control.skin=ALL-UNNAMED</option>
+                        <option>-Dorg.bytedeco.javacpp.logger.debug=true</option>
                     </options>
                 </configuration>
             </plugin>

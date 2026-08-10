@@ -40,6 +40,61 @@ public class CardIndex{
     private boolean firstScan = true;
     private final Settings settings;
 
+    // --- Windows-safe path handling: keeps Path.resolve() from throwing
+    // InvalidPathException on Windows when cardId contains ':' (e.g. "Type: Null").
+    // Same transform as fix_windows_image_paths.py / common.ts sanitizeWinPath().
+    private static final java.util.Set<String> WIN_RESERVED = java.util.Set.of(
+            "CON","PRN","AUX","NUL",
+            "COM1","COM2","COM3","COM4","COM5","COM6","COM7","COM8","COM9",
+            "LPT1","LPT2","LPT3","LPT4","LPT5","LPT6","LPT7","LPT8","LPT9");
+
+    private static boolean isIllegalWin(char c){
+        return c=='<'||c=='>'||c==':'||c=='"'||c=='/'||c=='\\'||c=='|'||c=='?'||c=='*'||c < 0x20;
+    }
+    private static boolean isDashOrIllegalWin(char c){ return c=='-' || isIllegalWin(c); }
+
+    static String sanitizeWinPath(String name, boolean isFile){
+        String stem = name, ext = "";
+        if (isFile){
+            int dot = name.lastIndexOf('.');
+            if (dot > 0){ stem = name.substring(0, dot); ext = name.substring(dot + 1); }
+        }
+        StringBuilder sb = new StringBuilder(stem.length());
+        int i = 0, n = stem.length();
+        while (i < n){
+            char c = stem.charAt(i);
+            if (isDashOrIllegalWin(c)){
+                int j = i; boolean hasIllegal = false;
+                while (j < n && isDashOrIllegalWin(stem.charAt(j))){
+                    if (isIllegalWin(stem.charAt(j))) hasIllegal = true;
+                    j++;
+                }
+                sb.append(hasIllegal ? "-" : stem.substring(i, j));
+                i = j;
+            } else {
+                sb.append(c); i++;
+            }
+        }
+        stem = sb.toString();
+        int end = stem.length();
+        while (end > 0 && (stem.charAt(end-1) == ' ' || stem.charAt(end-1) == '.')) end--;
+        stem = stem.substring(0, end);
+        int start = 0;
+        while (start < stem.length() && stem.charAt(start) == ' ') start++;
+        stem = stem.substring(start);
+        if (stem.isEmpty()) stem = "_";
+        if (WIN_RESERVED.contains(stem.toUpperCase(java.util.Locale.ROOT))) stem = "_" + stem;
+        if (!ext.isEmpty()){
+            StringBuilder e = new StringBuilder(ext.length());
+            for (int k = 0; k < ext.length(); k++){
+                char c = ext.charAt(k);
+                if (!isIllegalWin(c) && c != '.' && c != ' ') e.append(c);
+            }
+            return e.length() > 0 ? stem + "." + e : stem;
+        }
+        return stem;
+    }
+
 
     /*Approach so far is the query sql db and dump its contents for every hit to a new Card obj, which is stored
     in an array of cards...*/
@@ -97,8 +152,8 @@ public class CardIndex{
                     // NOTE: larp for the log. The real lookup happens in resolveImage();
                     // the file may actually exist under a different number format.
                     Path expected = this.settings.imagesDir()
-                            .resolve(expName == null ? "" : expName.replace(" ", "-"))
-                            .resolve(cardId.replace("/", "-") + ".jpg");
+                            .resolve(sanitizeWinPath(expName == null ? "" : expName.replace(" ", "-"), false))
+                            .resolve(sanitizeWinPath(cardId.replace("/", "-") + ".jpg", true));
                     data.add(new String[]{"File " + cardId + " cannot be found by the program.\nLocation searched (folder): " + expected.getParent()});
                     cardDB[line] = new CardSignature(cardId, img == null ? expected : img, null, null, null);
                     failed++;
@@ -107,7 +162,7 @@ public class CardIndex{
                 }
             }
         System.out.println("\n\nPassed: " + passed + "\nFailed: " + failed + "\nCorrupt: " + corrupt + "\nOut of: " + line);
-        String result = String.format("%.0f", ((double) line / size) * 100);
+        String result = String.format("%.0f", ((double) passed / size) * 100);
         System.out.println(result + "% passed.\n\n");
         writeToTxt("log.txt", data);
     }
@@ -119,10 +174,10 @@ public class CardIndex{
     }
 
     private Path resolveImage(String expName, String cardId, String expCardNumber){
-        String folder = (expName == null ? "" : expName.replace(" ", "-"));
-        Path dir = settings.imagesDir().resolve("cards/"+folder);
+        String folder = sanitizeWinPath(expName == null ? "" : expName.replace(" ", "-"), false);
+        Path dir = settings.imagesDir().resolve("cards/" + folder);
        //bail out if normal file path is correct (about 77% chance it is)
-        Path exact = dir.resolve(cardId.replace("/", "-") + ".jpg");
+        Path exact = dir.resolve(sanitizeWinPath(cardId.replace("/", "-") + ".jpg", true));
         if (Files.exists(exact)){
             return exact;
         }
@@ -699,7 +754,12 @@ public class CardIndex{
 
     private static String getTime(){
         LocalDateTime currentDateTime = LocalDateTime.now();
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-HH:mm:ss");
+        String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        String pattern = " ";
+        if (os.contains("win"))
+            pattern = "yyyy-MM-dd-HH-mm-s";
+        else pattern = "yyyy-MM-dd-HH:mm:ss";
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(pattern);
         return currentDateTime.format(formatter);
     }
 

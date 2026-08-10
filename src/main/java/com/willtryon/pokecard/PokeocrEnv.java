@@ -15,11 +15,11 @@ import java.util.stream.Stream;
 public final class PokeocrEnv{
 
     private static final String RESOURCE_ROOT = "/python";
-    private static final String DEPS_VERSION = "2026-07-26";
+    private static final String DEPS_VERSION = "2026-08-10";
     private static final List<String> BASE_DEPS = List.of(
             "easyocr", "reportlab", "pillow", "numpy",
             "transformers>=4.49,<5", "sentencepiece", "accelerate",
-            "safetensors", "einops", "tiktoken");
+            "safetensors", "einops", "tiktoken", "bitsandbytes");
     private static final Set<String> SKIP = Set.of(
             "out", "out2", "scans", "__pycache__", ".venv", ".claude");
     public enum Platform{MAC_ARM, MAC_X86, LINUX, WINDOWS}
