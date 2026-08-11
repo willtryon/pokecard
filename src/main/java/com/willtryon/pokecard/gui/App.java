@@ -36,6 +36,7 @@ import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import static com.willtryon.pokecard.CardImportsIndex.globalCardVersion;
 import static com.willtryon.pokecard.CardImportsIndex.globalFirstEdition;
@@ -1325,9 +1326,20 @@ class Finalize{
         stage.initModality(Modality.APPLICATION_MODAL);
         stage.initOwner(mainStage);
         stage.setTitle("Finalize Imports");
+        Scene scene1 = finalizeScene1(stage);
+        stage.setTitle("String-Based Object Checklist");
+        stage.setScene(scene1);
+        stage.showAndWait();
+    }
+
+    private Scene finalizeScene1(Stage stage) {
+        CardImports selectedCard;
+
+        Label stage1Info = new Label("Select the imports you want to finalize. To change an import's settings, select properties.");
 
         ObservableList<CardImports> candidates = FXCollections.observableArrayList();
         for(CardImports c : ctx.importDB().getImports()){
+            c.selectedProperty().set(true);
             candidates.add(c);
         }
         ListView<CardImports> listView = new ListView<>(candidates);
@@ -1342,11 +1354,29 @@ class Finalize{
         listView.setCellFactory(CheckBoxListCell.forListView(
                 CardImports::selectedProperty, converter
         ));
-        VBox root = new VBox(listView);
-        Scene scene = new Scene(root, 350, 200);
-        stage.setTitle("String-Based Object Checklist");
-        stage.setScene(scene);
-        stage.show();
+        Button nextButton = new Button("Next");
+        Button cancelButton = new Button("Cancel");
+        Button propertiesButton = new Button("Properties");
+        nextButton.setOnAction(e -> {
+            List<CardImports> selectedItems = candidates.stream()
+                    .filter(c -> c.selectedProperty().get())
+                    .toList();
+        });
+        cancelButton.setOnAction(e -> {
+            stage.close();
+        });
+        propertiesButton.setOnAction(e -> {
+        });
+
+        HBox buttons = new HBox(10, nextButton, cancelButton, propertiesButton);
+        VBox root = new VBox(stage1Info,listView, buttons);
+        root.setAlignment(Pos.CENTER);
+        root.setPadding(new Insets(10));
+        return new Scene(root, 350, 200);
+    }
+
+    private Scene finalizeScene2(Stage stage) {
+        return new Scene(new VBox(), 350, 200);
     }
 
 }

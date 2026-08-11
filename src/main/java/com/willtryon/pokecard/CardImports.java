@@ -25,6 +25,7 @@ public class CardImports {
     private final List<Double> recordScore2;
     private final List<CardSignature> recordRecord2;
     private final BooleanProperty selected = new SimpleBooleanProperty(false);
+    private boolean isFinal = false;
 
 
 
@@ -129,6 +130,12 @@ public class CardImports {
     }
 
     public BooleanProperty selectedProperty() { return selected; }
+
+    public boolean isFinal() { return isFinal; }
+
+    public void setFinal(boolean isFinal){
+        this.isFinal = isFinal;
+    }
 
     public String[][] toCsvRows() {
         String q = img.toString();
