@@ -37,7 +37,7 @@ public class CardImportsIndex {
         this.settings = settings;
     }
 
-    public synchronized List<CardImports> scan(ScanProgress progress){
+    public synchronized List<CardImports> scan(ScanProgress progress) throws SQLException {
         guess = "";
         List<CardImports> ocrCandidates =  new ArrayList<>();
         Path ocrDir = settings.cacheDir().resolve("ocr-victim");
@@ -107,6 +107,7 @@ public class CardImportsIndex {
                 e.printStackTrace();
             }
         }
+        setBestMatches(fresh);
         //try{Thread.sleep(5000);}catch(InterruptedException e){e.printStackTrace();}
         return fresh;
     }
@@ -217,6 +218,7 @@ public class CardImportsIndex {
             }
             System.out.println("The operation completed successfully.");
             System.out.println("Total time: " + timer(startTime));
+            setBestMatches(fresh);
         }catch(Exception e){
             e.printStackTrace();
         }
@@ -265,6 +267,41 @@ public class CardImportsIndex {
         if (bottom == null) return null;
         var m = java.util.regex.Pattern.compile("(\\d{1,4})\\s*/\\s*\\d{1,4}").matcher(bottom);
         return m.find() ? Integer.parseInt(m.group(1)) : null;
+    }
+
+    private void setBestMatches(List<CardImports> fresh)throws SQLException{
+        for(CardImports i : fresh){
+            if (i.getBestMatch() == null) {
+                if (i.bestMatch().winner() == 0){
+                    i.setBestMatch(i.getOcrWinner());
+                }else{
+                    i.setBestMatch(i.getOrbWinner());
+                }
+            }
+            if(i.getPrice() == -1){
+                FullCardSignature priceGetter = new FullCardSignature(cardDB.findCardId(i.getBestMatch().cardID()), settings.dbPath(), settings.cacheDir(), globalCardVersion, globalFirstEdition);
+                i.setPrice(priceGetter.getPrice());
+                System.out.println("\n\n"+i.getPrice());
+                if(i.getPrice() >= 12.0){
+                    i.setCat("ULTRA");
+                }else if(i.getPrice() >= 6.0 && i.getPrice() <= 11.99){
+                    i.setCat("HIGH");
+                }else if(i.getPrice() >= 3.0 && i.getPrice() <= 5.99){
+                    i.setCat("MID");
+                }else{
+                    i.setCat("UNREMARK");
+                }
+            }
+        }
+        System.out.println("Updated Card Information");
+    }
+
+    public void setAsFinal(List<CardImports> candidates){
+        for (var c : candidates) {
+            c.setFinal(true);
+
+
+        }
     }
 
     public List<CardImports> getImports() { return imports; }

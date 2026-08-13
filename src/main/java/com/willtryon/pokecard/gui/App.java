@@ -44,6 +44,8 @@ import static com.willtryon.pokecard.PokeocrEnv.ocrDefaultCacheDir;
 import static com.willtryon.pokecard.TcgdbEnv.tcgdbDefaultCacheDir;
 import com.willtryon.pokecard.Config.Settings;
 
+import javax.swing.event.HyperlinkEvent;
+
 public class App extends Application {
 
     private Config config;
@@ -288,7 +290,7 @@ public class App extends Application {
 
             Task<Void> orbTask = new Task<>() {
                 @Override
-                protected Void call() {
+                protected Void call() throws SQLException {
                     ctx.cardDB.scanImports(ctx.importDB(), (msg, frac) -> {
                         updateMessage(msg);
                         updateProgress(frac, 1.0);
@@ -520,7 +522,7 @@ public class App extends Application {
             if(currentImport() == null){
                 showError(new IllegalArgumentException("No current import"));
             }
-            buildEditor(mainStage);
+            new ImportsProperties(mainStage, ctx, currentImport());
         });
 
         aboutItem.setOnAction(e -> {
@@ -625,20 +627,6 @@ public class App extends Application {
         System.out.println("Done.");
         statusBar.setText("Ready.");
         statusProgress.setVisible(false);
-    }
-
-    public void buildEditor(Stage mainStage){
-        Stage editor = new Stage();
-        editor.initModality(Modality.APPLICATION_MODAL);
-        editor.initOwner(mainStage);
-        editor.setTitle("Editing "+currentImport());
-        ObservableList<PropertySheet.Item> properties = BeanPropertyUtils.getProperties(currentImport());
-        PropertySheet propertySheet = new PropertySheet(properties);
-        VBox test = new VBox(10, propertySheet);
-        test.setAlignment(Pos.CENTER);
-        test.setPadding(new Insets(10));
-        editor.setScene(new Scene(test));
-        editor.show();
     }
 
     private HBox buildStatusBar() {
@@ -1155,11 +1143,11 @@ class InitTask extends Task<App.AppContext>{
 class ConfigEditor {
     private final Config config;
 
-    ConfigEditor(Config config) {
+    protected ConfigEditor(Config config) {
         this.config = config;
     }
 
-    boolean showAndWait(Window owner) {
+    protected boolean showAndWait(Window owner) {
         Stage dialog = new Stage();
         if (owner != null) {
             dialog.initOwner(owner);
@@ -1316,25 +1304,27 @@ class ConfigEditor {
 
 class Finalize{
     private App.AppContext ctx;
+    private List<CardImports> selectedItems;
 
-    Finalize(App.AppContext ctx) {
+    protected Finalize(App.AppContext ctx) {
         this.ctx = ctx;
     }
 
-    void finalizeImports(Stage mainStage){
+    protected void finalizeImports(Stage mainStage){
         Stage stage = new Stage();
         stage.initModality(Modality.APPLICATION_MODAL);
         stage.initOwner(mainStage);
         stage.setTitle("Finalize Imports");
-        Scene scene1 = finalizeScene1(stage);
+        Scene scene1 = finalizeScene1(stage, () -> {
+            stage.setScene(finalizeScene2(stage));
+        });
+        //Scene scene1 = finalizeScene1(stage);
         stage.setTitle("String-Based Object Checklist");
         stage.setScene(scene1);
         stage.showAndWait();
     }
 
-    private Scene finalizeScene1(Stage stage) {
-        CardImports selectedCard;
-
+    private Scene finalizeScene1(Stage stage, Runnable runnable) {
         Label stage1Info = new Label("Select the imports you want to finalize. To change an import's settings, select properties.");
 
         ObservableList<CardImports> candidates = FXCollections.observableArrayList();
@@ -1358,14 +1348,17 @@ class Finalize{
         Button cancelButton = new Button("Cancel");
         Button propertiesButton = new Button("Properties");
         nextButton.setOnAction(e -> {
-            List<CardImports> selectedItems = candidates.stream()
+            selectedItems = candidates.stream()
                     .filter(c -> c.selectedProperty().get())
                     .toList();
+            runnable.run();
         });
         cancelButton.setOnAction(e -> {
             stage.close();
         });
         propertiesButton.setOnAction(e -> {
+            CardImports temp = listView.getSelectionModel().getSelectedItem();
+            new ImportsProperties(stage, ctx, temp);
         });
 
         HBox buttons = new HBox(10, nextButton, cancelButton, propertiesButton);
@@ -1376,7 +1369,35 @@ class Finalize{
     }
 
     private Scene finalizeScene2(Stage stage) {
-        return new Scene(new VBox(), 350, 200);
+        Label label = new Label("tee hee");
+        VBox root = new VBox(10, label);
+        return new Scene(root, 350, 200);
     }
+
+}
+
+class ImportsProperties{
+    private App.AppContext ctx;
+    private CardImports selected;
+
+    protected ImportsProperties(Stage mainStage, App.AppContext ctx,  CardImports selected) {
+        this.ctx = ctx;
+        buildEditor(mainStage, selected);
+    }
+
+    protected void buildEditor(Stage mainStage, CardImports selected) {
+        Stage editor = new Stage();
+        editor.initModality(Modality.APPLICATION_MODAL);
+        editor.initOwner(mainStage);
+        editor.setTitle("Editing "+selected.getQueryImage().getFileName());
+        ObservableList<PropertySheet.Item> properties = BeanPropertyUtils.getProperties(selected);
+        PropertySheet propertySheet = new PropertySheet(properties);
+        VBox test = new VBox(10, propertySheet);
+        test.setAlignment(Pos.CENTER);
+        test.setPadding(new Insets(10));
+        editor.setScene(new Scene(test));
+        editor.show();
+    }
+
 
 }

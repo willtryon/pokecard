@@ -8,7 +8,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 
-@SuppressWarnings("LombokGetterMayBeUsed")
+@SuppressWarnings({"LombokGetterMayBeUsed", "LombokSetterMayBeUsed"})
 public class CardImports {
     // one match against the DB (pHash or ORB)
     public record Match(String cardID, String img, double winner) {}
@@ -20,12 +20,15 @@ public class CardImports {
     private final Match hashMatch;
     private final Match orbMatch;
     private Match ocrMatch;
+    private Match bestMatch;
     private final List<Double> recordScore;
     private final List<CardSignature> recordRecord;
     private final List<Double> recordScore2;
     private final List<CardSignature> recordRecord2;
     private final BooleanProperty selected = new SimpleBooleanProperty(false);
     private boolean isFinal = false;
+    private float price = -1;
+    private String cat = "";
 
 
 
@@ -76,6 +79,7 @@ public class CardImports {
     public boolean hasOcr(){
         return ocrMatch != null && ocrMatch.cardID() != null;
     }
+
     public Match bestMatch(){
         return (ocrMatch != null && ocrMatch.cardID() != null) ? ocrMatch : orbMatch;
     }
@@ -135,6 +139,30 @@ public class CardImports {
 
     public void setFinal(boolean isFinal){
         this.isFinal = isFinal;
+    }
+
+    public float getPrice() {
+        return price;
+    }
+
+    public void setPrice(float price) {
+        this.price = price;
+    }
+
+    public Match getBestMatch() {
+        return bestMatch;
+    }
+
+    public void setBestMatch(Match bestMatch) {
+        this.bestMatch = bestMatch;
+    }
+
+    public String getCat() {
+        return cat;
+    }
+
+    public void setCat(String cat) {
+        this.cat = cat;
     }
 
     public String[][] toCsvRows() {

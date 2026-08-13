@@ -490,11 +490,11 @@ public class CardIndex{
         return new CardImportsIndex(hashed, this, settings);
     }
 
-    public void scanImports(CardImportsIndex importDB){
+    public void scanImports(CardImportsIndex importDB) throws SQLException {
         scanImports(importDB, null);
     }
 
-    public void scanImports(CardImportsIndex importDB, ScanProgress progress){
+    public void scanImports(CardImportsIndex importDB, ScanProgress progress) throws SQLException {
         List<CardImports> fresh = importDB.scan(progress);
         if (fresh.isEmpty()) return;
         List<String[]> rows = new ArrayList<>();
