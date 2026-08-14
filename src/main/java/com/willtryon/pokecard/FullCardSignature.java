@@ -123,8 +123,6 @@ public class FullCardSignature extends CardSignature {
                 case "HOLOFOIL" -> cardVersion = "1ST EDITION HOLOFOIL";
             }
         }
-        System.out.println(cardVersion);
-
         String sql = "SELECT pr.sub_type, pr.market_price, pr.mid_price, pr.low_price " +
                 "FROM iddb.cards ic " +
                 "JOIN products p ON p.product_id = ic.idTCGP " +
@@ -144,14 +142,13 @@ public class FullCardSignature extends CardSignature {
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
                         String subType = rs.getString("sub_type");
-                        System.out.println(subType);
+                        System.out.println("\n"+subType);
                         float marketPrice = rs.getFloat("market_price");
-                        System.out.println(marketPrice);
+                        System.out.print("\tMarket Price: "+marketPrice);
                         float lowPrice = rs.getFloat("low_price");
-                        System.out.println(lowPrice);
+                        System.out.print("\tLow Price: "+lowPrice);
                         float midPrice = rs.getFloat("mid_price");
-                        System.out.println(midPrice);
-                        System.out.println("Hello");
+                        System.out.print("\tMid Price: "+midPrice);
                         price = Math.max(marketPrice, Math.max(lowPrice, midPrice));
                     }else{
                         rs.close();
@@ -166,12 +163,11 @@ public class FullCardSignature extends CardSignature {
                                 String subType = rs.getString("sub_type");
                                 System.out.println(subType);
                                 float marketPrice = rs.getFloat("market_price");
-                                System.out.println(marketPrice);
+                                System.out.print("\tMarket Price: "+marketPrice);
                                 float lowPrice = rs.getFloat("low_price");
-                                System.out.println(lowPrice);
+                                System.out.print("\tLow Price: "+lowPrice);
                                 float midPrice = rs.getFloat("mid_price");
-                                System.out.println(midPrice);
-                                System.out.println("Hello");
+                                System.out.print("\tMid Price: "+midPrice);
                                 price = Math.max(marketPrice, Math.max(lowPrice, midPrice));
                             }else {
                                 rs2.close();

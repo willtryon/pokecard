@@ -16,6 +16,10 @@ public class CardImports {
     private final Path img;
     private final String cardVersion;
     private final boolean firstEdition;
+    private boolean isFinal;
+    private boolean matchOverride;
+    private float price;
+    private String cat;
     private final Hash qHash;
     private final Match hashMatch;
     private final Match orbMatch;
@@ -26,16 +30,17 @@ public class CardImports {
     private final List<Double> recordScore2;
     private final List<CardSignature> recordRecord2;
     private final BooleanProperty selected = new SimpleBooleanProperty(false);
-    private boolean isFinal = false;
-    private float price = -1;
-    private String cat = "";
 
 
 
-    public CardImports(Path img, String cardVersion, boolean firstEdition, Hash qHash, Match hashMatch, Match orbMatch, Match ocrMatch, List<Double> recordScore, List<CardSignature> recordRecord, List<Double> recordScore2, List<CardSignature> recordRecord2) {
+    public CardImports(Path img, String cardVersion, boolean firstEdition, boolean isFinal, boolean matchOverride, float price, String cat, Hash qHash, Match hashMatch, Match orbMatch, Match ocrMatch, List<Double> recordScore, List<CardSignature> recordRecord, List<Double> recordScore2, List<CardSignature> recordRecord2) {
         this.img = img;
         this.cardVersion = cardVersion;
         this.firstEdition = firstEdition;
+        this.isFinal = isFinal;
+        this.matchOverride = matchOverride;
+        this.price = price;
+        this.cat = cat;
         this.qHash = qHash;
         this.hashMatch  = hashMatch;
         this.orbMatch   = orbMatch;
@@ -135,11 +140,15 @@ public class CardImports {
 
     public BooleanProperty selectedProperty() { return selected; }
 
-    public boolean isFinal() { return isFinal; }
+    public boolean getFinal() { return isFinal; }
 
     public void setFinal(boolean isFinal){
         this.isFinal = isFinal;
     }
+
+    public boolean getMatchOverride() { return matchOverride; }
+
+    public void setMatchOverride(boolean matchOverride) { this.matchOverride = matchOverride; }
 
     public float getPrice() {
         return price;

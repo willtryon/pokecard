@@ -181,7 +181,8 @@ public class CardImportsIndex {
             recordRecord2.add(scored.sig());
             recordScore2.add(scored.score());
         }
-		return new CardImports(path, globalCardVersion, globalFirstEdition, test, hashMatch, orbMatch, ocrMatch, recordScore, recordRecord, recordScore2, recordRecord2);
+        boolean isFinal = false; boolean matchOverride = false; float price = -1; String cat = "";
+		return new CardImports(path, globalCardVersion, globalFirstEdition, isFinal, matchOverride, price, cat, test, hashMatch, orbMatch, ocrMatch, recordScore, recordRecord, recordScore2, recordRecord2);
     }
 
     public void runOcr(ScanProgress progress) throws IOException, URISyntaxException, InterruptedException {
@@ -271,8 +272,8 @@ public class CardImportsIndex {
 
     private void setBestMatches(List<CardImports> fresh)throws SQLException{
         for(CardImports i : fresh){
-            if (i.getBestMatch() == null) {
-                if (i.bestMatch().winner() == 0){
+            if (!i.getMatchOverride()) {
+                if (i.hasOcr()){
                     i.setBestMatch(i.getOcrWinner());
                 }else{
                     i.setBestMatch(i.getOrbWinner());
@@ -320,7 +321,7 @@ public class CardImportsIndex {
 
 
     //I write session information to the disk
-    private static final int IMPORTS_FORMAT_VERSION = 5;
+    private static final int IMPORTS_FORMAT_VERSION = 6;
 
     public void writeImportsToDisk(String currentSession) {
         Path path = settings.outputDir().resolve(currentSession);
@@ -345,12 +346,21 @@ public class CardImportsIndex {
                 dos.writeUTF(v != null ? v : "");
                 boolean f = ci.getFirstEdition();
                 dos.writeBoolean(f);
+                boolean fi = ci.getFinal();
+                dos.writeBoolean(fi);
+                boolean mo =  ci.getMatchOverride();
+                dos.writeBoolean(mo);
+                float p = ci.getPrice();
+                dos.writeFloat(p);
+                String c = ci.getCat();
+                dos.writeUTF(c);
                 Hash qh = ci.getQueryHash();
                 dos.writeUTF(qh != null ? qh.getHashValue().toString(16) : "");
 
                 writeMatch(dos, ci.getHashWinner());
                 writeMatch(dos, ci.getOrbWinner());
                 writeMatch(dos, ci.getOcrWinner());
+                writeMatch(dos, ci.getBestMatch());
 
                 writeRanking(dos, ci, "hash");
                 writeRanking(dos, ci, "orb");   // same length as hash side by construction
@@ -409,6 +419,11 @@ public class CardImportsIndex {
                 String vStr = dis.readUTF();
                 String v =  vStr.isEmpty() ? null : vStr;
                 boolean f = dis.readBoolean();
+                boolean fi = dis.readBoolean();
+                boolean mo = dis.readBoolean();
+                float p = dis.readFloat();
+                String cStr = dis.readUTF();
+                cStr = cStr.isEmpty() ? null : cStr;
                 String qHex = dis.readUTF();
                 Hash qHash = qHex.isEmpty() ? null : new Hash(new BigInteger(qHex, 16), bits, algo);
 
@@ -424,7 +439,7 @@ public class CardImportsIndex {
                 List<Double>        recordScore2  = new ArrayList<>();
                 readRanking(dis, byId, recordRecord2, recordScore2);
 
-                loaded.add(new CardImports(q, v, f, qHash, hashMatch, orbMatch, ocrMatch,
+                loaded.add(new CardImports(q, v, f, fi, mo, p, cStr, qHash, hashMatch, orbMatch, ocrMatch,
                         recordScore, recordRecord, recordScore2, recordRecord2));
                 if (qHash != null) loadedHashes.add(qHash);
             }

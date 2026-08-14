@@ -10,6 +10,7 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.control.cell.CheckBoxListCell;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
@@ -839,9 +840,23 @@ public class App extends Application {
         return new HBox(10, box, info);
     }
 
+
     private Node buildImportDetail(CardImports imp) {
-        HBox box = new HBox(10);
-        box.setPadding(new Insets(16));
+        HBox content = new HBox(10);
+        content.setPadding(new Insets(16));
+
+        ToggleGroup group = new ToggleGroup();
+
+        ToggleButton overview = new ToggleButton("Overview");
+        ToggleButton hashList = new ToggleButton("Hash");
+        ToggleButton orbList = new ToggleButton("ORB");
+        ToggleButton ocrList = new ToggleButton("OCR");
+
+        ToggleButton[] buttons = { overview, hashList, orbList, ocrList };
+
+        for(ToggleButton b : buttons){
+            b.setToggleGroup(group);
+        }
 
         int size = imp.getRecordSize();
 
@@ -923,10 +938,12 @@ public class App extends Application {
 
         render.run();
 
+        HBox bar = new HBox(10, overview, hashList, orbList, ocrList);
+
         VBox imgStack = new VBox(10);
         imgStack.getChildren().addAll(orbLabel, hashLabel, ocrLabel, images, new HBox(16, previous, count, next));
-        box.getChildren().addAll(imgStack, info);
-        return box;
+        content.getChildren().addAll(imgStack, info);
+        return new VBox(10, bar, content);
     }
 
 
@@ -1098,7 +1115,6 @@ class InitTask extends Task<App.AppContext>{
         } else {
             updateMessage("Computing image data for " + size + " cards...");
             cardDB = new CardIndex(size, url, settings);
-            final CardIndex finalCardDB = cardDB;
             CountDownLatch latch = new CountDownLatch(1);
             AtomicBoolean saveChoice = new AtomicBoolean(false);
 
