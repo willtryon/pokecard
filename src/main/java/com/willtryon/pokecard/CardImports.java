@@ -33,7 +33,7 @@ public class CardImports {
 
 
 
-    public CardImports(Path img, String cardVersion, boolean firstEdition, boolean isFinal, boolean matchOverride, float price, String cat, Hash qHash, Match hashMatch, Match orbMatch, Match ocrMatch, List<Double> recordScore, List<CardSignature> recordRecord, List<Double> recordScore2, List<CardSignature> recordRecord2) {
+    public CardImports(Path img, String cardVersion, boolean firstEdition, boolean isFinal, boolean matchOverride, float price, String cat, Hash qHash, Match hashMatch, Match orbMatch, Match ocrMatch, Match bestMatch, List<Double> recordScore, List<CardSignature> recordRecord, List<Double> recordScore2, List<CardSignature> recordRecord2) {
         this.img = img;
         this.cardVersion = cardVersion;
         this.firstEdition = firstEdition;
@@ -45,6 +45,7 @@ public class CardImports {
         this.hashMatch  = hashMatch;
         this.orbMatch   = orbMatch;
         this.ocrMatch = ocrMatch;
+        this.bestMatch = bestMatch;
         this.recordScore = recordScore;
         this.recordRecord = recordRecord;
         this.recordScore2 = recordScore2;

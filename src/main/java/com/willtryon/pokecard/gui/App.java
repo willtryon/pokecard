@@ -35,6 +35,9 @@ import java.nio.file.Path;
 import java.sql.*;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -385,6 +388,39 @@ public class App extends Application {
             });
         }), 0, 1, TimeUnit.MINUTES);*/
         //isOrb = false;
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "pokecard-price-fetcher");
+            t.setDaemon(true);          // don't keep the JVM alive after the window closes
+            return t;
+        });
+
+        scheduler.scheduleAtFixedRate(() -> Platform.runLater(() -> {
+            Task<Void> priceTask = new Task<>() {
+                @Override
+                protected Void call() throws Exception {
+                    syncPrices(false, (msg, frac) -> {
+                        updateMessage(msg);
+                        updateProgress(frac, 1.0);
+                    });
+                    return null;
+                }
+            };
+            priceTask.setOnFailed(event -> {
+                Throwable ex = priceTask.getException();
+                showError(ex);
+            });
+            runTask(priceTask, v -> {
+            });
+        }), 0, 3, TimeUnit.MINUTES);
+    }
+
+    public void syncPrices(boolean force, ScanProgress progress) throws Exception {
+        Path db = settings.cacheDir().resolve("tcg.db");
+        progress.report("Retrieving price information...", -1);
+        TcgdbEnv env = new TcgdbEnv(tcgdbDefaultCacheDir());
+        TcgdbEnv.EnvHandle handle = env.prepare();
+        int code = env.sync(handle, db, force);
+        System.out.println("tcgdb sync exited " + code + "; db at " + db);
     }
 
     private VBox buildTop(Stage mainStage, TabPane detailTabs, ImageView view1, ImageView view2){
@@ -1140,19 +1176,12 @@ class InitTask extends Task<App.AppContext>{
         PokeocrEnv env = new PokeocrEnv(ocrDefaultCacheDir(), settings);
         PokeocrEnv.EnvHandle handle = env.prepare();
         updateMessage("Rebuilding database...");
-        syncPrices(false);
+        TcgdbEnv env2 = new TcgdbEnv(tcgdbDefaultCacheDir());
+        TcgdbEnv.EnvHandle handle2 = env2.prepare();
         new PokemonCardNameCleaner(settings.dbPath(), false);
         updateMessage("Starting...");
         CardImportsIndex importDB = cardDB.newImportsIndex();
         return new App.AppContext(cardDB, importDB, size);
-    }
-
-    public void syncPrices(boolean force) throws IOException, InterruptedException, URISyntaxException {
-        Path db = settings.cacheDir().resolve("tcg.db");      // stable, known location
-        TcgdbEnv env = new TcgdbEnv(tcgdbDefaultCacheDir());
-        TcgdbEnv.EnvHandle handle = env.prepare();            // first run: venv + pip install requests
-        int code = env.sync(handle, db, force);               // pulls only if upstream is newer
-        System.out.println("tcgdb sync exited " + code + "; db at " + db);
     }
 }
 

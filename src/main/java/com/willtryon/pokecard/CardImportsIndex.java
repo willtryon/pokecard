@@ -175,6 +175,7 @@ public class CardImportsIndex {
 		System.out.println(bestOrb.score());
 		CardImports.Match orbMatch = new CardImports.Match(bestOrb.sig.getCardID(), bestOrb.sig.getStringImgPath(), bestOrb.score());
         CardImports.Match ocrMatch = new CardImports.Match(null, null, 100.0);
+        CardImports.Match bestMatch = new CardImports.Match(null, null, 100.0);
 		List<CardSignature> recordRecord2 = new ArrayList<>();
 		List<Double> recordScore2 = new ArrayList<>();
         for (Scored scored : orbSorted) {
@@ -182,7 +183,7 @@ public class CardImportsIndex {
             recordScore2.add(scored.score());
         }
         boolean isFinal = false; boolean matchOverride = false; float price = -1; String cat = "";
-		return new CardImports(path, globalCardVersion, globalFirstEdition, isFinal, matchOverride, price, cat, test, hashMatch, orbMatch, ocrMatch, recordScore, recordRecord, recordScore2, recordRecord2);
+		return new CardImports(path, globalCardVersion, globalFirstEdition, isFinal, matchOverride, price, cat, test, hashMatch, orbMatch, ocrMatch, bestMatch, recordScore, recordRecord, recordScore2, recordRecord2);
     }
 
     public void runOcr(ScanProgress progress) throws IOException, URISyntaxException, InterruptedException {
@@ -430,6 +431,7 @@ public class CardImportsIndex {
                 CardImports.Match hashMatch = readMatch(dis);
                 CardImports.Match orbMatch  = readMatch(dis);
                 CardImports.Match ocrMatch = readMatch(dis);
+                CardImports.Match bestMatch = readMatch(dis);
 
                 List<CardSignature> recordRecord  = new ArrayList<>();
                 List<Double>        recordScore   = new ArrayList<>();
@@ -439,7 +441,7 @@ public class CardImportsIndex {
                 List<Double>        recordScore2  = new ArrayList<>();
                 readRanking(dis, byId, recordRecord2, recordScore2);
 
-                loaded.add(new CardImports(q, v, f, fi, mo, p, cStr, qHash, hashMatch, orbMatch, ocrMatch,
+                loaded.add(new CardImports(q, v, f, fi, mo, p, cStr, qHash, hashMatch, orbMatch, ocrMatch, bestMatch,
                         recordScore, recordRecord, recordScore2, recordRecord2));
                 if (qHash != null) loadedHashes.add(qHash);
             }
