@@ -3,10 +3,14 @@ package com.willtryon.pokecard.gui;
 import com.willtryon.pokecard.*;
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.collections.ListChangeListener;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -18,6 +22,8 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.layout.*;
 import javafx.stage.*;
 import javafx.util.StringConverter;
+import org.controlsfx.control.PopOver;
+import org.controlsfx.control.TaskProgressView;
 import org.controlsfx.control.spreadsheet.*;
 import org.controlsfx.control.PropertySheet;
 import org.controlsfx.property.BeanPropertyUtils;
@@ -63,6 +69,9 @@ public class App extends Application {
 
     private Label statusBar;
     private ProgressBar statusProgress;
+    private final TaskProgressView<Task<?>> taskView = new TaskProgressView<>();
+    private final ObjectProperty<Task<?>> statusTask = new SimpleObjectProperty<>();
+    private PopOver taskPopOver;
     private TabPane detailTabs;
     private TreeItem<SideNode> importsBranch;
     public static boolean firstRun = true;
@@ -398,7 +407,7 @@ public class App extends Application {
             Task<Void> priceTask = new Task<>() {
                 @Override
                 protected Void call() throws Exception {
-                    syncPrices(false, (msg, frac) -> {
+                    syncPrices(true, (msg, frac) -> {
                         updateMessage(msg);
                         updateProgress(frac, 1.0);
                     });
@@ -411,7 +420,7 @@ public class App extends Application {
             });
             runTask(priceTask, v -> {
             });
-        }), 0, 3, TimeUnit.MINUTES);
+        }), 0, 30, TimeUnit.MINUTES);
     }
 
     public void syncPrices(boolean force, ScanProgress progress) throws Exception {
@@ -501,6 +510,7 @@ public class App extends Application {
         });
 
         loadSessionItem.setOnAction(e -> {
+            //new NamedTask<Void>("Scanning Imports..."){loadSession(mainStage, false)}
             loadSession(mainStage, false);
             mainStage.setTitle("Pokecard - "+currentSession);
         });
@@ -633,8 +643,8 @@ public class App extends Application {
 
     private void loadSession(Stage owner, boolean tf){
         System.out.println("Loading imports from disk:");
-        statusBar.setText("Loading Session...");
-        statusProgress.setVisible(true);
+        //statusBar.setText("Loading Session...");
+        //statusProgress.setVisible(true);
         if (tf) {
             ctx.importDB.readImportsFromDisk(sessionPath);
         }
@@ -662,15 +672,25 @@ public class App extends Application {
             System.out.println(restored.getFirst().getORBRecordHistory() + "\n" + restored.get(0).getOrbWinner());
         }*/
         System.out.println("Done.");
-        statusBar.setText("Ready.");
-        statusProgress.setVisible(false);
+        //statusBar.setText("Ready.");
+        //statusProgress.setVisible(false);
     }
 
     private HBox buildStatusBar() {
-        statusBar = new Label("Ready.");
+        statusBar = new Label();
+        statusBar.textProperty().bind(
+                statusTask.flatMap(Task::messageProperty).orElse("Ready.")
+        );
         statusProgress = new ProgressBar();
         statusProgress.setPrefWidth(120);
-        statusProgress.setVisible(false);
+        statusProgress.progressProperty().bind(
+                statusTask.flatMap(Task::progressProperty).orElse(0.0));
+        statusProgress.setCursor(Cursor.HAND);
+        statusProgress.setOnMouseClicked(e -> toggleTaskPopOver());
+        taskView.getTasks().addListener((ListChangeListener<Task<?>>) c -> {
+            var live = taskView.getTasks();
+            statusTask.set(live.isEmpty() ? null : live.get(live.size() - 1));
+        });
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         HBox bar = new HBox(8, statusBar, spacer, statusProgress);
@@ -1082,20 +1102,20 @@ public class App extends Application {
     private Task<?> currentStatusTask;
     private final AtomicBoolean scanRunning = new AtomicBoolean(false);
 
+    private void toggleTaskPopOver() {
+        if (taskPopOver == null) {
+            taskView.setPrefSize(420, 260);
+            taskPopOver = new PopOver(taskView);
+            taskPopOver.setArrowLocation(PopOver.ArrowLocation.BOTTOM_RIGHT);
+        }
+        if (taskPopOver.isShowing()) taskPopOver.hide();
+        else taskPopOver.show(statusProgress);
+    }
+
     private <T> void runTask(Task<T> task, Consumer<T> onSuccess) {
-        currentStatusTask = task;
-        statusBar.textProperty().bind(task.messageProperty());
-        statusProgress.progressProperty().bind(task.progressProperty());
-        statusProgress.setVisible(true);
-        task.setOnSucceeded(e -> {
-            finishTask(task);
-            if (onSuccess != null) onSuccess.accept(task.getValue());
-        });
-        task.setOnFailed(e -> {
-            finishTask(task);
-            showError(task.getException());
-        });
-        task.setOnCancelled(e -> finishTask(task));
+        taskView.getTasks().add(task);          // before starting the thread
+        if (onSuccess != null) task.setOnSucceeded(e -> onSuccess.accept(task.getValue()));
+        task.setOnFailed(e -> showError(task.getException()));
         Thread t = new Thread(task);
         t.setDaemon(true);
         t.start();
@@ -1142,6 +1162,7 @@ class InitTask extends Task<App.AppContext>{
             size = rs.next() ? rs.getInt("n") : 0;
         }
         Main.size = size;
+        System.out.println(settings.cacheDir().resolve("tcg.db"));
 
         Path cacheFile = settings.cacheDir().resolve("cache_meta.dat");
         CardIndex cardDB;
@@ -1179,6 +1200,7 @@ class InitTask extends Task<App.AppContext>{
         TcgdbEnv env2 = new TcgdbEnv(tcgdbDefaultCacheDir());
         TcgdbEnv.EnvHandle handle2 = env2.prepare();
         new PokemonCardNameCleaner(settings.dbPath(), false);
+        var stats = PokemonCardNameCleaner.reconcileIdTcgp(settings.dbPath(), settings.cacheDir().resolve("tcg.db"), false);
         updateMessage("Starting...");
         CardImportsIndex importDB = cardDB.newImportsIndex();
         return new App.AppContext(cardDB, importDB, size);
