@@ -19,6 +19,7 @@ public class Config {
     public static final String SCAN_THREADS = "scan.threads";
     public static final String SESSION_PATH = "session.path";
     public static final String OCR_MODEL = "ocr.mode";
+    public static final String USE_OCR = "ocr.use";
 
     private final Path file;
     private final Properties props = new Properties();

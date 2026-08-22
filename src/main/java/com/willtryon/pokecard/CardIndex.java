@@ -20,10 +20,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.Arrays;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 import static org.bytedeco.opencv.global.opencv_calib3d.RANSAC;
@@ -39,6 +37,10 @@ public class CardIndex{
     private final ExecutorService executor;
     private boolean firstScan = true;
     private final Settings settings;
+    private int line = 0;
+    private int failed = 0;
+    private int passed = 0;
+    private int corrupt = 0;
 
     // --- Windows-safe path handling: keeps Path.resolve() from throwing
     // InvalidPathException on Windows when cardId contains ':' (e.g. "Type: Null").
@@ -66,7 +68,9 @@ public class CardIndex{
             if (isDashOrIllegalWin(c)){
                 int j = i; boolean hasIllegal = false;
                 while (j < n && isDashOrIllegalWin(stem.charAt(j))){
-                    if (isIllegalWin(stem.charAt(j))) hasIllegal = true;
+                    if (isIllegalWin(stem.charAt(j))) {
+                        hasIllegal = true;
+                    }
                     j++;
                 }
                 sb.append(hasIllegal ? "-" : stem.substring(i, j));
@@ -98,73 +102,105 @@ public class CardIndex{
 
     /*Approach so far is the query sql db and dump its contents for every hit to a new Card obj, which is stored
     in an array of cards...*/
-    public CardIndex(int size, String url, Settings settings) throws SQLException, FileNotFoundException {
+    public CardIndex(int size, String url, Settings settings) throws SQLException, TimeoutException {
         this.settings = settings;
-        int line = 0;
-        int failed = 0;
-        int passed = 0;
-        int corrupt = 0;
         this.executor = Executors.newFixedThreadPool(this.settings.scanThreads());
-        List<String[]> data = new ArrayList<>();
-        HashingAlgorithm hasher = new PerceptiveHash(64);
-        Scanner scan = new Scanner(System.in);
+        List<String[]> data = Collections.synchronizedList(new ArrayList<>());
+        AtomicInteger passedN = new AtomicInteger(), failedN = new AtomicInteger(), corruptN = new AtomicInteger();
+        List<Future<?>> future = new ArrayList<>();
         cardDB = new CardSignature[size];
+
         try (Connection conn = DriverManager.getConnection(url);
              Statement st = conn.createStatement();
-            ResultSet rs = st.executeQuery("SELECT cardId, name, expName, expCardNumber, rarity FROM cards")) {
+             ResultSet rs = st.executeQuery("SELECT cardId, name, expName, expCardNumber, rarity FROM cards")) {
+
             long startTime = System.currentTimeMillis();
             System.out.println("Now generating hashes for the database...");
             System.out.println("\n\n");
+            int row = 0;
             while (rs.next()) {
-                String cardId  = rs.getString("cardId");
-                String expName = rs.getString("expName");
-                String expCardNumber = rs.getString("expCardNumber");
-                Path img = resolveImage(expName, cardId, expCardNumber);
-                String percent = String.format("%.0f", ((double) line / size) * 100);
-                System.out.print("\033[3A\033[J");
-                System.out.println("Hashing:  " + cardId + "...");
-                System.out.println("ORB map:  generating...");
-                System.out.printf("Passed: %d\tFailed: %d\tCorrupt: %d\t%s%%\t%s\t(%d/%d)%n",
-                    passed, failed, corrupt, percent, timer(startTime), line, size);
-                ORB orb = ORB.create();
-                if (img != null && Files.exists(img)) {
-                    String address = img.toString();
+                if(row>=size) break;
+                final int slot = row++;
+                final String cardId = rs.getString("cardId");
+                final String expName = rs.getString("expName");
+                final String expCardNumber = rs.getString("expCardNumber");
+                final Path img = resolveImage(expName, cardId, expCardNumber);
+
+                future.add(executor.submit(() -> {
                     try {
-                        File victim = new File(address);
-                        try {
-                            Features f = describe(address, orb);
-                            cardDB[line] = new CardSignature(cardId, img, hasher.hash(victim), f.descriptors, f.keypoints);
-                            System.out.print("\033[3A\033[J");
-                            System.out.println("Hashing:  " + cardId + " \u2713");
-                            System.out.println("ORB map:  " + cardId + " \u2713");
-                            System.out.printf("Passed: %d\tFailed: %d\tCorrupt: %d\t%s%%\t%s\t(%d/%d)%n",
-                                    passed, failed, corrupt, percent, timer(startTime), line, size);
-                            passed++;
-                        } catch (IllegalArgumentException e) {
-                            data.add(new String[]{"File "+cardId+" appears to be corrupt (found at "+address+" but could not be decoded)."});
-                            corrupt++;
-                        }
-                    } catch (IOException e){
+                        computeData(slot, cardId, img, startTime, size);
+                        passedN.incrementAndGet();
+                    } catch (IllegalStateException e) {
+                        assert img != null;
+                        data.add(new String[]{"File " + cardId + " appears to be corrupt (found at "
+                                + img.toString() + " but could not be decoded)."});
+                        corruptN.incrementAndGet();
+                    } catch (IOException e) {
                         data.add(new String[]{"An unknown exception occurred when hashing " + cardId});
-                        failed++;
+                        failedN.incrementAndGet();
+                    } catch (IllegalArgumentException e) {
+                        line++;
+                        Path expected = this.settings.imagesDir()
+                                .resolve(sanitizeWinPath(expName == null ? "" : expName.replace(" ", "-"), false))
+                                .resolve(sanitizeWinPath(cardId.replace("/", "-") + ".jpg", true));
+                        data.add(new String[]{"File " + cardId + " cannot be found by the program.\nLocation searched (folder): "
+                                + expected.getParent()});
+                        cardDB[line] = new CardSignature(cardId, img == null ? expected : img, null, null, null);
+                        failedN.incrementAndGet();
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
                     }
-                } else{
-                    // NOTE: larp for the log. The real lookup happens in resolveImage();
-                    // the file may actually exist under a different number format.
-                    Path expected = this.settings.imagesDir()
-                            .resolve(sanitizeWinPath(expName == null ? "" : expName.replace(" ", "-"), false))
-                            .resolve(sanitizeWinPath(cardId.replace("/", "-") + ".jpg", true));
-                    data.add(new String[]{"File " + cardId + " cannot be found by the program.\nLocation searched (folder): " + expected.getParent()});
-                    cardDB[line] = new CardSignature(cardId, img == null ? expected : img, null, null, null);
-                    failed++;
-                }
-                line++;
-                }
+                }));
             }
-        System.out.println("\n\nPassed: " + passed + "\nFailed: " + failed + "\nCorrupt: " + corrupt + "\nOut of: " + line);
-        String result = String.format("%.0f", ((double) passed / size) * 100);
-        System.out.println(result + "% passed.\n\n");
-        writeToTxt("log.txt", data);
+            executor.shutdown();
+            try {
+                if(!executor.awaitTermination(1, TimeUnit.HOURS)){
+                    throw new TimeoutException("Timed out calculating cache objects.");
+                }
+                for (Future<?> f : future) f.get();
+            } catch (InterruptedException | ExecutionException e) {
+                throw new RuntimeException(e);
+            }
+
+            System.out.println("\n\nPassed: " + passed + "\nFailed: " + failed + "\nCorrupt: " + corrupt + "\nOut of: " + line);
+            String result = String.format("%.0f", ((double) passed / size) * 100);
+            System.out.println(result + "% passed.\n\n");
+            writeToTxt("log.txt", data);
+
+        }
+    }
+
+    private void computeData(int slot, String cardId, Path img, long startTime, int size)
+            throws Exception {
+
+        HashingAlgorithm hasher = new PerceptiveHash(64);
+        String percent = String.format("%.0f", ((double) line / size) * 100);
+        System.out.print("\033[3A\033[J");
+        System.out.println("Hashing:  " + cardId + "...");
+        System.out.println("ORB map:  generating...");
+        System.out.printf("Passed: %d\tFailed: %d\tCorrupt: %d\t%s%%\t%s\t(%d/%d)%n",
+                passed, failed, corrupt, percent, timer(startTime), line, size);
+
+        ORB orb = ORB.create();
+
+        if (img != null && Files.exists(img)) {
+            String address = img.toString();
+            File victim = new File(address);
+
+            Features f = describe(address, orb);
+            cardDB[slot] = new CardSignature(cardId, img, hasher.hash(victim), f.descriptors, f.keypoints);
+
+            System.out.print("\033[3A\033[J");
+            System.out.println("Hashing:  " + cardId + " \u2713");
+            System.out.println("ORB map:  " + cardId + " \u2713");
+            System.out.printf("Passed: %d\tFailed: %d\tCorrupt: %d\t%s%%\t%s\t(%d/%d)%n",
+                    passed, failed, corrupt, percent, timer(startTime), line, size);
+        } else {
+            // NOTE: larp for the log. The real lookup happens in resolveImage();
+            // the file may actually exist under a different number format.
+            throw new IllegalArgumentException();
+        }
+        line++;
     }
 
    public CardIndex(Settings settings) {
@@ -533,7 +569,7 @@ public class CardIndex{
             System.err.println("Error reading the root directory: " + e.getMessage());
         }
     }*/
-    private static final int METADATA_FORMAT_VERSION = 1;
+    private static final int METADATA_FORMAT_VERSION = 2;
 
     public void writeToDisk() {
         Path xmlPath = settings.cacheDir().resolve("cache.xml");
@@ -622,8 +658,8 @@ public class CardIndex{
 
             int version = dis.readInt();
             if (version != METADATA_FORMAT_VERSION) {
-                System.out.println("Metadata cache version mismatch; please delete and ");
-                return new CardSignature[0];
+                System.out.println("Metadata cache version mismatch detected.");
+                throw new InvalidVersionException("Metadata cache version mismatch detected.");
             }
             int count  = dis.readInt();
             int bitRes = dis.readInt();
@@ -768,3 +804,4 @@ public class CardIndex{
     }
 
 }
+

@@ -32,29 +32,23 @@ import javafx.collections.ObservableList;
 import javafx.scene.control.ComboBox;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.*;
 import java.util.*;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 import static com.willtryon.pokecard.CardImportsIndex.globalCardVersion;
 import static com.willtryon.pokecard.CardImportsIndex.globalFirstEdition;
 import static com.willtryon.pokecard.PokeocrEnv.ocrDefaultCacheDir;
 import static com.willtryon.pokecard.TcgdbEnv.tcgdbDefaultCacheDir;
 import com.willtryon.pokecard.Config.Settings;
-
-import javax.swing.event.HyperlinkEvent;
 
 public class App extends Application {
 
@@ -121,6 +115,7 @@ public class App extends Application {
                     new Setting(Config.SCAN_THREADS, "Threads", Kind.TEXT, false)
             )),
             new Section("pokeocr", List.of(
+                    new Setting(Config.USE_OCR, "Use OCR", Kind.BOOLEAN, false),
                     new Setting(Config.OCR_MODEL, "OCR model", Kind.MODE, false)
             ))
     );
@@ -211,9 +206,10 @@ public class App extends Application {
         }));
         initTask.setOnFailed(e -> {
             Throwable ex = initTask.getException();
-            ex.printStackTrace(); showError(ex);
             statusLabel.textProperty().unbind();
             statusLabel.setText("Exception occurred:" + ex.getMessage());
+            ex.printStackTrace(); showError(ex);
+            System.exit(1);
         });
         Thread initThread = new Thread(initTask, "pokecard-init");
         initThread.setDaemon(true);
@@ -407,7 +403,7 @@ public class App extends Application {
             Task<Void> priceTask = new Task<>() {
                 @Override
                 protected Void call() throws Exception {
-                    syncPrices(true, (msg, frac) -> {
+                    syncPrices(false, (msg, frac) -> {
                         updateMessage(msg);
                         updateProgress(frac, 1.0);
                     });
@@ -423,7 +419,7 @@ public class App extends Application {
         }), 0, 30, TimeUnit.MINUTES);
     }
 
-    public void syncPrices(boolean force, ScanProgress progress) throws Exception {
+    private void syncPrices(boolean force, ScanProgress progress) throws Exception {
         Path db = settings.cacheDir().resolve("tcg.db");
         progress.report("Retrieving price information...", -1);
         TcgdbEnv env = new TcgdbEnv(tcgdbDefaultCacheDir());
@@ -1168,30 +1164,13 @@ class InitTask extends Task<App.AppContext>{
         CardIndex cardDB;
         if (Files.isRegularFile(cacheFile)) {
             updateMessage("Loading cache (" + size + " cards)...");
-            cardDB = new CardIndex(settings);
-        } else {
-            updateMessage("Computing image data for " + size + " cards...");
-            cardDB = new CardIndex(size, url, settings);
-            CountDownLatch latch = new CountDownLatch(1);
-            AtomicBoolean saveChoice = new AtomicBoolean(false);
-
-            Platform.runLater(() -> {
-                Alert alert = new Alert(
-                        Alert.AlertType.INFORMATION,
-                        "Done calculating image data. Writing the data to the disk will take about 620MB. Do you want to save the data?",
-                        ButtonType.YES, ButtonType.NO
-                );
-                alert.setHeaderText("Save image data");
-                Optional<ButtonType> result = alert.showAndWait();
-                saveChoice.set(result.isPresent() && result.get() == ButtonType.YES);
-                latch.countDown();
-            });
-
-            latch.await(); // block the background thread until the user answers
-
-            if (saveChoice.get()) {
-                cardDB.writeToDisk();
+            try {
+                cardDB = new CardIndex(settings);
+            } catch (InvalidVersionException e) {
+                cardDB = calculateDB(size, url);
             }
+        } else {
+            cardDB = calculateDB(size, url);
         }
         updateMessage("Verifying python env...");
         PokeocrEnv env = new PokeocrEnv(ocrDefaultCacheDir(), settings);
@@ -1204,6 +1183,33 @@ class InitTask extends Task<App.AppContext>{
         updateMessage("Starting...");
         CardImportsIndex importDB = cardDB.newImportsIndex();
         return new App.AppContext(cardDB, importDB, size);
+    }
+
+    private CardIndex calculateDB(int size, String url) throws SQLException, FileNotFoundException, InterruptedException, TimeoutException {
+        CardIndex cardDB;
+        updateMessage("Computing image data for " + size + " cards...");
+        cardDB = new CardIndex(size, url, settings);
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicBoolean saveChoice = new AtomicBoolean(false);
+
+        Platform.runLater(() -> {
+            Alert alert = new Alert(
+                    Alert.AlertType.INFORMATION,
+                    "Done calculating image data. Writing the data to the disk will take about 620MB. Do you want to save the data?",
+                    ButtonType.YES, ButtonType.NO
+            );
+            alert.setHeaderText("Save image data");
+            Optional<ButtonType> result = alert.showAndWait();
+            saveChoice.set(result.isPresent() && result.get() == ButtonType.YES);
+            latch.countDown();
+        });
+
+        latch.await(); // block the background thread until the user answers
+
+        if (saveChoice.get()) {
+            cardDB.writeToDisk();
+        }
+        return cardDB;
     }
 }
 
@@ -1334,12 +1340,24 @@ class ConfigEditor {
 
                     grid.add(ocrMode, 1, row);
                 }
+                case BOOLEAN -> {
+                    CheckBox checkBox = new CheckBox();
+                    boolean current = Boolean.parseBoolean(config.get(s.key()));
+                    checkBox.setSelected(current);
+                    field.setText(String.valueOf(current));   // seed the hidden field to match
+
+                    checkBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+                        field.setText(String.valueOf(newVal));
+                    });
+
+                    grid.add(checkBox, 1, row);
+                }
             }
 
             field.setText(config.get(s.key()));
             field.setPrefColumnCount(30);
             inputs.put(s.key(), field);
-            if(!(s.kind()==App.Kind.MODE)){
+            if(!(s.kind()==App.Kind.MODE || s.kind()==App.Kind.BOOLEAN)){
                 grid.add(field, 1, row);
             }
             grid.add(new Label(s.label()), 0, row);
