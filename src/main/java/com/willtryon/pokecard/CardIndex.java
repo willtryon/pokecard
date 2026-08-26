@@ -34,7 +34,7 @@ import com.willtryon.pokecard.Config.Settings;
 
 public class CardIndex{
     private final CardSignature [] cardDB;
-    private final ExecutorService executor;
+    private ExecutorService executor;
     private boolean firstScan = true;
     private final Settings settings;
     private int line = 0;
@@ -485,6 +485,9 @@ public class CardIndex{
 
     public double[] scoreOrbParallel(Features query, List<CardSignature> candidates) {
         int n = candidates.size();
+        if(executor.isShutdown()){
+            executor = Executors.newFixedThreadPool(this.settings.scanThreads());
+        }
         if (firstScan){
             System.out.println("Using " + settings.scanThreads() + " threads...");
             firstScan = false;

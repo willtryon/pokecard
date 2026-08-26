@@ -14,8 +14,8 @@ public class CardImports {
     public record Match(String cardID, String img, double winner) {}
 
     private final Path img;
-    private final String cardVersion;
-    private final boolean firstEdition;
+    private String cardVersion;
+    private boolean firstEdition;
     private boolean isFinal;
     private boolean matchOverride;
     private float price;
@@ -60,8 +60,16 @@ public class CardImports {
         return cardVersion;
     }
 
+    public void setCardVersion(String cardVersion){
+        this.cardVersion = cardVersion;
+    }
+
     public boolean getFirstEdition(){
         return firstEdition;
+    }
+
+    public void setFirstEdition(boolean firstEdition){
+        this.firstEdition = firstEdition;
     }
 
     public Hash getQueryHash() {return qHash;}

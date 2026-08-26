@@ -6,6 +6,7 @@ import javafx.application.Platform;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.value.ObservableValue;
 import javafx.collections.ListChangeListener;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
@@ -49,6 +50,8 @@ import static com.willtryon.pokecard.CardImportsIndex.globalFirstEdition;
 import static com.willtryon.pokecard.PokeocrEnv.ocrDefaultCacheDir;
 import static com.willtryon.pokecard.TcgdbEnv.tcgdbDefaultCacheDir;
 import com.willtryon.pokecard.Config.Settings;
+import org.controlsfx.property.editor.AbstractPropertyEditor;
+import org.controlsfx.property.editor.DefaultPropertyEditorFactory;
 
 public class App extends Application {
 
@@ -1467,6 +1470,7 @@ class ImportsProperties{
 
     protected ImportsProperties(Stage mainStage, App.AppContext ctx,  CardImports selected) {
         this.ctx = ctx;
+        this.selected = selected;
         buildEditor(mainStage, selected);
     }
 
@@ -1475,14 +1479,68 @@ class ImportsProperties{
         editor.initModality(Modality.APPLICATION_MODAL);
         editor.initOwner(mainStage);
         editor.setTitle("Editing "+selected.getQueryImage().getFileName());
-        ObservableList<PropertySheet.Item> properties = BeanPropertyUtils.getProperties(selected);
-        PropertySheet propertySheet = new PropertySheet(properties);
-        VBox test = new VBox(10, propertySheet);
+        ObservableList<PropertySheet.Item> items = FXCollections.observableArrayList(
+                new ImportItem<>("Card", "Version", "Foiling / print variant",
+                        CardVersion.class,
+                        () -> CardVersion.fromDb(selected.getCardVersion()),
+                        v  -> selected.setCardVersion(v.dbValue())),
+
+                new ImportItem<>("Card", "Category", "How this card is being handled",
+                        Category.class,
+                        () -> Category.fromCatDb(selected.getCat()),
+                        v  -> selected.setCat(v.dbValue())),
+
+                new ImportItem<>("Card", "First edition", null,
+                        Boolean.class, selected::getFirstEdition, selected::setFirstEdition),
+
+                new ImportItem<>("Pricing", "Price", "Sale price in USD",
+                        Float.class, selected::getPrice, selected::setPrice),
+
+                new ImportItem<>("Match", "Best match", "The card this scan resolves to",
+                        CardImports.Match.class, selected::getBestMatch, selected::setBestMatch),
+
+                new ImportItem<>("Match", "Match overridden", "Set when you pick a match by hand",
+                        Boolean.class, selected::getMatchOverride, selected::setMatchOverride),
+
+                new ImportItem<>("Status", "Finalized", null,
+                        Boolean.class, selected::getFinal, selected::setFinal)
+        );
+
+        PropertySheet sheet = new PropertySheet(items);
+        sheet.setMode(PropertySheet.Mode.CATEGORY);
+        sheet.setModeSwitcherVisible(false);
+        sheet.setSearchBoxVisible(false);
+        DefaultPropertyEditorFactory defaults = new DefaultPropertyEditorFactory();
+        sheet.setPropertyEditorFactory(item ->
+                item.getType() == CardImports.Match.class
+                        ? new BestMatchEditor(item, ctx, editor)   // editor == the owning Stage
+                        : defaults.call(item));
+        VBox test = new VBox(10, sheet);
         test.setAlignment(Pos.CENTER);
         test.setPadding(new Insets(10));
         editor.setScene(new Scene(test));
         editor.show();
     }
+}
+class BestMatchEditor extends AbstractPropertyEditor<CardImports.Match, Button>{
+    private ObjectProperty<CardImports.Match> value;
 
+    protected BestMatchEditor(PropertySheet.Item item, App.AppContext ctx, Window owner) {
+        super(item, new Button());
+        Button b = getEditor();
+        b.setMaxWidth(Double.MAX_VALUE);
+        b.textProperty().bind(value.map(CardImports.Match::cardID)
+                .orElse("Choose a card\u2026"));
+        //b.setOnAction(e -> new CardSearchDialog(ctx).showAndWait(owner)
+        //                                                    .ifPresent(value::set));
+    }
 
+    @Override
+    protected ObservableValue<CardImports.Match> getObservableValue() {
+        if (value == null) value = new SimpleObjectProperty<>();   // lazy: super() calls this
+        return value;
+    }
+
+    @Override
+    public void setValue(CardImports.Match m) { getObservableValue(); value.set(m); }
 }
