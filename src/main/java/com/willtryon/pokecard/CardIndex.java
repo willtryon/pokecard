@@ -34,7 +34,7 @@ import com.willtryon.pokecard.Config.Settings;
 
 public class CardIndex{
     private final CardSignature [] cardDB;
-    private final ExecutorService executor;
+    private ExecutorService executor;
     private boolean firstScan = true;
     private final Settings settings;
     private int line = 0;
@@ -485,6 +485,9 @@ public class CardIndex{
 
     public double[] scoreOrbParallel(Features query, List<CardSignature> candidates) {
         int n = candidates.size();
+        if(executor.isShutdown()){
+            executor = Executors.newFixedThreadPool(this.settings.scanThreads());
+        }
         if (firstScan){
             System.out.println("Using " + settings.scanThreads() + " threads...");
             firstScan = false;
@@ -647,6 +650,7 @@ public class CardIndex{
     }
 
     private CardSignature[] readFromDisk() {
+        long startTime = System.currentTimeMillis();
         Path xmlPath = settings.cacheDir().resolve("cache.xml");
         Path orbPath = settings.cacheDir().resolve("cache_orb.dat");
 
@@ -692,10 +696,9 @@ public class CardIndex{
                 System.out.println("Warning: ORB cache count mismatch; ORB matching unavailable.");
                 return db;
             }
-            for (int i = 0; i < count; i++) {
-                String percent = String.format("%.0f", ((double) i / count) * 100);
-                System.out.print("\033[0F\033[J");
-                System.out.printf("\nLoading ORB objects...%s%%",percent);
+            System.out.println("\nLoading ORB objects...");
+            int i;
+            for (i = 0; i < count; i++) {
                 boolean hasData = dis.readBoolean();
                 if (!hasData) continue;
                 int rows = dis.readInt();
@@ -723,10 +726,17 @@ public class CardIndex{
                     Path imgP = (pStr != null && !pStr.isEmpty()) ? Path.of(pStr) : null;
                     db[i] = new CardSignature(db[i].getCardID(), imgP, db[i].getBinaryHash(), desc, kp);
                 }
+                int checkInterval = Math.max(1, count / 10);
+                if (i % checkInterval == 0 || i == count - 1) {
+                    String percent = String.format("%.0f", ((double) i / count) * 100);
+                    System.out.printf("Loading ORB objects...%s%%\n", percent);
+                    System.out.flush(); // Forces the console to display the text immediately
+                }
             }
         } catch (IOException e){
             System.out.println("Warning: Failed to load ORB cache: " + e.getMessage());
         }
+        System.out.println(timer(startTime));
         return db;
     }
 

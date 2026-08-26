@@ -19,7 +19,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class PokemonCardNameCleaner {
+public class dbCleanup {
 
     // --- Regexes used only by the last-resort strip (step 2c) ---
 
@@ -53,12 +53,14 @@ public class PokemonCardNameCleaner {
     private record Update(long rowid, String newName) {
     }
 
-    public PokemonCardNameCleaner(Path dbPath, boolean dryRun) {
+    public dbCleanup(ScanProgress progress, Path dbPath, Path tcgDb, boolean dryRun) {
         this.dbPath = dbPath;
         this.dryRun = dryRun;
         String url = "jdbc:sqlite:" + dbPath;
         try (Connection conn = DriverManager.getConnection(url)) {
-            run(conn, dryRun);
+            run(progress, conn, dryRun);
+            reconcileIdTcgp(progress, dbPath, tcgDb, dryRun);
+            prepareForSearch(progress, conn);
         } catch (SQLException e) {
             System.err.println("Database error: " + e.getMessage());
             e.printStackTrace();
@@ -67,7 +69,8 @@ public class PokemonCardNameCleaner {
     }
 
     /** Loads the Pokédex, computes every needed change, then applies them in one transaction. */
-    public void run(Connection conn, boolean dryRun) throws SQLException {
+    public void run(ScanProgress progress, Connection conn, boolean dryRun) throws SQLException {
+        progress.report("Running database tasks... (1/4)", 0.25);
         loadPokedex(conn);
         System.out.println("Loaded " + dexById.size() + " Pokédex entries.");
 
@@ -302,23 +305,25 @@ public class PokemonCardNameCleaner {
     public record ReconcileStats(int confirmed, int corrected, int review, int unmatched, int noXwalk) {}
 
     /** Convenience: idTCGP-only fix, no CSV report. */
-    public static ReconcileStats reconcileIdTcgp(Path dataDb, Path tcgDb, boolean dryRun) {
-        return reconcileIdTcgp(dataDb, tcgDb, dryRun, false, null);
+    public static ReconcileStats reconcileIdTcgp(ScanProgress progress, Path dataDb, Path tcgDb, boolean dryRun) {
+        return reconcileIdTcgp(progress, dataDb, tcgDb, dryRun, false, null);
     }
 
     /**
      * Repairs data.sqlite's idTCGP against tcg.db.
      *
-     * @param dataDb        path to data.sqlite (updated in place unless dryRun)
-     * @param tcgDb         path to tcg.db (opened read-only)
-     * @param dryRun        compute + report but write nothing
+     * @param progress
+     * @param dataDb         path to data.sqlite (updated in place unless dryRun)
+     * @param tcgDb          path to tcg.db (opened read-only)
+     * @param dryRun         compute + report but write nothing
      * @param writeSetFields also normalize expCodeTCGP/expIdTCGP on corrected rows to the
      *                       matched set (rewrites those two columns to tcg.db's vocabulary,
      *                       e.g. EVO / SVI); idTCGP-only when false
-     * @param reportCsv     if non-null, write a CSV of corrected/review/unmatched rows here
+     * @param reportCsv      if non-null, write a CSV of corrected/review/unmatched rows here
      */
-    public static ReconcileStats reconcileIdTcgp(Path dataDb, Path tcgDb, boolean dryRun,
+    public static ReconcileStats reconcileIdTcgp(ScanProgress progress, Path dataDb, Path tcgDb, boolean dryRun,
                                                  boolean writeSetFields, Path reportCsv) {
+        progress.report("Running database tasks... (2/4)", 0.5);
         try (Connection data = DriverManager.getConnection("jdbc:sqlite:" + dataDb);
              Connection tcg = DriverManager.getConnection("jdbc:sqlite:" + tcgDb)) {
 
@@ -605,5 +610,32 @@ public class PokemonCardNameCleaner {
             return '"' + s.replace("\"", "\"\"") + '"';
         }
         return s;
+    }
+
+    public void prepareForSearch(ScanProgress progress, Connection conn) throws SQLException {
+        progress.report("Running database tasks... (3/4)", 0.75);
+
+        try (Statement st = conn.createStatement()) {
+            boolean exists;
+            try (ResultSet rs = st.executeQuery(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='cards_fts'")) {
+                exists = rs.next();
+            }
+
+            if (!exists) {
+                st.execute("""
+                    CREATE VIRTUAL TABLE cards_fts USING fts5(
+                        name, expName, expCardNumber, rarity,
+                        content='cards',
+                        tokenize='unicode61'
+                    )""");
+            }
+
+            st.executeUpdate("INSERT INTO cards_fts(cards_fts) VALUES('rebuild')");
+
+            try (ResultSet rs = st.executeQuery("SELECT count(*) FROM cards_fts")) {
+                System.out.println("cards_fts: indexed " + (rs.next() ? rs.getInt(1) : 0) + " cards.");
+            }
+        }
     }
 }

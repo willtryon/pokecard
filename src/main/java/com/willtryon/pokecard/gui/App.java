@@ -6,6 +6,7 @@ import javafx.application.Platform;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.value.ObservableValue;
 import javafx.collections.ListChangeListener;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
@@ -26,7 +27,6 @@ import org.controlsfx.control.PopOver;
 import org.controlsfx.control.TaskProgressView;
 import org.controlsfx.control.spreadsheet.*;
 import org.controlsfx.control.PropertySheet;
-import org.controlsfx.property.BeanPropertyUtils;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.control.ComboBox;
@@ -49,6 +49,8 @@ import static com.willtryon.pokecard.CardImportsIndex.globalFirstEdition;
 import static com.willtryon.pokecard.PokeocrEnv.ocrDefaultCacheDir;
 import static com.willtryon.pokecard.TcgdbEnv.tcgdbDefaultCacheDir;
 import com.willtryon.pokecard.Config.Settings;
+import org.controlsfx.property.editor.AbstractPropertyEditor;
+import org.controlsfx.property.editor.DefaultPropertyEditorFactory;
 
 public class App extends Application {
 
@@ -125,7 +127,7 @@ public class App extends Application {
         return s.kind().isValidValue(value);
     }
 
-    record AppContext(CardIndex cardDB, CardImportsIndex importDB, int size) {
+    record AppContext(CardIndex cardDB, CardImportsIndex importDB, CardSearchRepo searchDB, int size) {
     }
 
     @Override
@@ -417,6 +419,21 @@ public class App extends Application {
             runTask(priceTask, v -> {
             });
         }), 0, 30, TimeUnit.MINUTES);
+        scheduler.scheduleAtFixedRate(() -> Platform.runLater(() -> {
+            Task<Void> saveTask = new Task<>() {
+                @Override
+                protected Void call() throws Exception {
+                    System.out.println("I work!");
+                    if(saved) saveSession(mainStage);
+                    return null;
+                }
+            };
+            saveTask.setOnFailed(event -> {
+                Throwable ex = saveTask.getException();
+                showError(ex);
+            });
+            runTask(saveTask, v -> {});
+        }), 10000, 1, TimeUnit.MINUTES);
     }
 
     private void syncPrices(boolean force, ScanProgress progress) throws Exception {
@@ -479,7 +496,8 @@ public class App extends Application {
             openSpreadSheetTab(null, "session");
         });
         cd1Button.setOnAction(event -> {
-            new Finalize(ctx).finalizeImports(mainStage);
+            new Finalize(ctx, settings).finalizeImports(mainStage);
+            saveSession(mainStage);
         });
         Separator sep = new Separator();
 
@@ -565,14 +583,15 @@ public class App extends Application {
             if(currentImport() == null){
                 showError(new IllegalArgumentException("No current import"));
             }
-            new ImportsProperties(mainStage, ctx, currentImport());
+            new ImportsProperties(mainStage, ctx, currentImport(), settings);
+            saveSession(mainStage);
         });
 
         aboutItem.setOnAction(e -> {
             Stage aboutStage = new Stage();
             aboutStage.setTitle("About Pokecard");
             Label name = new Label("Pokecard");
-            Label version = new Label("Version 0.7.0");
+            Label version = new Label("Version 0.8.0");
             Label author = new Label("by willtryon");
             Button close = new Button("Close");
             VBox aboutLayout = new VBox(12, name, version, author, close);
@@ -629,11 +648,7 @@ public class App extends Application {
                 }
             }
         }
-        statusBar.setText("Saving Session...");
-        statusProgress.setVisible(true);
         System.out.println("Done.");
-        statusBar.setText("Ready.");
-        statusProgress.setVisible(false);
         saved = true;
     }
 
@@ -663,6 +678,7 @@ public class App extends Application {
         }
         System.out.println("Loaded " + restored.size() + " imports.");
         refreshImports(ctx.importDB());
+        saved = true;
         /*
         if (!restored.isEmpty()) {
             System.out.println(restored.getFirst().getORBRecordHistory() + "\n" + restored.get(0).getOrbWinner());
@@ -897,18 +913,18 @@ public class App extends Application {
         HBox content = new HBox(10);
         content.setPadding(new Insets(16));
 
-        ToggleGroup group = new ToggleGroup();
+        //ToggleGroup group = new ToggleGroup();
 
-        ToggleButton overview = new ToggleButton("Overview");
-        ToggleButton hashList = new ToggleButton("Hash");
-        ToggleButton orbList = new ToggleButton("ORB");
-        ToggleButton ocrList = new ToggleButton("OCR");
+        //ToggleButton overview = new ToggleButton("Overview");
+        //ToggleButton hashList = new ToggleButton("Hash");
+        //ToggleButton orbList = new ToggleButton("ORB");
+        //ToggleButton ocrList = new ToggleButton("OCR");
 
-        ToggleButton[] buttons = { overview, hashList, orbList, ocrList };
+        //ToggleButton[] buttons = { overview, hashList, orbList, ocrList };
 
-        for(ToggleButton b : buttons){
-            b.setToggleGroup(group);
-        }
+        //for(ToggleButton b : buttons){
+          //  b.setToggleGroup(group);
+        //}
 
         int size = imp.getRecordSize();
 
@@ -990,12 +1006,12 @@ public class App extends Application {
 
         render.run();
 
-        HBox bar = new HBox(10, overview, hashList, orbList, ocrList);
+        //HBox bar = new HBox(10, overview, hashList, orbList, ocrList);
 
         VBox imgStack = new VBox(10);
         imgStack.getChildren().addAll(orbLabel, hashLabel, ocrLabel, images, new HBox(16, previous, count, next));
         content.getChildren().addAll(imgStack, info);
-        return new VBox(10, bar, content);
+        return new VBox(10, /*bar,*/ content);
     }
 
 
@@ -1007,6 +1023,7 @@ public class App extends Application {
     }
 
     private SpreadsheetView buildSpreadsheet(CardImports imp, String args) {
+        refreshImports(ctx.importDB);
         int rows;
         if(args.equals("session")) rows = ctx.importDB.getImports().size();
         else if (args.equals("ocr")) rows = 1;
@@ -1150,6 +1167,7 @@ class InitTask extends Task<App.AppContext>{
     @Override
     protected App.AppContext call() throws Exception{
         String url = "jdbc:sqlite:" + settings.dbPath();
+        System.out.println("Pokecard v0.8.0\nby willtryon\n");
         updateMessage("Connecting to database...");
         int size;
         try (Connection conn = DriverManager.getConnection(url);
@@ -1175,14 +1193,19 @@ class InitTask extends Task<App.AppContext>{
         updateMessage("Verifying python env...");
         PokeocrEnv env = new PokeocrEnv(ocrDefaultCacheDir(), settings);
         PokeocrEnv.EnvHandle handle = env.prepare();
-        updateMessage("Rebuilding database...");
+        updateMessage("Running database tasks...");
         TcgdbEnv env2 = new TcgdbEnv(tcgdbDefaultCacheDir());
         TcgdbEnv.EnvHandle handle2 = env2.prepare();
-        new PokemonCardNameCleaner(settings.dbPath(), false);
-        var stats = PokemonCardNameCleaner.reconcileIdTcgp(settings.dbPath(), settings.cacheDir().resolve("tcg.db"), false);
+        new dbCleanup((msg, frac) -> {
+            updateMessage(msg);
+            updateProgress(frac, 1.0);
+        }, settings.dbPath(), settings.cacheDir().resolve("tcg.db"), false);
+        updateMessage("Running database tasks...");
+        updateProgress(1.0, 1.0);
+        CardSearchRepo searchDB = new CardSearchRepo(settings.dbPath(), cardDB);
         updateMessage("Starting...");
         CardImportsIndex importDB = cardDB.newImportsIndex();
-        return new App.AppContext(cardDB, importDB, size);
+        return new App.AppContext(cardDB, importDB, searchDB, size);
     }
 
     private CardIndex calculateDB(int size, String url) throws SQLException, FileNotFoundException, InterruptedException, TimeoutException {
@@ -1390,9 +1413,11 @@ class ConfigEditor {
 class Finalize{
     private App.AppContext ctx;
     private List<CardImports> selectedItems;
+    private final Settings settings;
 
-    protected Finalize(App.AppContext ctx) {
+    protected Finalize(App.AppContext ctx, Settings settings) {
         this.ctx = ctx;
+        this.settings = settings;
     }
 
     protected void finalizeImports(Stage mainStage){
@@ -1443,7 +1468,7 @@ class Finalize{
         });
         propertiesButton.setOnAction(e -> {
             CardImports temp = listView.getSelectionModel().getSelectedItem();
-            new ImportsProperties(stage, ctx, temp);
+            new ImportsProperties(stage, ctx, temp, settings);
         });
 
         HBox buttons = new HBox(10, nextButton, cancelButton, propertiesButton);
@@ -1464,9 +1489,12 @@ class Finalize{
 class ImportsProperties{
     private App.AppContext ctx;
     private CardImports selected;
+    private final Settings settings;
 
-    protected ImportsProperties(Stage mainStage, App.AppContext ctx,  CardImports selected) {
+    protected ImportsProperties(Stage mainStage, App.AppContext ctx, CardImports selected, Settings settings) {
         this.ctx = ctx;
+        this.selected = selected;
+        this.settings = settings;
         buildEditor(mainStage, selected);
     }
 
@@ -1475,14 +1503,72 @@ class ImportsProperties{
         editor.initModality(Modality.APPLICATION_MODAL);
         editor.initOwner(mainStage);
         editor.setTitle("Editing "+selected.getQueryImage().getFileName());
-        ObservableList<PropertySheet.Item> properties = BeanPropertyUtils.getProperties(selected);
-        PropertySheet propertySheet = new PropertySheet(properties);
-        VBox test = new VBox(10, propertySheet);
+        ObservableList<PropertySheet.Item> items = FXCollections.observableArrayList(
+                new ImportItem<>("Card", "Version", "Foiling / print variant",
+                        CardVersion.class,
+                        () -> CardVersion.fromDb(selected.getCardVersion()),
+                        v  -> selected.setCardVersion(v.dbValue())),
+
+                new ImportItem<>("Card", "Category", "How this card is being handled",
+                        Category.class,
+                        () -> Category.fromCatDb(selected.getCat()),
+                        v  -> selected.setCat(v.dbValue())),
+
+                new ImportItem<>("Card", "First edition", null,
+                        Boolean.class, selected::getFirstEdition, selected::setFirstEdition),
+
+                new ImportItem<>("Pricing", "Price", "Sale price in USD",
+                        Float.class, selected::getPrice, selected::setPrice),
+
+                new ImportItem<>("Match", "Best match", "The card this scan resolves to",
+                        CardImports.Match.class, selected::getBestMatch, selected::setBestMatch),
+
+                new ImportItem<>("Match", "Match overridden", "Set when you pick a match by hand",
+                        Boolean.class, selected::getMatchOverride, selected::setMatchOverride),
+
+                new ImportItem<>("Status", "Finalized", null,
+                        Boolean.class, selected::getFinal, selected::setFinal)
+        );
+
+        PropertySheet sheet = new PropertySheet(items);
+        sheet.setMode(PropertySheet.Mode.CATEGORY);
+        sheet.setModeSwitcherVisible(false);
+        sheet.setSearchBoxVisible(false);
+        DefaultPropertyEditorFactory defaults = new DefaultPropertyEditorFactory();
+        sheet.setPropertyEditorFactory(item ->
+                item.getType() == CardImports.Match.class
+                        ? new BestMatchEditor(item, ctx, editor, settings)   // editor == the owning Stage
+                        : defaults.call(item));
+        VBox test = new VBox(10, sheet);
         test.setAlignment(Pos.CENTER);
         test.setPadding(new Insets(10));
         editor.setScene(new Scene(test));
         editor.show();
     }
+}
 
+class BestMatchEditor extends AbstractPropertyEditor<CardImports.Match, Button>{
+    private ObjectProperty<CardImports.Match> value;
+    private final Settings settings;
 
+    protected BestMatchEditor(PropertySheet.Item item, App.AppContext ctx, Window owner, Settings settings) {
+        super(item, new Button());
+        this.settings = settings;
+        Button b = getEditor();
+        b.setMaxWidth(Double.MAX_VALUE);
+        b.textProperty().bind(value.map(CardImports.Match::cardID)
+                .orElse("Choose a card\u2026"));
+        b.setOnAction(e -> new CardSearchDialog(ctx.searchDB())
+                .showAndWait(owner)
+                .ifPresent(value::set));
+    }
+
+    @Override
+    protected ObservableValue<CardImports.Match> getObservableValue() {
+        if (value == null) value = new SimpleObjectProperty<>();   // lazy: super() calls this
+        return value;
+    }
+
+    @Override
+    public void setValue(CardImports.Match m) { getObservableValue(); value.set(m); }
 }
