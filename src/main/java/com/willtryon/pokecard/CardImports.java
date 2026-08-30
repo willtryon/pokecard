@@ -176,6 +176,11 @@ public class CardImports {
         this.bestMatch = bestMatch;
     }
 
+    public void applyManualMatch(Match m) {
+        this.bestMatch = m;
+        this.matchOverride = (m != null);
+    }
+
     public String getCat() {
         return cat;
     }

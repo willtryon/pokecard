@@ -187,7 +187,7 @@ public class CardImportsIndex {
     }
 
     public void runOcr(ScanProgress progress) throws IOException, URISyntaxException, InterruptedException {
-        System.out.println("I work!");
+        if(!Boolean.parseBoolean((settings.useOcr()))) return;
         progress.report("OCR bullshit now", -1);
         long startTime = System.currentTimeMillis();
         PokeocrEnv env = new PokeocrEnv(ocrDefaultCacheDir(), settings);

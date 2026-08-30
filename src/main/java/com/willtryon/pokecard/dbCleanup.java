@@ -19,7 +19,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class dbCleanup {
+public final class dbCleanup {
 
     // --- Regexes used only by the last-resort strip (step 2c) ---
 

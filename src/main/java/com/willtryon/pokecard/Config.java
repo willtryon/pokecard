@@ -26,7 +26,7 @@ public class Config {
 
     public record Settings(
             Path dbPath, Path imagesDir, Path compareDir, Path outputDir,
-            Path cacheDir, int scanThreads, String eBayApiKey, String ocrModel
+            Path cacheDir, int scanThreads, String eBayApiKey, String ocrModel, String useOcr
     ){
         public static Settings from (Config c){
             return new Settings(
@@ -37,7 +37,8 @@ public class Config {
                     Path.of(c.get(Config.CACHE_DIR)),
                     c.getScanThreads(),
                     c.get(Config.EBAY_API_KEY),
-                    c.get(Config.OCR_MODEL)
+                    c.get(Config.OCR_MODEL),
+                    c.get(Config.USE_OCR)
             );
         }
     }

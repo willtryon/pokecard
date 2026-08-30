@@ -730,7 +730,7 @@ public class CardIndex{
                 if (i % checkInterval == 0 || i == count - 1) {
                     String percent = String.format("%.0f", ((double) i / count) * 100);
                     System.out.printf("Loading ORB objects...%s%%\n", percent);
-                    System.out.flush(); // Forces the console to display the text immediately
+                    System.out.flush();
                 }
             }
         } catch (IOException e){

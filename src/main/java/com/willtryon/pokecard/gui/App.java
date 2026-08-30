@@ -3,6 +3,7 @@ package com.willtryon.pokecard.gui;
 import com.willtryon.pokecard.*;
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleObjectProperty;
@@ -123,6 +124,7 @@ public class App extends Application {
     );
 
     static boolean satisfied(Setting s, String value) {
+        if (s.kind() == Kind.BOOLEAN) return true;
         if (value == null || value.isBlank()) return !s.required();
         return s.kind().isValidValue(value);
     }
@@ -481,6 +483,10 @@ public class App extends Application {
         Button imp1Button = buildToolBarButton(imp1);
         Image cd1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/cd1a.png")));
         Button cd1Button = buildToolBarButton(cd1);
+        Image prop1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/prop1a.png")));
+        Button prop1Button = buildToolBarButton(prop1);
+        Image search1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/search1a.png")));
+        Button search1Button = buildToolBarButton(search1);
 
         hash1Button.setOnAction(event -> {
             openSpreadSheetTab(currentImport(), "hash");
@@ -495,13 +501,33 @@ public class App extends Application {
         imp1Button.setOnAction(event -> {
             openSpreadSheetTab(null, "session");
         });
+        Separator sep = new Separator();
         cd1Button.setOnAction(event -> {
             new Finalize(ctx, settings).finalizeImports(mainStage);
-            saveSession(mainStage);
+            //saveSession(mainStage);
         });
-        Separator sep = new Separator();
+        // Only enabled when the selected tab actually has an import behind it.
+        search1Button.disableProperty().bind(Bindings.createBooleanBinding(
+                () -> currentImport() == null,
+                detailTabs.getSelectionModel().selectedItemProperty()));
 
-        toolBar.getItems().addAll(hash1Button, cv1Button, ocr1Button, imp1Button, sep, cd1Button);
+        prop1Button.setOnAction(event -> {
+            new ImportsProperties(mainStage, ctx, currentImport(), settings);
+        });
+
+        search1Button.setOnAction(event -> {
+            CardImports imp = currentImport();
+            if (imp == null) return;
+            new CardSearchDialog(ctx.searchDB())
+                    .showAndWait(mainStage)
+                    .ifPresent(m -> {
+                        imp.applyManualMatch(m);
+                    });
+        });
+
+
+
+        toolBar.getItems().addAll(hash1Button, cv1Button, ocr1Button, imp1Button, sep, cd1Button, prop1Button, search1Button);
 
 
         //Menu bar operations...
@@ -584,7 +610,7 @@ public class App extends Application {
                 showError(new IllegalArgumentException("No current import"));
             }
             new ImportsProperties(mainStage, ctx, currentImport(), settings);
-            saveSession(mainStage);
+            //saveSession(mainStage);
         });
 
         aboutItem.setOnAction(e -> {
@@ -816,6 +842,7 @@ public class App extends Application {
         SpreadsheetView sv = buildSpreadsheet(imp, args);
         Tab tab = new Tab(title, sv);
         tab.setId(key);
+        tab.setUserData(imp);
         detailTabs.getTabs().add(tab);
         detailTabs.getSelectionModel().select(tab);
         if(firstRun){
@@ -1236,14 +1263,14 @@ class InitTask extends Task<App.AppContext>{
     }
 }
 
-class ConfigEditor {
+final class ConfigEditor {
     private final Config config;
 
-    protected ConfigEditor(Config config) {
+    ConfigEditor(Config config) {
         this.config = config;
     }
 
-    protected boolean showAndWait(Window owner) {
+    boolean showAndWait(Window owner) {
         Stage dialog = new Stage();
         if (owner != null) {
             dialog.initOwner(owner);
@@ -1328,6 +1355,7 @@ class ConfigEditor {
         int row = 0;
         for (App.Setting s : sec.settings()) {
             TextField field = new TextField();
+            field.setText(config.get(s.key()));
             switch(s.kind()){
                 case SECRET -> {
 
@@ -1376,8 +1404,6 @@ class ConfigEditor {
                     grid.add(checkBox, 1, row);
                 }
             }
-
-            field.setText(config.get(s.key()));
             field.setPrefColumnCount(30);
             inputs.put(s.key(), field);
             if(!(s.kind()==App.Kind.MODE || s.kind()==App.Kind.BOOLEAN)){
@@ -1410,17 +1436,17 @@ class ConfigEditor {
     }
 }
 
-class Finalize{
+final class Finalize{
     private App.AppContext ctx;
     private List<CardImports> selectedItems;
     private final Settings settings;
 
-    protected Finalize(App.AppContext ctx, Settings settings) {
+    Finalize(App.AppContext ctx, Settings settings) {
         this.ctx = ctx;
         this.settings = settings;
     }
 
-    protected void finalizeImports(Stage mainStage){
+    void finalizeImports(Stage mainStage){
         Stage stage = new Stage();
         stage.initModality(Modality.APPLICATION_MODAL);
         stage.initOwner(mainStage);
@@ -1486,19 +1512,19 @@ class Finalize{
 
 }
 
-class ImportsProperties{
-    private App.AppContext ctx;
-    private CardImports selected;
+final class ImportsProperties{
+    private final App.AppContext ctx;
+    private final CardImports selected;
     private final Settings settings;
 
-    protected ImportsProperties(Stage mainStage, App.AppContext ctx, CardImports selected, Settings settings) {
+    ImportsProperties(Stage mainStage, App.AppContext ctx, CardImports selected, Settings settings) {
         this.ctx = ctx;
         this.selected = selected;
         this.settings = settings;
         buildEditor(mainStage, selected);
     }
 
-    protected void buildEditor(Stage mainStage, CardImports selected) {
+    void buildEditor(Stage mainStage, CardImports selected) {
         Stage editor = new Stage();
         editor.initModality(Modality.APPLICATION_MODAL);
         editor.initOwner(mainStage);
@@ -1521,7 +1547,7 @@ class ImportsProperties{
                         Float.class, selected::getPrice, selected::setPrice),
 
                 new ImportItem<>("Match", "Best match", "The card this scan resolves to",
-                        CardImports.Match.class, selected::getBestMatch, selected::setBestMatch),
+                        CardImports.Match.class, selected::getBestMatch, selected::applyManualMatch),
 
                 new ImportItem<>("Match", "Match overridden", "Set when you pick a match by hand",
                         Boolean.class, selected::getMatchOverride, selected::setMatchOverride),
@@ -1550,10 +1576,12 @@ class ImportsProperties{
 class BestMatchEditor extends AbstractPropertyEditor<CardImports.Match, Button>{
     private ObjectProperty<CardImports.Match> value;
     private final Settings settings;
+    private App.AppContext ctx;
 
     protected BestMatchEditor(PropertySheet.Item item, App.AppContext ctx, Window owner, Settings settings) {
         super(item, new Button());
         this.settings = settings;
+        this.ctx = ctx;
         Button b = getEditor();
         b.setMaxWidth(Double.MAX_VALUE);
         b.textProperty().bind(value.map(CardImports.Match::cardID)
@@ -1565,10 +1593,12 @@ class BestMatchEditor extends AbstractPropertyEditor<CardImports.Match, Button>{
 
     @Override
     protected ObservableValue<CardImports.Match> getObservableValue() {
-        if (value == null) value = new SimpleObjectProperty<>();   // lazy: super() calls this
+        if (value == null) value = new SimpleObjectProperty<>();// lazy: super() calls this
         return value;
     }
 
     @Override
-    public void setValue(CardImports.Match m) { getObservableValue(); value.set(m); }
+    public void setValue(CardImports.Match m) {
+        getObservableValue(); value.set(m);
+    }
 }
