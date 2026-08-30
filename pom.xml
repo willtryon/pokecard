@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.willtryon</groupId>
     <artifactId>pokecard</artifactId>   
-    <version>0.7.0</version>
+    <version>0.8.0</version>
     <packaging>jar</packaging>
 
     <properties>
@@ -22,6 +22,12 @@
             <groupId>org.xerial</groupId>
             <artifactId>sqlite-jdbc</artifactId>
             <version>3.53.2.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.10.2</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
@@ -42,12 +48,6 @@
             <groupId>org.bytedeco</groupId>
             <artifactId>opencv-platform</artifactId>
             <version>4.13.0-1.5.13</version>
-        </dependency>
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <version>RELEASE</version>
-            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.controlsfx</groupId>
@@ -98,6 +98,36 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.13.0</version>
             </plugin>
+
+            <!--
+              Surefire runs the tests during `mvn test` / `package` / `verify`.
+
+              Pinned on purpose. Maven only supplies a default version for this plugin, and older
+              Maven releases defaulted to surefire 2.12.4, which predates JUnit 5 and silently
+              reports "Tests run: 0" instead of failing. Declaring the version means the CI matrix
+              behaves identically no matter which Maven each runner happens to ship.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.4</version>
+                <configuration>
+                    <!--
+                      java.awt.headless=true tells AWT at startup not to look for a display. This
+                      is the fix for "Can't connect to X11 window server" / HeadlessException on a
+                      Linux runner: without it, AWT probes for a screen and some classes throw when
+                      it cannot find one. It has to be a JVM flag rather than a System.setProperty
+                      call in a test, because AWT reads it once when it initialises.
+
+                      prism.order=sw forces JavaFX onto its software renderer if a test ever starts
+                      the toolkit. Harmless while no test does.
+                    -->
+                    <argLine>-Djava.awt.headless=true -Dprism.order=sw</argLine>
+                    <!-- Full stack traces; the trimmed default hides the frame that matters. -->
+                    <trimStackTrace>false</trimStackTrace>
+                </configuration>
+            </plugin>
+
             <plugin>
                 <groupId>org.openjfx</groupId>
                 <artifactId>javafx-maven-plugin</artifactId>
@@ -116,6 +146,7 @@
                         <option>--add-exports=javafx.controls/com.sun.javafx.scene.control.behavior=ALL-UNNAMED</option>
                         <option>--add-exports=javafx.controls/com.sun.javafx.scene.control.inputmap=ALL-UNNAMED</option>
                         <option>--add-opens=javafx.controls/javafx.scene.control.skin=ALL-UNNAMED</option>
+                        <option>-Dorg.bytedeco.javacpp.logger.debug=true</option>
                     </options>
                 </configuration>
             </plugin>

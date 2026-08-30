@@ -3,32 +3,44 @@ package com.willtryon.pokecard.gui;
 import com.willtryon.pokecard.*;
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.value.ObservableValue;
+import javafx.collections.ListChangeListener;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.cell.CheckBoxListCell;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.*;
 import javafx.stage.*;
+import javafx.util.StringConverter;
+import org.controlsfx.control.PopOver;
+import org.controlsfx.control.TaskProgressView;
 import org.controlsfx.control.spreadsheet.*;
+import org.controlsfx.control.PropertySheet;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.scene.control.ComboBox;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.*;
 import java.util.*;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
@@ -37,6 +49,8 @@ import static com.willtryon.pokecard.CardImportsIndex.globalFirstEdition;
 import static com.willtryon.pokecard.PokeocrEnv.ocrDefaultCacheDir;
 import static com.willtryon.pokecard.TcgdbEnv.tcgdbDefaultCacheDir;
 import com.willtryon.pokecard.Config.Settings;
+import org.controlsfx.property.editor.AbstractPropertyEditor;
+import org.controlsfx.property.editor.DefaultPropertyEditorFactory;
 
 public class App extends Application {
 
@@ -51,6 +65,9 @@ public class App extends Application {
 
     private Label statusBar;
     private ProgressBar statusProgress;
+    private final TaskProgressView<Task<?>> taskView = new TaskProgressView<>();
+    private final ObjectProperty<Task<?>> statusTask = new SimpleObjectProperty<>();
+    private PopOver taskPopOver;
     private TabPane detailTabs;
     private TreeItem<SideNode> importsBranch;
     public static boolean firstRun = true;
@@ -59,13 +76,13 @@ public class App extends Application {
 
 
     enum Kind {
-        DIRECTORY, FILE, TEXT, SECRET, BOOLEAN;
+        DIRECTORY, FILE, TEXT, SECRET, BOOLEAN, MODE;
 
         boolean isValidValue(String v) {
             return switch (this) {
                 case DIRECTORY -> Files.isDirectory(Path.of(v));
                 case FILE -> Files.isRegularFile(Path.of(v));
-                case TEXT, SECRET -> !v.isBlank();
+                case TEXT, SECRET, MODE -> !v.isBlank();
                 case BOOLEAN -> Boolean.parseBoolean(v);
             };
         }
@@ -98,6 +115,10 @@ public class App extends Application {
             )),
             new Section("Performance", List.of(
                     new Setting(Config.SCAN_THREADS, "Threads", Kind.TEXT, false)
+            )),
+            new Section("pokeocr", List.of(
+                    new Setting(Config.USE_OCR, "Use OCR", Kind.BOOLEAN, false),
+                    new Setting(Config.OCR_MODEL, "OCR model", Kind.MODE, false)
             ))
     );
 
@@ -106,7 +127,7 @@ public class App extends Application {
         return s.kind().isValidValue(value);
     }
 
-    record AppContext(CardIndex cardDB, CardImportsIndex importDB, int size) {
+    record AppContext(CardIndex cardDB, CardImportsIndex importDB, CardSearchRepo searchDB, int size) {
     }
 
     @Override
@@ -187,9 +208,10 @@ public class App extends Application {
         }));
         initTask.setOnFailed(e -> {
             Throwable ex = initTask.getException();
-            ex.printStackTrace(); showError(ex);
             statusLabel.textProperty().unbind();
             statusLabel.setText("Exception occurred:" + ex.getMessage());
+            ex.printStackTrace(); showError(ex);
+            System.exit(1);
         });
         Thread initThread = new Thread(initTask, "pokecard-init");
         initThread.setDaemon(true);
@@ -279,7 +301,7 @@ public class App extends Application {
 
             Task<Void> orbTask = new Task<>() {
                 @Override
-                protected Void call() {
+                protected Void call() throws SQLException {
                     ctx.cardDB.scanImports(ctx.importDB(), (msg, frac) -> {
                         updateMessage(msg);
                         updateProgress(frac, 1.0);
@@ -373,6 +395,54 @@ public class App extends Application {
             });
         }), 0, 1, TimeUnit.MINUTES);*/
         //isOrb = false;
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "pokecard-price-fetcher");
+            t.setDaemon(true);          // don't keep the JVM alive after the window closes
+            return t;
+        });
+
+        scheduler.scheduleAtFixedRate(() -> Platform.runLater(() -> {
+            Task<Void> priceTask = new Task<>() {
+                @Override
+                protected Void call() throws Exception {
+                    syncPrices(false, (msg, frac) -> {
+                        updateMessage(msg);
+                        updateProgress(frac, 1.0);
+                    });
+                    return null;
+                }
+            };
+            priceTask.setOnFailed(event -> {
+                Throwable ex = priceTask.getException();
+                showError(ex);
+            });
+            runTask(priceTask, v -> {
+            });
+        }), 0, 30, TimeUnit.MINUTES);
+        scheduler.scheduleAtFixedRate(() -> Platform.runLater(() -> {
+            Task<Void> saveTask = new Task<>() {
+                @Override
+                protected Void call() throws Exception {
+                    System.out.println("I work!");
+                    if(saved) saveSession(mainStage);
+                    return null;
+                }
+            };
+            saveTask.setOnFailed(event -> {
+                Throwable ex = saveTask.getException();
+                showError(ex);
+            });
+            runTask(saveTask, v -> {});
+        }), 10000, 1, TimeUnit.MINUTES);
+    }
+
+    private void syncPrices(boolean force, ScanProgress progress) throws Exception {
+        Path db = settings.cacheDir().resolve("tcg.db");
+        progress.report("Retrieving price information...", -1);
+        TcgdbEnv env = new TcgdbEnv(tcgdbDefaultCacheDir());
+        TcgdbEnv.EnvHandle handle = env.prepare();
+        int code = env.sync(handle, db, force);
+        System.out.println("tcgdb sync exited " + code + "; db at " + db);
     }
 
     private VBox buildTop(Stage mainStage, TabPane detailTabs, ImageView view1, ImageView view2){
@@ -388,6 +458,8 @@ public class App extends Application {
         Menu fileMenu = new Menu("File");
         fileMenu.getItems().addAll(newSessionItem, saveSessionItem, loadSessionItem, importItem, settingsItem, new SeparatorMenuItem(),closeTabsItem, new SeparatorMenuItem(), exitItem);
         Menu editMenu = new Menu("Edit");
+        MenuItem editImportItem = new MenuItem("Edit import...");
+        editMenu.getItems().addAll(editImportItem);
         Menu helpMenu = new Menu("Help");
         MenuItem aboutItem = new MenuItem("About");
         helpMenu.getItems().addAll(aboutItem);
@@ -398,15 +470,17 @@ public class App extends Application {
 
         ToolBar toolBar = new ToolBar();
         Image hash1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/hash1a.png")));
-        Button hash1Button = buildTooBarButton(hash1);
+        Button hash1Button = buildToolBarButton(hash1);
         hash1Button.disableProperty().bind(isHash.not());
         Image cv1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/cv1a.png")));
-        Button cv1Button = buildTooBarButton(cv1);
+        Button cv1Button = buildToolBarButton(cv1);
         cv1Button.disableProperty().bind(isOrb.not());
         Image ocr1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/ocr1a.png")));
-        Button ocr1Button = buildTooBarButton(ocr1);
+        Button ocr1Button = buildToolBarButton(ocr1);
         Image imp1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/imp1a.png")));
-        Button imp1Button = buildTooBarButton(imp1);
+        Button imp1Button = buildToolBarButton(imp1);
+        Image cd1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/cd1a.png")));
+        Button cd1Button = buildToolBarButton(cd1);
 
         hash1Button.setOnAction(event -> {
             openSpreadSheetTab(currentImport(), "hash");
@@ -421,8 +495,13 @@ public class App extends Application {
         imp1Button.setOnAction(event -> {
             openSpreadSheetTab(null, "session");
         });
+        cd1Button.setOnAction(event -> {
+            new Finalize(ctx, settings).finalizeImports(mainStage);
+            saveSession(mainStage);
+        });
+        Separator sep = new Separator();
 
-        toolBar.getItems().addAll(hash1Button, cv1Button, ocr1Button,  imp1Button);
+        toolBar.getItems().addAll(hash1Button, cv1Button, ocr1Button, imp1Button, sep, cd1Button);
 
 
         //Menu bar operations...
@@ -445,6 +524,7 @@ public class App extends Application {
         });
 
         loadSessionItem.setOnAction(e -> {
+            //new NamedTask<Void>("Scanning Imports..."){loadSession(mainStage, false)}
             loadSession(mainStage, false);
             mainStage.setTitle("Pokecard - "+currentSession);
         });
@@ -499,11 +579,19 @@ public class App extends Application {
             System.exit(0);
         });
 
+        editImportItem.setOnAction(e -> {
+            if(currentImport() == null){
+                showError(new IllegalArgumentException("No current import"));
+            }
+            new ImportsProperties(mainStage, ctx, currentImport(), settings);
+            saveSession(mainStage);
+        });
+
         aboutItem.setOnAction(e -> {
             Stage aboutStage = new Stage();
             aboutStage.setTitle("About Pokecard");
             Label name = new Label("Pokecard");
-            Label version = new Label("Version 0.7.0");
+            Label version = new Label("Version 0.8.0");
             Label author = new Label("by willtryon");
             Button close = new Button("Close");
             VBox aboutLayout = new VBox(12, name, version, author, close);
@@ -516,7 +604,7 @@ public class App extends Application {
         return new VBox(15, menuBar, toolBar);
     }
 
-    private Button buildTooBarButton(Image img){
+    private Button buildToolBarButton(Image img){
         ImageView view = new ImageView(img);
         view.setFitHeight(24);
         view.setFitWidth(24);
@@ -560,18 +648,14 @@ public class App extends Application {
                 }
             }
         }
-        statusBar.setText("Saving Session...");
-        statusProgress.setVisible(true);
         System.out.println("Done.");
-        statusBar.setText("Ready.");
-        statusProgress.setVisible(false);
         saved = true;
     }
 
     private void loadSession(Stage owner, boolean tf){
         System.out.println("Loading imports from disk:");
-        statusBar.setText("Loading Session...");
-        statusProgress.setVisible(true);
+        //statusBar.setText("Loading Session...");
+        //statusProgress.setVisible(true);
         if (tf) {
             ctx.importDB.readImportsFromDisk(sessionPath);
         }
@@ -594,21 +678,31 @@ public class App extends Application {
         }
         System.out.println("Loaded " + restored.size() + " imports.");
         refreshImports(ctx.importDB());
+        saved = true;
         /*
         if (!restored.isEmpty()) {
             System.out.println(restored.getFirst().getORBRecordHistory() + "\n" + restored.get(0).getOrbWinner());
         }*/
         System.out.println("Done.");
-        statusBar.setText("Ready.");
-        statusProgress.setVisible(false);
+        //statusBar.setText("Ready.");
+        //statusProgress.setVisible(false);
     }
 
-
     private HBox buildStatusBar() {
-        statusBar = new Label("Ready.");
+        statusBar = new Label();
+        statusBar.textProperty().bind(
+                statusTask.flatMap(Task::messageProperty).orElse("Ready.")
+        );
         statusProgress = new ProgressBar();
         statusProgress.setPrefWidth(120);
-        statusProgress.setVisible(false);
+        statusProgress.progressProperty().bind(
+                statusTask.flatMap(Task::progressProperty).orElse(0.0));
+        statusProgress.setCursor(Cursor.HAND);
+        statusProgress.setOnMouseClicked(e -> toggleTaskPopOver());
+        taskView.getTasks().addListener((ListChangeListener<Task<?>>) c -> {
+            var live = taskView.getTasks();
+            statusTask.set(live.isEmpty() ? null : live.get(live.size() - 1));
+        });
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         HBox bar = new HBox(8, statusBar, spacer, statusProgress);
@@ -761,9 +855,40 @@ public class App extends Application {
     private Node buildCardDetail(CardSignature sig) {
         VBox box = new VBox(10);
         box.setPadding(new Insets(16));
+        box.setAlignment(Pos.CENTER_LEFT);
 
         Label id = new Label("Card ID: " + sig.getCardID());
         id.setStyle("-fx-font-size: 15px; -fx-font-weight: bold;");
+
+        Label cardInformation = new Label("Card information:");
+        Label cardName = new Label();
+        Label collectorNum = new Label();
+        Label series = new Label();
+        Label idTCGP = new Label();
+        Label cardType = new Label();
+        Label rarity = new Label();
+        Label price = new Label();
+        Label description = new Label();
+        VBox info = new VBox(10, cardInformation, cardName, collectorNum, series, idTCGP, cardType, rarity, price, description);
+        info.setPadding(new Insets(16));
+        info.setAlignment(Pos.CENTER_RIGHT);
+        info.setSpacing(10);
+        FullCardSignature orbSig = null;
+        try {
+            orbSig = new FullCardSignature(sig, settings.dbPath(), settings.cacheDir(), globalCardVersion, globalFirstEdition);
+            System.out.println(orbSig.getName());
+        } catch (SQLException e) {
+            showError(e);
+        }
+
+        cardName.setText("Name: " + (orbSig == null ? "" : orbSig.getName()));
+        collectorNum.setText("Collection Number: "+(orbSig == null ? "" : orbSig.getExpCardNumber()));
+        series.setText("Series: "+(orbSig == null ? "" : orbSig.getExpName()));
+        idTCGP.setText("TCGP ID: "+(orbSig == null ? "" : orbSig.getIdTCGP()));
+        cardType.setText("Type: "+(orbSig == null ? "" : orbSig.getCardType()));
+        rarity.setText("Rarity: "+(orbSig == null ? "" : orbSig.getRarity()));
+        price.setText("Price: "+(orbSig == null ? "" : String.valueOf(orbSig.getPrice())));
+        description.setText((orbSig == null ? "" : orbSig.getDescription()));
 
         Path p = sig.getImgPath();
         boolean hasOrb = sig.getMatData() != null && !sig.getMatData().empty();
@@ -780,12 +905,26 @@ public class App extends Application {
             iv.setFitHeight(360);
             box.getChildren().add(iv);
         }
-        return box;
+        return new HBox(10, box, info);
     }
 
+
     private Node buildImportDetail(CardImports imp) {
-        HBox box = new HBox(10);
-        box.setPadding(new Insets(16));
+        HBox content = new HBox(10);
+        content.setPadding(new Insets(16));
+
+        //ToggleGroup group = new ToggleGroup();
+
+        //ToggleButton overview = new ToggleButton("Overview");
+        //ToggleButton hashList = new ToggleButton("Hash");
+        //ToggleButton orbList = new ToggleButton("ORB");
+        //ToggleButton ocrList = new ToggleButton("OCR");
+
+        //ToggleButton[] buttons = { overview, hashList, orbList, ocrList };
+
+        //for(ToggleButton b : buttons){
+          //  b.setToggleGroup(group);
+        //}
 
         int size = imp.getRecordSize();
 
@@ -804,7 +943,7 @@ public class App extends Application {
         Button previous = new Button("Previous");
         Button next = new Button("Next");
 
-        Label cardInfomation = new Label("Card information:");
+        Label cardInformation = new Label("Card information:");
         Label cardName = new Label();
         Label collectorNum = new Label();
         Label series = new Label();
@@ -813,7 +952,7 @@ public class App extends Application {
         Label rarity = new Label();
         Label price = new Label();
         Label description = new Label();
-        VBox info = new VBox(10, cardInfomation, cardName, collectorNum, series, idTCGP, cardType, rarity, price, description);
+        VBox info = new VBox(10, cardInformation, cardName, collectorNum, series, idTCGP, cardType, rarity, price, description);
         info.setPadding(new Insets(16));
         info.setSpacing(10);
 
@@ -860,8 +999,6 @@ public class App extends Application {
             rarity.setText("Rarity: "+(orbSig == null ? "" : orbSig.getRarity()));
             price.setText("Price: "+(orbSig == null ? "" : String.valueOf(orbSig.getPrice())));
             description.setText((orbSig == null ? "" : orbSig.getDescription()));
-
-
         };
 
         previous.setOnAction(e -> { if (pos[0] > 0)        { pos[0]--; render.run(); } });
@@ -869,11 +1006,14 @@ public class App extends Application {
 
         render.run();
 
+        //HBox bar = new HBox(10, overview, hashList, orbList, ocrList);
+
         VBox imgStack = new VBox(10);
         imgStack.getChildren().addAll(orbLabel, hashLabel, ocrLabel, images, new HBox(16, previous, count, next));
-        box.getChildren().addAll(imgStack, info);
-        return box;
+        content.getChildren().addAll(imgStack, info);
+        return new VBox(10, /*bar,*/ content);
     }
+
 
     private ImageView imageAt(String uri) {
         ImageView iv = new ImageView(new Image(uri));
@@ -883,6 +1023,7 @@ public class App extends Application {
     }
 
     private SpreadsheetView buildSpreadsheet(CardImports imp, String args) {
+        refreshImports(ctx.importDB);
         int rows;
         if(args.equals("session")) rows = ctx.importDB.getImports().size();
         else if (args.equals("ocr")) rows = 1;
@@ -974,20 +1115,20 @@ public class App extends Application {
     private Task<?> currentStatusTask;
     private final AtomicBoolean scanRunning = new AtomicBoolean(false);
 
+    private void toggleTaskPopOver() {
+        if (taskPopOver == null) {
+            taskView.setPrefSize(420, 260);
+            taskPopOver = new PopOver(taskView);
+            taskPopOver.setArrowLocation(PopOver.ArrowLocation.BOTTOM_RIGHT);
+        }
+        if (taskPopOver.isShowing()) taskPopOver.hide();
+        else taskPopOver.show(statusProgress);
+    }
+
     private <T> void runTask(Task<T> task, Consumer<T> onSuccess) {
-        currentStatusTask = task;
-        statusBar.textProperty().bind(task.messageProperty());
-        statusProgress.progressProperty().bind(task.progressProperty());
-        statusProgress.setVisible(true);
-        task.setOnSucceeded(e -> {
-            finishTask(task);
-            if (onSuccess != null) onSuccess.accept(task.getValue());
-        });
-        task.setOnFailed(e -> {
-            finishTask(task);
-            showError(task.getException());
-        });
-        task.setOnCancelled(e -> finishTask(task));
+        taskView.getTasks().add(task);          // before starting the thread
+        if (onSuccess != null) task.setOnSucceeded(e -> onSuccess.accept(task.getValue()));
+        task.setOnFailed(e -> showError(task.getException()));
         Thread t = new Thread(task);
         t.setDaemon(true);
         t.start();
@@ -1026,6 +1167,7 @@ class InitTask extends Task<App.AppContext>{
     @Override
     protected App.AppContext call() throws Exception{
         String url = "jdbc:sqlite:" + settings.dbPath();
+        System.out.println("Pokecard v0.8.0\nby willtryon\n");
         updateMessage("Connecting to database...");
         int size;
         try (Connection conn = DriverManager.getConnection(url);
@@ -1034,65 +1176,74 @@ class InitTask extends Task<App.AppContext>{
             size = rs.next() ? rs.getInt("n") : 0;
         }
         Main.size = size;
+        System.out.println(settings.cacheDir().resolve("tcg.db"));
 
         Path cacheFile = settings.cacheDir().resolve("cache_meta.dat");
         CardIndex cardDB;
         if (Files.isRegularFile(cacheFile)) {
             updateMessage("Loading cache (" + size + " cards)...");
-            cardDB = new CardIndex(settings);
-        } else {
-            updateMessage("Computing image data for " + size + " cards...");
-            cardDB = new CardIndex(size, url, settings);
-            final CardIndex finalCardDB = cardDB;
-            CountDownLatch latch = new CountDownLatch(1);
-            AtomicBoolean saveChoice = new AtomicBoolean(false);
-
-            Platform.runLater(() -> {
-                Alert alert = new Alert(
-                        Alert.AlertType.INFORMATION,
-                        "Done calculating image data. Writing the data to the disk will take about 620MB. Do you want to save the data?",
-                        ButtonType.YES, ButtonType.NO
-                );
-                alert.setHeaderText("Save image data");
-                Optional<ButtonType> result = alert.showAndWait();
-                saveChoice.set(result.isPresent() && result.get() == ButtonType.YES);
-                latch.countDown();
-            });
-
-            latch.await(); // block the background thread until the user answers
-
-            if (saveChoice.get()) {
-                cardDB.writeToDisk();
+            try {
+                cardDB = new CardIndex(settings);
+            } catch (InvalidVersionException e) {
+                cardDB = calculateDB(size, url);
             }
+        } else {
+            cardDB = calculateDB(size, url);
         }
         updateMessage("Verifying python env...");
-        PokeocrEnv env = new PokeocrEnv(ocrDefaultCacheDir());
+        PokeocrEnv env = new PokeocrEnv(ocrDefaultCacheDir(), settings);
         PokeocrEnv.EnvHandle handle = env.prepare();
-        updateMessage("Rebuilding database...");
-        syncPrices(false);
-        new PokemonCardNameCleaner(settings.dbPath(), false);
+        updateMessage("Running database tasks...");
+        TcgdbEnv env2 = new TcgdbEnv(tcgdbDefaultCacheDir());
+        TcgdbEnv.EnvHandle handle2 = env2.prepare();
+        new dbCleanup((msg, frac) -> {
+            updateMessage(msg);
+            updateProgress(frac, 1.0);
+        }, settings.dbPath(), settings.cacheDir().resolve("tcg.db"), false);
+        updateMessage("Running database tasks...");
+        updateProgress(1.0, 1.0);
+        CardSearchRepo searchDB = new CardSearchRepo(settings.dbPath(), cardDB);
         updateMessage("Starting...");
         CardImportsIndex importDB = cardDB.newImportsIndex();
-        return new App.AppContext(cardDB, importDB, size);
+        return new App.AppContext(cardDB, importDB, searchDB, size);
     }
 
-    public void syncPrices(boolean force) throws IOException, InterruptedException, URISyntaxException {
-        Path db = settings.cacheDir().resolve("tcg.db");      // stable, known location
-        TcgdbEnv env = new TcgdbEnv(tcgdbDefaultCacheDir());
-        TcgdbEnv.EnvHandle handle = env.prepare();            // first run: venv + pip install requests
-        int code = env.sync(handle, db, force);               // pulls only if upstream is newer
-        System.out.println("tcgdb sync exited " + code + "; db at " + db);
+    private CardIndex calculateDB(int size, String url) throws SQLException, FileNotFoundException, InterruptedException, TimeoutException {
+        CardIndex cardDB;
+        updateMessage("Computing image data for " + size + " cards...");
+        cardDB = new CardIndex(size, url, settings);
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicBoolean saveChoice = new AtomicBoolean(false);
+
+        Platform.runLater(() -> {
+            Alert alert = new Alert(
+                    Alert.AlertType.INFORMATION,
+                    "Done calculating image data. Writing the data to the disk will take about 620MB. Do you want to save the data?",
+                    ButtonType.YES, ButtonType.NO
+            );
+            alert.setHeaderText("Save image data");
+            Optional<ButtonType> result = alert.showAndWait();
+            saveChoice.set(result.isPresent() && result.get() == ButtonType.YES);
+            latch.countDown();
+        });
+
+        latch.await(); // block the background thread until the user answers
+
+        if (saveChoice.get()) {
+            cardDB.writeToDisk();
+        }
+        return cardDB;
     }
 }
 
 class ConfigEditor {
     private final Config config;
 
-    ConfigEditor(Config config) {
+    protected ConfigEditor(Config config) {
         this.config = config;
     }
 
-    boolean showAndWait(Window owner) {
+    protected boolean showAndWait(Window owner) {
         Stage dialog = new Stage();
         if (owner != null) {
             dialog.initOwner(owner);
@@ -1176,35 +1327,248 @@ class ConfigEditor {
         grid.setVgap(10);
         int row = 0;
         for (App.Setting s : sec.settings()) {
-            TextField field = (s.kind() == App.Kind.SECRET) ? new PasswordField() : new TextField();
+            TextField field = new TextField();
+            switch(s.kind()){
+                case SECRET -> {
+
+                }
+                case TEXT -> {
+                    //field = new TextField();
+                }
+                case DIRECTORY,  FILE -> {
+                    //field = new TextField();
+                    Button browse = createBrowse(owner, s, field);
+                    grid.add(browse, 2, row);
+                }
+                case MODE ->{
+                    ObservableList<String> options = FXCollections.observableArrayList(
+                            "Easy Ocr", "Got Ocr", "Trocr", "Qwen Model"
+                    );
+                    ComboBox<String> ocrMode = new ComboBox<>(options);
+                    System.out.println(config.get(s.key()));
+                    if(config.get(s.key()).isBlank()){
+                        ocrMode.setPromptText("Select an OCR model to use...");
+                    }else{
+                        ocrMode.setPromptText(config.get(s.key()));
+                    }
+                    //ocrMode.setVisibleRowCount(4);
+                    ocrMode.setOnAction(e -> {
+                        switch(ocrMode.getValue()){
+                            case "Easy Ocr" -> field.setText("easy-ocr");
+                            case "Got Ocr" -> field.setText("got-ocr2");
+                            case "Trocr" -> field.setText("trocr");
+                            case "Qwen Model" -> field.setText("qwen2.5-vl");
+                        }
+                    });
+
+                    grid.add(ocrMode, 1, row);
+                }
+                case BOOLEAN -> {
+                    CheckBox checkBox = new CheckBox();
+                    boolean current = Boolean.parseBoolean(config.get(s.key()));
+                    checkBox.setSelected(current);
+                    field.setText(String.valueOf(current));   // seed the hidden field to match
+
+                    checkBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+                        field.setText(String.valueOf(newVal));
+                    });
+
+                    grid.add(checkBox, 1, row);
+                }
+            }
+
             field.setText(config.get(s.key()));
             field.setPrefColumnCount(30);
             inputs.put(s.key(), field);
-
-            grid.add(new Label(s.label()), 0, row);
-            grid.add(field, 1, row);
-
-            if (s.kind() == App.Kind.DIRECTORY || s.kind() == App.Kind.FILE) {
-                Button browse = new Button("Browse\u2026");
-                browse.setOnAction(e -> {
-                    File f;
-                    if (s.kind() == App.Kind.DIRECTORY) {
-                        DirectoryChooser dc = new DirectoryChooser();
-                        dc.setTitle("Choose " + s.label());
-                        f = dc.showDialog(owner);
-                    } else {
-                        FileChooser fc = new FileChooser();
-                        fc.setTitle("Choose " + s.label());
-                        f = fc.showOpenDialog(owner);
-                    }
-                    if (f != null) field.setText(f.getAbsolutePath());
-                });
-                grid.add(browse, 2, row);
+            if(!(s.kind()==App.Kind.MODE || s.kind()==App.Kind.BOOLEAN)){
+                grid.add(field, 1, row);
             }
+            grid.add(new Label(s.label()), 0, row);
             row++;
         }
         Label header = new Label(sec.name());
         header.setStyle("-fx-font-size: 15px; -fx-font-weight: bold;");
         return new VBox(12, header, grid);
     }
+
+    private static Button createBrowse(Window owner, App.Setting s, TextField field) {
+        Button browse = new Button("Browse\u2026");
+        browse.setOnAction(e -> {
+            File f;
+            if (s.kind() == App.Kind.DIRECTORY) {
+                DirectoryChooser dc = new DirectoryChooser();
+                dc.setTitle("Choose " + s.label());
+                f = dc.showDialog(owner);
+            } else {
+                FileChooser fc = new FileChooser();
+                fc.setTitle("Choose " + s.label());
+                f = fc.showOpenDialog(owner);
+            }
+            if (f != null) field.setText(f.getAbsolutePath());
+        });
+        return browse;
+    }
+}
+
+class Finalize{
+    private App.AppContext ctx;
+    private List<CardImports> selectedItems;
+    private final Settings settings;
+
+    protected Finalize(App.AppContext ctx, Settings settings) {
+        this.ctx = ctx;
+        this.settings = settings;
+    }
+
+    protected void finalizeImports(Stage mainStage){
+        Stage stage = new Stage();
+        stage.initModality(Modality.APPLICATION_MODAL);
+        stage.initOwner(mainStage);
+        stage.setTitle("Finalize Imports");
+        Scene scene1 = finalizeScene1(stage, () -> {
+            stage.setScene(finalizeScene2(stage));
+        });
+        //Scene scene1 = finalizeScene1(stage);
+        stage.setTitle("String-Based Object Checklist");
+        stage.setScene(scene1);
+        stage.showAndWait();
+    }
+
+    private Scene finalizeScene1(Stage stage, Runnable runnable) {
+        Label stage1Info = new Label("Select the imports you want to finalize. To change an import's settings, select properties.");
+
+        ObservableList<CardImports> candidates = FXCollections.observableArrayList();
+        for(CardImports c : ctx.importDB().getImports()){
+            c.selectedProperty().set(true);
+            candidates.add(c);
+        }
+        ListView<CardImports> listView = new ListView<>(candidates);
+        StringConverter<CardImports> converter = new StringConverter<>() {
+            @Override
+            public String toString(CardImports item) {
+                return(item == null ? "" : String.valueOf(item.getQueryImage().getFileName()));
+            }
+            @Override
+            public CardImports fromString(String item) {return null;}
+        };
+        listView.setCellFactory(CheckBoxListCell.forListView(
+                CardImports::selectedProperty, converter
+        ));
+        Button nextButton = new Button("Next");
+        Button cancelButton = new Button("Cancel");
+        Button propertiesButton = new Button("Properties");
+        nextButton.setOnAction(e -> {
+            selectedItems = candidates.stream()
+                    .filter(c -> c.selectedProperty().get())
+                    .toList();
+            runnable.run();
+        });
+        cancelButton.setOnAction(e -> {
+            stage.close();
+        });
+        propertiesButton.setOnAction(e -> {
+            CardImports temp = listView.getSelectionModel().getSelectedItem();
+            new ImportsProperties(stage, ctx, temp, settings);
+        });
+
+        HBox buttons = new HBox(10, nextButton, cancelButton, propertiesButton);
+        VBox root = new VBox(stage1Info,listView, buttons);
+        root.setAlignment(Pos.CENTER);
+        root.setPadding(new Insets(10));
+        return new Scene(root, 350, 200);
+    }
+
+    private Scene finalizeScene2(Stage stage) {
+        Label label = new Label("tee hee");
+        VBox root = new VBox(10, label);
+        return new Scene(root, 350, 200);
+    }
+
+}
+
+class ImportsProperties{
+    private App.AppContext ctx;
+    private CardImports selected;
+    private final Settings settings;
+
+    protected ImportsProperties(Stage mainStage, App.AppContext ctx, CardImports selected, Settings settings) {
+        this.ctx = ctx;
+        this.selected = selected;
+        this.settings = settings;
+        buildEditor(mainStage, selected);
+    }
+
+    protected void buildEditor(Stage mainStage, CardImports selected) {
+        Stage editor = new Stage();
+        editor.initModality(Modality.APPLICATION_MODAL);
+        editor.initOwner(mainStage);
+        editor.setTitle("Editing "+selected.getQueryImage().getFileName());
+        ObservableList<PropertySheet.Item> items = FXCollections.observableArrayList(
+                new ImportItem<>("Card", "Version", "Foiling / print variant",
+                        CardVersion.class,
+                        () -> CardVersion.fromDb(selected.getCardVersion()),
+                        v  -> selected.setCardVersion(v.dbValue())),
+
+                new ImportItem<>("Card", "Category", "How this card is being handled",
+                        Category.class,
+                        () -> Category.fromCatDb(selected.getCat()),
+                        v  -> selected.setCat(v.dbValue())),
+
+                new ImportItem<>("Card", "First edition", null,
+                        Boolean.class, selected::getFirstEdition, selected::setFirstEdition),
+
+                new ImportItem<>("Pricing", "Price", "Sale price in USD",
+                        Float.class, selected::getPrice, selected::setPrice),
+
+                new ImportItem<>("Match", "Best match", "The card this scan resolves to",
+                        CardImports.Match.class, selected::getBestMatch, selected::setBestMatch),
+
+                new ImportItem<>("Match", "Match overridden", "Set when you pick a match by hand",
+                        Boolean.class, selected::getMatchOverride, selected::setMatchOverride),
+
+                new ImportItem<>("Status", "Finalized", null,
+                        Boolean.class, selected::getFinal, selected::setFinal)
+        );
+
+        PropertySheet sheet = new PropertySheet(items);
+        sheet.setMode(PropertySheet.Mode.CATEGORY);
+        sheet.setModeSwitcherVisible(false);
+        sheet.setSearchBoxVisible(false);
+        DefaultPropertyEditorFactory defaults = new DefaultPropertyEditorFactory();
+        sheet.setPropertyEditorFactory(item ->
+                item.getType() == CardImports.Match.class
+                        ? new BestMatchEditor(item, ctx, editor, settings)   // editor == the owning Stage
+                        : defaults.call(item));
+        VBox test = new VBox(10, sheet);
+        test.setAlignment(Pos.CENTER);
+        test.setPadding(new Insets(10));
+        editor.setScene(new Scene(test));
+        editor.show();
+    }
+}
+
+class BestMatchEditor extends AbstractPropertyEditor<CardImports.Match, Button>{
+    private ObjectProperty<CardImports.Match> value;
+    private final Settings settings;
+
+    protected BestMatchEditor(PropertySheet.Item item, App.AppContext ctx, Window owner, Settings settings) {
+        super(item, new Button());
+        this.settings = settings;
+        Button b = getEditor();
+        b.setMaxWidth(Double.MAX_VALUE);
+        b.textProperty().bind(value.map(CardImports.Match::cardID)
+                .orElse("Choose a card\u2026"));
+        b.setOnAction(e -> new CardSearchDialog(ctx.searchDB())
+                .showAndWait(owner)
+                .ifPresent(value::set));
+    }
+
+    @Override
+    protected ObservableValue<CardImports.Match> getObservableValue() {
+        if (value == null) value = new SimpleObjectProperty<>();   // lazy: super() calls this
+        return value;
+    }
+
+    @Override
+    public void setValue(CardImports.Match m) { getObservableValue(); value.set(m); }
 }

@@ -1,12 +1,14 @@
 package com.willtryon.pokecard;
 
 import dev.brachtendorf.jimagehash.hash.Hash;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
 
 import java.nio.file.Path;
 import java.util.List;
 
 
-@SuppressWarnings("LombokGetterMayBeUsed")
+@SuppressWarnings({"LombokGetterMayBeUsed", "LombokSetterMayBeUsed"})
 public class CardImports {
     // one match against the DB (pHash or ORB)
     public record Match(String cardID, String img, double winner) {}
@@ -14,25 +16,36 @@ public class CardImports {
     private final Path img;
     private String cardVersion;
     private boolean firstEdition;
+    private boolean isFinal;
+    private boolean matchOverride;
+    private float price;
+    private String cat;
     private final Hash qHash;
     private final Match hashMatch;
     private final Match orbMatch;
     private Match ocrMatch;
+    private Match bestMatch;
     private final List<Double> recordScore;
     private final List<CardSignature> recordRecord;
     private final List<Double> recordScore2;
     private final List<CardSignature> recordRecord2;
+    private final BooleanProperty selected = new SimpleBooleanProperty(false);
 
 
 
-    public CardImports(Path img, String cardVersion, boolean firstEdition, Hash qHash, Match hashMatch, Match orbMatch, Match ocrMatch, List<Double> recordScore, List<CardSignature> recordRecord, List<Double> recordScore2, List<CardSignature> recordRecord2) {
+    public CardImports(Path img, String cardVersion, boolean firstEdition, boolean isFinal, boolean matchOverride, float price, String cat, Hash qHash, Match hashMatch, Match orbMatch, Match ocrMatch, Match bestMatch, List<Double> recordScore, List<CardSignature> recordRecord, List<Double> recordScore2, List<CardSignature> recordRecord2) {
         this.img = img;
         this.cardVersion = cardVersion;
         this.firstEdition = firstEdition;
+        this.isFinal = isFinal;
+        this.matchOverride = matchOverride;
+        this.price = price;
+        this.cat = cat;
         this.qHash = qHash;
         this.hashMatch  = hashMatch;
         this.orbMatch   = orbMatch;
         this.ocrMatch = ocrMatch;
+        this.bestMatch = bestMatch;
         this.recordScore = recordScore;
         this.recordRecord = recordRecord;
         this.recordScore2 = recordScore2;
@@ -47,8 +60,16 @@ public class CardImports {
         return cardVersion;
     }
 
+    public void setCardVersion(String cardVersion){
+        this.cardVersion = cardVersion;
+    }
+
     public boolean getFirstEdition(){
         return firstEdition;
+    }
+
+    public void setFirstEdition(boolean firstEdition){
+        this.firstEdition = firstEdition;
     }
 
     public Hash getQueryHash() {return qHash;}
@@ -72,8 +93,10 @@ public class CardImports {
     public boolean hasOcr(){
         return ocrMatch != null && ocrMatch.cardID() != null;
     }
+
     public Match bestMatch(){
-        return (ocrMatch != null && ocrMatch.cardID() != null) ? ocrMatch : orbMatch;
+        if (matchOverride && bestMatch != null) return bestMatch;
+        return hasOcr() ? ocrMatch : orbMatch;
     }
     
     public int getRecordSize(){
@@ -123,6 +146,42 @@ public class CardImports {
             return c;
         }
         return -1;
+    }
+
+    public BooleanProperty selectedProperty() { return selected; }
+
+    public boolean getFinal() { return isFinal; }
+
+    public void setFinal(boolean isFinal){
+        this.isFinal = isFinal;
+    }
+
+    public boolean getMatchOverride() { return matchOverride; }
+
+    public void setMatchOverride(boolean matchOverride) { this.matchOverride = matchOverride; }
+
+    public float getPrice() {
+        return price;
+    }
+
+    public void setPrice(float price) {
+        this.price = price;
+    }
+
+    public Match getBestMatch() {
+        return bestMatch;
+    }
+
+    public void setBestMatch(Match bestMatch) {
+        this.bestMatch = bestMatch;
+    }
+
+    public String getCat() {
+        return cat;
+    }
+
+    public void setCat(String cat) {
+        this.cat = cat;
     }
 
     public String[][] toCsvRows() {

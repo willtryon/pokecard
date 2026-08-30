@@ -8,10 +8,7 @@ this build is from july 1st, 2026.
 package com.willtryon.pokecard;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.Scanner;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -58,7 +55,13 @@ public class Main {
                                             "\n4. Start scheduled scanning for image imports"+
                                             "\n99. Quit");
                         switch(choice = in.nextInt()){
-                            case 1 -> scheduler.submit(() -> cardDB.scanImports(importDB));
+                            case 1 -> scheduler.submit(() -> {
+                                try {
+                                    cardDB.scanImports(importDB);
+                                } catch (SQLException e) {
+                                    throw new RuntimeException(e);
+                                }
+                            });
                             case 2 -> cardDB.test(size);
                             case 3 -> cardDB.testHash();
                             case 4 -> {

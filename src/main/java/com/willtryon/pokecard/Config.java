@@ -18,13 +18,15 @@ public class Config {
     public static final String EBAY_API_KEY = "ebay.apiKey";
     public static final String SCAN_THREADS = "scan.threads";
     public static final String SESSION_PATH = "session.path";
+    public static final String OCR_MODEL = "ocr.mode";
+    public static final String USE_OCR = "ocr.use";
 
     private final Path file;
     private final Properties props = new Properties();
 
     public record Settings(
             Path dbPath, Path imagesDir, Path compareDir, Path outputDir,
-            Path cacheDir, int scanThreads, String eBayApiKey
+            Path cacheDir, int scanThreads, String eBayApiKey, String ocrModel
     ){
         public static Settings from (Config c){
             return new Settings(
@@ -34,7 +36,8 @@ public class Config {
                     Path.of(c.get(Config.OUTPUT_DIR)),
                     Path.of(c.get(Config.CACHE_DIR)),
                     c.getScanThreads(),
-                    c.get(Config.EBAY_API_KEY)
+                    c.get(Config.EBAY_API_KEY),
+                    c.get(Config.OCR_MODEL)
             );
         }
     }
