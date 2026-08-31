@@ -53,7 +53,7 @@ import com.willtryon.pokecard.Config.Settings;
 import org.controlsfx.property.editor.AbstractPropertyEditor;
 import org.controlsfx.property.editor.DefaultPropertyEditorFactory;
 
-public class App extends Application {
+public final class App extends Application {
 
     private Config config;
     private Path sessionPath;
@@ -69,6 +69,7 @@ public class App extends Application {
     private PopOver taskPopOver;
     private TabPane detailTabs;
     private TreeItem<SideNode> importsBranch;
+    private String toggleMode = "default";
     public static boolean firstRun = true;
 
 
@@ -828,6 +829,7 @@ public class App extends Application {
 
     private void openImportTab(CardImports imp) {
         Path q = imp.getQueryImage();
+        toggleMode = "default";
         String key = "import:" + (q == null ? String.valueOf(imp.hashCode()) : q.toString());
         if (focusExistingTab(key)) return;
         Tab tab = new Tab(q == null ? "Import" : q.getFileName().toString(), buildImportDetail(imp));
@@ -944,18 +946,19 @@ public class App extends Application {
         HBox content = new HBox(10);
         content.setPadding(new Insets(16));
 
-        //ToggleGroup group = new ToggleGroup();
+        ToggleGroup group = new ToggleGroup();
 
-        //ToggleButton overview = new ToggleButton("Overview");
-        //ToggleButton hashList = new ToggleButton("Hash");
-        //ToggleButton orbList = new ToggleButton("ORB");
-        //ToggleButton ocrList = new ToggleButton("OCR");
+        ToggleButton overview = new ToggleButton("Overview");
+        ToggleButton hashList = new ToggleButton("Hash");
+        ToggleButton orbList = new ToggleButton("ORB");
+        ToggleButton ocrList = new ToggleButton("OCR");
 
-        //ToggleButton[] buttons = { overview, hashList, orbList, ocrList };
+        ToggleButton[] buttons = { overview, hashList, orbList, ocrList };
 
-        //for(ToggleButton b : buttons){
-          //  b.setToggleGroup(group);
-        //}
+        for(ToggleButton b : buttons){
+            b.setToggleGroup(group);
+        }
+        buttons[0].setSelected(true);
 
         int size = imp.getRecordSize();
 
@@ -988,39 +991,81 @@ public class App extends Application {
         info.setSpacing(10);
 
         int[] pos = {0};
+        VBox imgStack = new VBox(10);
 
-        Runnable render = () -> {
-            if (size == 0) {
-                orbLabel.setText("ORB match: -");
-                hashLabel.setText("pHash match: -");
-                ocrLabel.setText("OCR match: -");
-                count.setText("(0 of 0)");
-                previous.setDisable(true);
-                next.setDisable(true);
-                return;
+        Runnable render = getRender(imp, size, orbLabel, hashLabel, ocrLabel, count, previous, next, pos, image2, cardName, collectorNum, series, idTCGP, cardType, rarity, price, description);
+
+        previous.setOnAction(e -> { if (pos[0] > 0)        { pos[0]--; render.run(); } });
+        next.setOnAction(e ->     { if (pos[0] < size - 1) { pos[0]++; render.run(); } });
+
+
+        Runnable updateLayout = () -> {
+            imgStack.getChildren().clear();
+            if (!toggleMode.equals("default")) {
+                imgStack.getChildren().addAll(orbLabel, hashLabel, ocrLabel, images, new HBox(16, previous, count, next));
+            } else {
+                imgStack.getChildren().addAll(images);
             }
+        };
+
+        overview.setOnAction(e -> { toggleMode = "default"; render.run(); updateLayout.run(); });
+        hashList.setOnAction(e -> { toggleMode = "hash";    render.run(); updateLayout.run(); });
+        orbList.setOnAction(e ->  { toggleMode = "orb";     render.run(); updateLayout.run(); });
+        ocrList.setOnAction(e ->  { toggleMode = "ocr";      render.run(); updateLayout.run(); });
+
+        render.run();
+        updateLayout.run(); // initial layout, replacing your old one-off if/else at the bottom
+
+        HBox bar = new HBox(10, overview, hashList, orbList, ocrList);
+        bar.setAlignment(Pos.CENTER);
+        bar.setPadding(new Insets(10));
+        bar.setSpacing(20);
+        content.getChildren().addAll(imgStack, info);
+        return new VBox(10, bar, content);
+    }
+
+    private Runnable getRender(CardImports imp, int size, Label orbLabel, Label hashLabel, Label ocrLabel, Label count, Button previous, Button next, int[] pos, ImageView image2, Label cardName, Label collectorNum, Label series, Label idTCGP, Label cardType, Label rarity, Label price, Label description) {
+        return () -> {
             int p = pos[0];
-            CardSignature orbSigVictim  = imp.getARecordRecord(p, "orb");
+            CardSignature orbSigVictim;
             FullCardSignature orbSig = null;
+            switch(toggleMode){
+                case "ocr" -> orbSigVictim = ctx.searchDB.signature(imp.getOcrWinner().cardID());
+                case "default" -> orbSigVictim = ctx.searchDB.signature(imp.getBestMatch().cardID());
+                default -> orbSigVictim  = imp.getARecordRecord(p, toggleMode);
+            };
             try {
                 orbSig = new FullCardSignature(orbSigVictim, settings.dbPath(), settings.cacheDir(), imp.getCardVersion(), imp.getFirstEdition());
-                System.out.println(orbSig.getName());
             } catch (SQLException e) {
                 showError(e);
             }
-            CardSignature hashSig = imp.getARecordRecord(p, "hash");
-            CardImports.Match ocrSig = imp.getOcrWinner();
-
-            orbLabel.setText ("ORB match: "   + (orbSig  == null ? "-" : orbSig.getCardID()  + "  (" + imp.getARecordScore(p, "orb")  + ")"));
-            hashLabel.setText("pHash match: " + (hashSig == null ? "-" : hashSig.getCardID() + "  (" + imp.getARecordScore(p, "hash") + ")"));
-            ocrLabel.setText("OCR match: " + (ocrSig == null || ocrSig.cardID() == null ? "-" : ocrSig.cardID()));
-
-            Path orbImg = (orbSig != null) ? orbSig.getImgPath() : null;
-            image2.setImage((orbImg != null && Files.exists(orbImg)) ? new Image(orbImg.toUri().toString()) : null);
-
             count.setText("(" + (p + 1) + " of " + size + ")");
             previous.setDisable(p == 0);
             next.setDisable(p >= size - 1);
+
+            if(toggleMode.equals("default")){
+                if (size == 0) {
+                    orbLabel.setText("ORB match: -");
+                    hashLabel.setText("pHash match: -");
+                    ocrLabel.setText("OCR match: -");
+                    count.setText("(0 of 0)");
+                    previous.setDisable(true);
+                    next.setDisable(true);
+                }
+                CardSignature hashSig = imp.getARecordRecord(p, "hash");
+                CardImports.Match ocrSig = imp.getOcrWinner();
+
+                orbLabel.setText ("ORB match: "   + (orbSig  == null ? "-" : orbSig.getCardID()  + "  (" + imp.getARecordScore(p, "orb")  + ")"));
+                hashLabel.setText("pHash match: " + (hashSig == null ? "-" : hashSig.getCardID() + "  (" + imp.getARecordScore(p, "hash") + ")"));
+                ocrLabel.setText("OCR match: " + (ocrSig == null || ocrSig.cardID() == null ? "-" : ocrSig.cardID()));
+
+                count.setText("(" + (p + 1) + " of " + size + ")");
+                previous.setDisable(p == 0);
+                next.setDisable(p >= size - 1);
+            }
+
+            Path orbImg = (orbSig != null) ? orbSig.getImgPath() : null;
+            image2.setImage((orbImg != null && Files.exists(orbImg)) ? new Image(orbImg.toUri().toString()) : null);
 
             cardName.setText("Name: " + (orbSig == null ? "" : orbSig.getName()));
             collectorNum.setText("Collection Number: "+(orbSig == null ? "" : orbSig.getExpCardNumber()));
@@ -1031,18 +1076,6 @@ public class App extends Application {
             price.setText("Price: "+(orbSig == null ? "" : String.valueOf(orbSig.getPrice())));
             description.setText((orbSig == null ? "" : orbSig.getDescription()));
         };
-
-        previous.setOnAction(e -> { if (pos[0] > 0)        { pos[0]--; render.run(); } });
-        next.setOnAction(e ->     { if (pos[0] < size - 1) { pos[0]++; render.run(); } });
-
-        render.run();
-
-        //HBox bar = new HBox(10, overview, hashList, orbList, ocrList);
-
-        VBox imgStack = new VBox(10);
-        imgStack.getChildren().addAll(orbLabel, hashLabel, ocrLabel, images, new HBox(16, previous, count, next));
-        content.getChildren().addAll(imgStack, info);
-        return new VBox(10, /*bar,*/ content);
     }
 
 

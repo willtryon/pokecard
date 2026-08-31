@@ -22,6 +22,7 @@ import java.util.*;
 import java.util.Arrays;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.stream.Stream;
 
 import static org.bytedeco.opencv.global.opencv_calib3d.RANSAC;
@@ -38,9 +39,9 @@ public class CardIndex{
     private boolean firstScan = true;
     private final Settings settings;
     private int line = 0;
-    private int failed = 0;
-    private int passed = 0;
-    private int corrupt = 0;
+    private final AtomicInteger passedN = new AtomicInteger() ;
+    private final AtomicInteger failedN = new AtomicInteger();
+    private final AtomicInteger corruptN = new AtomicInteger();
 
     // --- Windows-safe path handling: keeps Path.resolve() from throwing
     // InvalidPathException on Windows when cardId contains ':' (e.g. "Type: Null").
@@ -106,7 +107,6 @@ public class CardIndex{
         this.settings = settings;
         this.executor = Executors.newFixedThreadPool(this.settings.scanThreads());
         List<String[]> data = Collections.synchronizedList(new ArrayList<>());
-        AtomicInteger passedN = new AtomicInteger(), failedN = new AtomicInteger(), corruptN = new AtomicInteger();
         List<Future<?>> future = new ArrayList<>();
         cardDB = new CardSignature[size];
 
@@ -162,8 +162,8 @@ public class CardIndex{
                 throw new RuntimeException(e);
             }
 
-            System.out.println("\n\nPassed: " + passed + "\nFailed: " + failed + "\nCorrupt: " + corrupt + "\nOut of: " + line);
-            String result = String.format("%.0f", ((double) passed / size) * 100);
+            System.out.println("\n\nPassed: " + passedN + "\nFailed: " + failedN + "\nCorrupt: " + corruptN + "\nOut of: " + line);
+            String result = String.format("%.0f", ((double) passedN.get() / size) * 100);
             System.out.println(result + "% passed.\n\n");
             writeToTxt("log.txt", data);
 
@@ -175,11 +175,6 @@ public class CardIndex{
 
         HashingAlgorithm hasher = new PerceptiveHash(64);
         String percent = String.format("%.0f", ((double) line / size) * 100);
-        System.out.print("\033[3A\033[J");
-        System.out.println("Hashing:  " + cardId + "...");
-        System.out.println("ORB map:  generating...");
-        System.out.printf("Passed: %d\tFailed: %d\tCorrupt: %d\t%s%%\t%s\t(%d/%d)%n",
-                passed, failed, corrupt, percent, timer(startTime), line, size);
 
         ORB orb = ORB.create();
 
@@ -189,12 +184,8 @@ public class CardIndex{
 
             Features f = describe(address, orb);
             cardDB[slot] = new CardSignature(cardId, img, hasher.hash(victim), f.descriptors, f.keypoints);
-
-            System.out.print("\033[3A\033[J");
-            System.out.println("Hashing:  " + cardId + " \u2713");
-            System.out.println("ORB map:  " + cardId + " \u2713");
             System.out.printf("Passed: %d\tFailed: %d\tCorrupt: %d\t%s%%\t%s\t(%d/%d)%n",
-                    passed, failed, corrupt, percent, timer(startTime), line, size);
+                    passedN.get(), failedN.get(), corruptN.get(), percent, timer(startTime), line, size);
         } else {
             // NOTE: larp for the log. The real lookup happens in resolveImage();
             // the file may actually exist under a different number format.
