@@ -8,7 +8,6 @@ import java.nio.file.Path;
 import java.util.List;
 
 
-@SuppressWarnings({"LombokGetterMayBeUsed", "LombokSetterMayBeUsed"})
 public class CardImports {
     // one match against the DB (pHash or ORB)
     public record Match(String cardID, String img, double winner) {}

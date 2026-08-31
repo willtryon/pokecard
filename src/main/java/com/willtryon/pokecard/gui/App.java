@@ -60,8 +60,6 @@ public class App extends Application {
     private String currentSession;
     private Settings settings;
     private boolean saved;
-    private final SimpleBooleanProperty isOrb = new SimpleBooleanProperty(false);
-    private final SimpleBooleanProperty isHash = new SimpleBooleanProperty(false);
     private AppContext ctx;
 
     private Label statusBar;
@@ -200,8 +198,6 @@ public class App extends Application {
         initStage.initStyle(StageStyle.UNDECORATED);
         initStage.setScene(splashScene);
         initStage.show();
-
-        isOrb.set(false); isHash.set(false);
 
         initTask.setOnSucceeded(event -> Platform.runLater(() -> {
             ctx = initTask.getValue();
@@ -473,10 +469,8 @@ public class App extends Application {
         ToolBar toolBar = new ToolBar();
         Image hash1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/hash1a.png")));
         Button hash1Button = buildToolBarButton(hash1);
-        hash1Button.disableProperty().bind(isHash.not());
         Image cv1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/cv1a.png")));
         Button cv1Button = buildToolBarButton(cv1);
-        cv1Button.disableProperty().bind(isOrb.not());
         Image ocr1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/ocr1a.png")));
         Button ocr1Button = buildToolBarButton(ocr1);
         Image imp1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/imp1a.png")));
@@ -488,41 +482,54 @@ public class App extends Application {
         Image search1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/search1a.png")));
         Button search1Button = buildToolBarButton(search1);
 
+        hash1Button.disableProperty().bind(Bindings.createBooleanBinding(
+                () -> currentImport() == null,
+                detailTabs.getSelectionModel().selectedItemProperty()));
         hash1Button.setOnAction(event -> {
             openSpreadSheetTab(currentImport(), "hash");
         });
 
+        cv1Button.disableProperty().bind(Bindings.createBooleanBinding(
+                () -> currentImport() == null,
+                detailTabs.getSelectionModel().selectedItemProperty()));
         cv1Button.setOnAction(event -> {
             openSpreadSheetTab(currentImport(), "orb");
         });
+
+        ocr1Button.disableProperty().bind(Bindings.createBooleanBinding(
+                () -> currentImport() == null,
+                detailTabs.getSelectionModel().selectedItemProperty()));
         ocr1Button.setOnAction(event -> {
             openSpreadSheetTab(currentImport(), "ocr");
         });
+
         imp1Button.setOnAction(event -> {
             openSpreadSheetTab(null, "session");
         });
+
         Separator sep = new Separator();
+
         cd1Button.setOnAction(event -> {
             new Finalize(ctx, settings).finalizeImports(mainStage);
             //saveSession(mainStage);
         });
-        // Only enabled when the selected tab actually has an import behind it.
-        search1Button.disableProperty().bind(Bindings.createBooleanBinding(
+
+        prop1Button.disableProperty().bind(Bindings.createBooleanBinding(
                 () -> currentImport() == null,
                 detailTabs.getSelectionModel().selectedItemProperty()));
-
         prop1Button.setOnAction(event -> {
             new ImportsProperties(mainStage, ctx, currentImport(), settings);
         });
 
+        search1Button.disableProperty().bind(Bindings.createBooleanBinding(
+                () -> currentImport() == null,
+                detailTabs.getSelectionModel().selectedItemProperty()));
         search1Button.setOnAction(event -> {
             CardImports imp = currentImport();
             if (imp == null) return;
             new CardSearchDialog(ctx.searchDB())
                     .showAndWait(mainStage)
-                    .ifPresent(m -> {
-                        imp.applyManualMatch(m);
-                    });
+                    .ifPresent(imp::applyManualMatch);
         });
 
 
@@ -812,7 +819,6 @@ public class App extends Application {
     }
 
     private void openCardTab(CardSignature sig) {
-        isOrb.set(false); isHash.set(false);
         if (focusExistingTab("card:" + sig.getCardID())) return;
         Tab tab = new Tab(sig.getCardID(), buildCardDetail(sig));
         tab.setId("card:" + sig.getCardID());
@@ -821,7 +827,6 @@ public class App extends Application {
     }
 
     private void openImportTab(CardImports imp) {
-        isOrb.set(true); isHash.set(true);
         Path q = imp.getQueryImage();
         String key = "import:" + (q == null ? String.valueOf(imp.hashCode()) : q.toString());
         if (focusExistingTab(key)) return;
@@ -833,7 +838,6 @@ public class App extends Application {
     }
 
     private void openSpreadSheetTab(CardImports imp, String args) {
-        isOrb.set(false); isHash.set(false);
         Path q = sessionPath;
         if(!args.equals("session")) q = imp.getQueryImage();
         String key = "spreadsheet:" + (q == null ? String.valueOf(imp.hashCode()) : q.toString());
@@ -1437,7 +1441,7 @@ final class ConfigEditor {
 }
 
 final class Finalize{
-    private App.AppContext ctx;
+    private final App.AppContext ctx;
     private List<CardImports> selectedItems;
     private final Settings settings;
 
@@ -1505,6 +1509,7 @@ final class Finalize{
     }
 
     private Scene finalizeScene2(Stage stage) {
+
         Label label = new Label("tee hee");
         VBox root = new VBox(10, label);
         return new Scene(root, 350, 200);
