@@ -1,5 +1,8 @@
 package com.willtryon.pokecard;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -10,6 +13,7 @@ import java.util.Scanner;
 import java.util.function.Predicate;
 
 public class Config {
+    private static final Logger logger = LogManager.getLogger(Config.class);
     public static final String DB_PATH    = "db.path";
     public static final String IMAGES_DIR = "images.dir";
     public static final String COMPARE_DIR  = "compare.dir";
@@ -56,9 +60,9 @@ public class Config {
         String value = props.getProperty(key, "").trim();
         while (value.isBlank() || !valid.test(Path.of(value))) {
             if (!value.isBlank()) {
-                System.out.println("  '" + value + "' isn't valid for " + key + ".");
+                logger.debug("  '" + value + "' isn't valid for " + key + ".");
             }
-            System.out.println(prompt + " not found. Please enter the path and press enter.");
+            logger.debug(prompt + " not found. Please enter the path and press enter.");
             value = in.nextLine().trim();
         }
         props.setProperty(key, value);

@@ -1,5 +1,9 @@
 package com.willtryon.pokecard;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.sqlite.util.LoggerFactory;
+
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -13,6 +17,8 @@ import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 public final class TcgdbEnv {
+
+    private static final Logger logger = LogManager.getLogger(TcgdbEnv.class);
     private static final String RESOURCE_ROOT = "/tcgdb";
     private static final String DEPS_VERSION = "2026-07-31";
     private static final List<String> DEPS = List.of("requests");
@@ -239,6 +245,6 @@ public final class TcgdbEnv {
         EnvHandle handle = env.prepare();
         Path db = tcgdbDefaultCacheDir().resolve("tcg.db");
         int code = env.sync(handle, db, false);
-        System.out.println("tcgdb sync exited " + code + "; db at " + db);
+        logger.debug("tcgdb sync exited " + code + "; db at " + db);
     }
 }

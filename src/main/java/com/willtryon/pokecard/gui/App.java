@@ -24,6 +24,8 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.layout.*;
 import javafx.stage.*;
 import javafx.util.StringConverter;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.controlsfx.control.PopOver;
 import org.controlsfx.control.TaskProgressView;
 import org.controlsfx.control.spreadsheet.*;
@@ -31,6 +33,8 @@ import org.controlsfx.control.PropertySheet;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.control.ComboBox;
+import org.controlsfx.property.editor.AbstractPropertyEditor;
+import org.controlsfx.property.editor.DefaultPropertyEditorFactory;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -50,11 +54,10 @@ import static com.willtryon.pokecard.CardImportsIndex.globalFirstEdition;
 import static com.willtryon.pokecard.PokeocrEnv.ocrDefaultCacheDir;
 import static com.willtryon.pokecard.TcgdbEnv.tcgdbDefaultCacheDir;
 import com.willtryon.pokecard.Config.Settings;
-import org.controlsfx.property.editor.AbstractPropertyEditor;
-import org.controlsfx.property.editor.DefaultPropertyEditorFactory;
 
 public final class App extends Application {
 
+    private static final Logger logger = LogManager.getLogger(App.class);
     private Config config;
     private Path sessionPath;
     private String currentSession;
@@ -268,7 +271,7 @@ public final class App extends Application {
                     switch (selectedRb.getText()){
                         case "Normal" -> {
                             globalCardVersion = "NORMAL";
-                            System.out.println(globalCardVersion);
+                            logger.debug(globalCardVersion);
                         }
                         case "R.Holo" -> globalCardVersion = "REVERSE HOLOFOIL";
                         case "Holo" -> globalCardVersion = "HOLOFOIL";
@@ -278,7 +281,7 @@ public final class App extends Application {
             CheckBox firstEdition = new CheckBox("First Edition");
             firstEdition.setOnAction(event -> {
                 globalFirstEdition = firstEdition.isSelected();
-                System.out.println(globalFirstEdition);
+                logger.debug(globalFirstEdition);
             });
             VBox mcq =  new VBox(10, normal, revHolo, holo);
             HBox options =  new HBox(10, mcq, firstEdition);
@@ -422,8 +425,8 @@ public final class App extends Application {
             Task<Void> saveTask = new Task<>() {
                 @Override
                 protected Void call() throws Exception {
-                    System.out.println("I work!");
-                    if(saved) saveSession(mainStage);
+                    logger.debug("I work!");
+                    if (saved) saveSession(mainStage);
                     return null;
                 }
             };
@@ -441,7 +444,7 @@ public final class App extends Application {
         TcgdbEnv env = new TcgdbEnv(tcgdbDefaultCacheDir());
         TcgdbEnv.EnvHandle handle = env.prepare();
         int code = env.sync(handle, db, force);
-        System.out.println("tcgdb sync exited " + code + "; db at " + db);
+        logger.debug("tcgdb sync exited " + code + "; db at " + db);
     }
 
     private VBox buildTop(Stage mainStage, TabPane detailTabs, ImageView view1, ImageView view2){
@@ -542,13 +545,13 @@ public final class App extends Application {
 
 
         newSessionItem.setOnAction(e -> {
-            System.out.println("Creating new session...");
+            logger.debug("Creating new session...");
             saved = false;
             ctx.importDB.clearSession();
             refreshImports(ctx.importDB());
             currentSession = "";
-            mainStage.setTitle("Pokecard - "+currentSession);
-            sessionPath = Path.of(settings.outputDir()+"/"+ currentSession);
+            mainStage.setTitle("Pokecard - " + currentSession);
+            sessionPath = Path.of(settings.outputDir() + "/" + currentSession);
             config.set(Config.SESSION_PATH, String.valueOf(sessionPath));
         });
 
@@ -577,16 +580,16 @@ public final class App extends Application {
                         updateMessage(msg);
                         updateProgress(frac, 1.0);
                     });
-                    System.out.println("\n\n" + ctx.importDB.getLastImports().getOrbWinner());
+                    logger.debug("\n\n" + ctx.importDB.getLastImports().getOrbWinner());
                     return result;
                 }
             };
             runTask(t, found -> {
                 view1.setImage(new Image(file.toURI().toString()));
                 String foundImage = found.getOrbWinner().img();
-                System.out.println(foundImage);
+                logger.debug(foundImage);
                 view2.setImage(new Image(new File(foundImage).toURI().toString()));
-                System.out.println(ctx.importDB.getLastImports().getOrbWinner().img());
+                logger.debug(ctx.importDB.getLastImports().getOrbWinner().img());
                 //view2.setImage(new Image(ctx.importDB.getLastImports().getOrbWinner().img()));
 
             });
@@ -650,9 +653,9 @@ public final class App extends Application {
     }
 
 
-    private void saveSession(Stage owner){
-        System.out.println("Saving imports to disk:");
-        if(saved) ctx.importDB.writeImportsToDisk(currentSession);
+    private void saveSession(Stage owner) {
+        logger.debug("Saving imports to disk:");
+        if (saved) ctx.importDB.writeImportsToDisk(currentSession);
         if (!saved) {
             FileChooser fc = new FileChooser();
             fc.setTitle("Save Session");
@@ -666,8 +669,7 @@ public final class App extends Application {
 
                 if (filePath.toLowerCase().endsWith(extension + extension)) {
                     filePath = filePath.substring(0, filePath.length() - extension.length());
-                }
-                else if (!filePath.toLowerCase().endsWith(extension)) {
+                } else if (!filePath.toLowerCase().endsWith(extension)) {
                     filePath += extension;
                 }
                 File fixedFile = new File(filePath);
@@ -682,22 +684,21 @@ public final class App extends Application {
                 }
             }
         }
-        System.out.println("Done.");
+        logger.debug("Done.");
         saved = true;
     }
 
-    private void loadSession(Stage owner, boolean tf){
-        System.out.println("Loading imports from disk:");
+    private void loadSession(Stage owner, boolean tf) {
+        logger.debug("Loading imports from disk:");
         //statusBar.setText("Loading Session...");
         //statusProgress.setVisible(true);
         if (tf) {
             ctx.importDB.readImportsFromDisk(sessionPath);
-        }
-        else{
+        } else {
             FileChooser fc = new FileChooser();
             fc.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Binary (*.dat)", "*.dat"));
             File targetFile = fc.showOpenDialog(owner);
-            if(targetFile != null){
+            if (targetFile != null) {
                 sessionPath = targetFile.toPath();
                 ctx.importDB.readImportsFromDisk(sessionPath);
             }
@@ -710,14 +711,14 @@ public final class App extends Application {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        System.out.println("Loaded " + restored.size() + " imports.");
+        logger.debug("Loaded " + restored.size() + " imports.");
         refreshImports(ctx.importDB());
         saved = true;
         /*
         if (!restored.isEmpty()) {
             System.out.println(restored.getFirst().getORBRecordHistory() + "\n" + restored.get(0).getOrbWinner());
         }*/
-        System.out.println("Done.");
+        logger.debug("Done.");
         //statusBar.setText("Ready.");
         //statusProgress.setVisible(false);
     }
@@ -909,7 +910,7 @@ public final class App extends Application {
         FullCardSignature orbSig = null;
         try {
             orbSig = new FullCardSignature(sig, settings.dbPath(), settings.cacheDir(), globalCardVersion, globalFirstEdition);
-            System.out.println(orbSig.getName());
+            logger.debug(orbSig.getName());
         } catch (SQLException e) {
             showError(e);
         }
@@ -1033,7 +1034,7 @@ public final class App extends Application {
                 case "ocr" -> orbSigVictim = ctx.searchDB.signature(imp.getOcrWinner().cardID());
                 case "default" -> orbSigVictim = ctx.searchDB.signature(imp.getBestMatch().cardID());
                 default -> orbSigVictim  = imp.getARecordRecord(p, toggleMode);
-            };
+            }
             try {
                 orbSig = new FullCardSignature(orbSigVictim, settings.dbPath(), settings.cacheDir(), imp.getCardVersion(), imp.getFirstEdition());
             } catch (SQLException e) {
@@ -1220,7 +1221,9 @@ public final class App extends Application {
     }
 }
 
-class InitTask extends Task<App.AppContext>{
+final class InitTask extends Task<App.AppContext>{
+
+    private static final Logger logger = LogManager.getLogger(InitTask.class);
 
     private Config.Settings settings;
 
@@ -1229,9 +1232,9 @@ class InitTask extends Task<App.AppContext>{
     }
 
     @Override
-    protected App.AppContext call() throws Exception{
+    protected App.AppContext call() throws Exception {
         String url = "jdbc:sqlite:" + settings.dbPath();
-        System.out.println("Pokecard v0.8.0\nby willtryon\n");
+        logger.info("Pokecard v0.8.0\nby willtryon\n");
         updateMessage("Connecting to database...");
         int size;
         try (Connection conn = DriverManager.getConnection(url);
@@ -1240,7 +1243,7 @@ class InitTask extends Task<App.AppContext>{
             size = rs.next() ? rs.getInt("n") : 0;
         }
         Main.size = size;
-        System.out.println(settings.cacheDir().resolve("tcg.db"));
+        logger.debug(settings.cacheDir().resolve("tcg.db"));
 
         Path cacheFile = settings.cacheDir().resolve("cache_meta.dat");
         CardIndex cardDB;
@@ -1410,7 +1413,6 @@ final class ConfigEditor {
                             "Easy Ocr", "Got Ocr", "Trocr", "Qwen Model"
                     );
                     ComboBox<String> ocrMode = new ComboBox<>(options);
-                    System.out.println(config.get(s.key()));
                     if(config.get(s.key()).isBlank()){
                         ocrMode.setPromptText("Select an OCR model to use...");
                     }else{
@@ -1477,6 +1479,7 @@ final class Finalize{
     private final App.AppContext ctx;
     private List<CardImports> selectedItems;
     private final Settings settings;
+    ListView<CardImports> listView;
 
     Finalize(App.AppContext ctx, Settings settings) {
         this.ctx = ctx;
@@ -1489,7 +1492,7 @@ final class Finalize{
         stage.initOwner(mainStage);
         stage.setTitle("Finalize Imports");
         Scene scene1 = finalizeScene1(stage, () -> {
-            stage.setScene(finalizeScene2(stage));
+            stage.setScene(finalizeScene2(stage, listView));
         });
         //Scene scene1 = finalizeScene1(stage);
         stage.setTitle("String-Based Object Checklist");
@@ -1505,7 +1508,7 @@ final class Finalize{
             c.selectedProperty().set(true);
             candidates.add(c);
         }
-        ListView<CardImports> listView = new ListView<>(candidates);
+        listView = new ListView<>(candidates);
         StringConverter<CardImports> converter = new StringConverter<>() {
             @Override
             public String toString(CardImports item) {
@@ -1541,8 +1544,12 @@ final class Finalize{
         return new Scene(root, 350, 200);
     }
 
-    private Scene finalizeScene2(Stage stage) {
-
+    private Scene finalizeScene2(Stage stage, ListView<CardImports> listView) {
+        for(CardImports c : listView.getItems()){
+            if(c.selectedProperty().get()){
+                c.setFinal(true);
+            }
+        }
         Label label = new Label("tee hee");
         VBox root = new VBox(10, label);
         return new Scene(root, 350, 200);
