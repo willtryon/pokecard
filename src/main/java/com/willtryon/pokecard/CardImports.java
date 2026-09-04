@@ -189,14 +189,18 @@ public class CardImports {
     }
 
     public String[][] toCsvRows() {
-        String q = img.toString();
+        String q = norm(img.toString());
         return new String[][]{
-            { q, hashMatch.cardID(), hashMatch.img(), Double.toString(hashMatch.winner())},
-            {},
-            { q, orbMatch.cardID(),  orbMatch.img(),  Double.toString(orbMatch.winner())},
-            {recordRecord2.get(1).getCardID(), recordRecord2.get(1).getStringImgPath(), Double.toString(recordScore2.get(1))},
-            {recordRecord2.get(2).getCardID(), recordRecord2.get(2).getStringImgPath(), Double.toString(recordScore2.get(2))},
-            {}
+                { q, hashMatch.cardID(), norm(hashMatch.img()), Double.toString(hashMatch.winner())},
+                {},
+                { q, orbMatch.cardID(),  norm(orbMatch.img()),  Double.toString(orbMatch.winner())},
+                {recordRecord2.get(1).getCardID(), norm(recordRecord2.get(1).getStringImgPath()), Double.toString(recordScore2.get(1))},
+                {recordRecord2.get(2).getCardID(), norm(recordRecord2.get(2).getStringImgPath()), Double.toString(recordScore2.get(2))},
+                {}
         };
+    }
+
+    private static String norm(String p) {
+        return p == null ? null : p.replace(java.io.File.separatorChar, '/');
     }
 }
