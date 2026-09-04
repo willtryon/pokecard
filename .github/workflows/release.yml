@@ -69,7 +69,7 @@ jobs:
           cache: maven
 
       - name: Build platform-restricted jar
-        run: mvn -B clean package -Djavacpp.platform=${{ matrix.platform }} --file pom.xml
+        run: mvn -B clean package "-Djavacpp.platform=${{ matrix.platform }}" --file pom.xml
 
       - name: Name the jar for its platform
         shell: bash          # windows-latest defaults to pwsh; force bash for the cp
@@ -137,6 +137,7 @@ jobs:
           cache: maven
 
       - name: Build jar with Maven
+        shell: bash
         run: mvn -B clean package -Djavacpp.platform=windows-x86_64 --file pom.xml
 
       - name: Package app image with jpackage
