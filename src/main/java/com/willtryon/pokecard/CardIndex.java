@@ -4,6 +4,8 @@ import com.opencsv.CSVWriter;
 import dev.brachtendorf.jimagehash.hash.Hash;
 import dev.brachtendorf.jimagehash.hashAlgorithms.HashingAlgorithm;
 import dev.brachtendorf.jimagehash.hashAlgorithms.PerceptiveHash;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.javacpp.indexer.FloatIndexer;
 import org.bytedeco.javacpp.indexer.UByteIndexer;
@@ -13,6 +15,7 @@ import org.bytedeco.opencv.opencv_features2d.ORB;
 
 import java.io.*;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.*;
@@ -22,6 +25,7 @@ import java.util.*;
 import java.util.Arrays;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.stream.Stream;
 
 import static org.bytedeco.opencv.global.opencv_calib3d.RANSAC;
@@ -32,15 +36,16 @@ import static org.bytedeco.opencv.global.opencv_imgcodecs.IMREAD_GRAYSCALE;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.imread;
 import com.willtryon.pokecard.Config.Settings;
 
-public class CardIndex{
+public final class CardIndex{
+    private static final Logger logger = LogManager.getLogger(CardIndex.class);
     private final CardSignature [] cardDB;
     private ExecutorService executor;
     private boolean firstScan = true;
     private final Settings settings;
     private int line = 0;
-    private int failed = 0;
-    private int passed = 0;
-    private int corrupt = 0;
+    private final AtomicInteger passedN = new AtomicInteger() ;
+    private final AtomicInteger failedN = new AtomicInteger();
+    private final AtomicInteger corruptN = new AtomicInteger();
 
     // --- Windows-safe path handling: keeps Path.resolve() from throwing
     // InvalidPathException on Windows when cardId contains ':' (e.g. "Type: Null").
@@ -106,7 +111,6 @@ public class CardIndex{
         this.settings = settings;
         this.executor = Executors.newFixedThreadPool(this.settings.scanThreads());
         List<String[]> data = Collections.synchronizedList(new ArrayList<>());
-        AtomicInteger passedN = new AtomicInteger(), failedN = new AtomicInteger(), corruptN = new AtomicInteger();
         List<Future<?>> future = new ArrayList<>();
         cardDB = new CardSignature[size];
 
@@ -115,11 +119,11 @@ public class CardIndex{
              ResultSet rs = st.executeQuery("SELECT cardId, name, expName, expCardNumber, rarity FROM cards")) {
 
             long startTime = System.currentTimeMillis();
-            System.out.println("Now generating hashes for the database...");
-            System.out.println("\n\n");
+            logger.debug("Now generating hashes for the database...");
+            logger.debug("\n\n");
             int row = 0;
             while (rs.next()) {
-                if(row>=size) break;
+                if (row >= size) break;
                 final int slot = row++;
                 final String cardId = rs.getString("cardId");
                 final String expName = rs.getString("expName");
@@ -139,13 +143,12 @@ public class CardIndex{
                         data.add(new String[]{"An unknown exception occurred when hashing " + cardId});
                         failedN.incrementAndGet();
                     } catch (IllegalArgumentException e) {
-                        line++;
                         Path expected = this.settings.imagesDir()
                                 .resolve(sanitizeWinPath(expName == null ? "" : expName.replace(" ", "-"), false))
                                 .resolve(sanitizeWinPath(cardId.replace("/", "-") + ".jpg", true));
                         data.add(new String[]{"File " + cardId + " cannot be found by the program.\nLocation searched (folder): "
                                 + expected.getParent()});
-                        cardDB[line] = new CardSignature(cardId, img == null ? expected : img, null, null, null);
+                        cardDB[slot] = new CardSignature(cardId, img == null ? expected : img, null, null, null);
                         failedN.incrementAndGet();
                     } catch (Exception e) {
                         throw new RuntimeException(e);
@@ -154,7 +157,7 @@ public class CardIndex{
             }
             executor.shutdown();
             try {
-                if(!executor.awaitTermination(1, TimeUnit.HOURS)){
+                if (!executor.awaitTermination(1, TimeUnit.HOURS)) {
                     throw new TimeoutException("Timed out calculating cache objects.");
                 }
                 for (Future<?> f : future) f.get();
@@ -162,9 +165,9 @@ public class CardIndex{
                 throw new RuntimeException(e);
             }
 
-            System.out.println("\n\nPassed: " + passed + "\nFailed: " + failed + "\nCorrupt: " + corrupt + "\nOut of: " + line);
-            String result = String.format("%.0f", ((double) passed / size) * 100);
-            System.out.println(result + "% passed.\n\n");
+            logger.debug("\n\nPassed: " + passedN + "\nFailed: " + failedN + "\nCorrupt: " + corruptN + "\nOut of: " +size);
+            String result = String.format("%.0f", ((double) passedN.get() / size) * 100);
+            logger.debug(result + "% passed.\n\n");
             writeToTxt("log.txt", data);
 
         }
@@ -175,11 +178,6 @@ public class CardIndex{
 
         HashingAlgorithm hasher = new PerceptiveHash(64);
         String percent = String.format("%.0f", ((double) line / size) * 100);
-        System.out.print("\033[3A\033[J");
-        System.out.println("Hashing:  " + cardId + "...");
-        System.out.println("ORB map:  generating...");
-        System.out.printf("Passed: %d\tFailed: %d\tCorrupt: %d\t%s%%\t%s\t(%d/%d)%n",
-                passed, failed, corrupt, percent, timer(startTime), line, size);
 
         ORB orb = ORB.create();
 
@@ -189,12 +187,8 @@ public class CardIndex{
 
             Features f = describe(address, orb);
             cardDB[slot] = new CardSignature(cardId, img, hasher.hash(victim), f.descriptors, f.keypoints);
-
-            System.out.print("\033[3A\033[J");
-            System.out.println("Hashing:  " + cardId + " \u2713");
-            System.out.println("ORB map:  " + cardId + " \u2713");
             System.out.printf("Passed: %d\tFailed: %d\tCorrupt: %d\t%s%%\t%s\t(%d/%d)%n",
-                    passed, failed, corrupt, percent, timer(startTime), line, size);
+                    passedN.get(), failedN.get(), corruptN.get(), percent, timer(startTime), line, size);
         } else {
             // NOTE: larp for the log. The real lookup happens in resolveImage();
             // the file may actually exist under a different number format.
@@ -331,14 +325,14 @@ public class CardIndex{
 
 
     //shallow test of Card & cardIndex init...
-    public void test(int args)throws NullPointerException{
-        System.out.println("\n"+cardDB.length);
-        int factor = args/10;
-        System.out.println(factor);
-        for(int i = 0; i < cardDB.length; i += 3000){
+    public void test(int args)throws NullPointerException {
+        logger.debug("\n" + cardDB.length);
+        int factor = args / 10;
+        logger.debug(factor);
+        for (int i = 0; i < cardDB.length; i += 3000) {
             if (cardDB[i] != null) {
-                System.out.println("Entry "+i);
-                System.out.println(cardDB[i].toString());
+                logger.debug("Entry " + i);
+                logger.debug(cardDB[i].toString());
             }
         }
     }
@@ -361,12 +355,12 @@ public class CardIndex{
         @ cardDB[index]. This for block checks for null values and adds them to an array list that only parses
         hashes so the program doesn't crash when it finds a null Card obj.*/
         List<CardSignature> hashed = new ArrayList<>();
-        for (int c = 0; c < cardDB.length; c++){
+        for (int c = 0; c < cardDB.length; c++) {
             if (cardDB[c] != null && cardDB[c].getBinaryHash() != null) {
                 hashed.add(cardDB[c]);
             }
         }
-        System.out.println("\n\nComparing " + hashed.size() + " hashed cards...\n");
+        logger.debug("\n\nComparing " + hashed.size() + " hashed cards...\n");
 
         long pairCount = 0;
         double record = Double.MAX_VALUE;
@@ -387,16 +381,16 @@ public class CardIndex{
                     pairCount++;
                 }
                 if (i % 500 == 0) {
-                    System.out.println(i + "/" + hashed.size() + "  (" + pairCount + " comparisons...)");
+                    logger.debug(i + "/" + hashed.size() + "  (" + pairCount + " comparisons...)");
                 }
             }
         }
-    long ms = System.currentTimeMillis() - startTime;
-    System.out.println("\nDone: " + pairCount + " comparisons in " + ms + " ms");
-    System.out.println("\nClosest pair: " + recordHolderA + " vs " + recordHolderB + " @ " + record);
+        long ms = System.currentTimeMillis() - startTime;
+        logger.debug("\nDone: " + pairCount + " comparisons in " + ms + " ms");
+        logger.debug("\nClosest pair: " + recordHolderA + " vs " + recordHolderB + " @ " + record);
     }
 
-    public static final class Features{
+    public static final class Features implements AutoCloseable {
         final KeyPointVector keypoints;
         final Mat descriptors;
         Features(KeyPointVector k, Mat d){
@@ -411,12 +405,18 @@ public class CardIndex{
             return descriptors;
         }
 
+        @Override
+        public void close() throws Exception {
+            if (keypoints != null) keypoints.close();
+            if (descriptors != null) descriptors.close();
+        }
     }
 
     public Features describe(String path, ORB orb){
         Mat img = imread(path, IMREAD_GRAYSCALE);
-        if (img.empty()){
-            System.out.println("Something went wrong when trying to load round 2 image: "+path);
+        if (img.empty()) {
+            logger.debug("Something went wrong when trying to load round 2 image: " + path);
+            throw new IllegalArgumentException();
         }
         KeyPointVector keypoints = new KeyPointVector();
         Mat descriptors = new Mat();
@@ -488,8 +488,8 @@ public class CardIndex{
         if(executor.isShutdown()){
             executor = Executors.newFixedThreadPool(this.settings.scanThreads());
         }
-        if (firstScan){
-            System.out.println("Using " + settings.scanThreads() + " threads...");
+        if (firstScan) {
+            logger.debug("Using " + settings.scanThreads() + " threads...");
             firstScan = false;
         }
         double[] scores = new double[n];
@@ -572,7 +572,7 @@ public class CardIndex{
             System.err.println("Error reading the root directory: " + e.getMessage());
         }
     }*/
-    private static final int METADATA_FORMAT_VERSION = 2;
+    private static final int METADATA_FORMAT_VERSION = 1;
 
     public void writeToDisk() {
         Path xmlPath = settings.cacheDir().resolve("cache.xml");
@@ -610,7 +610,7 @@ public class CardIndex{
                 }
             }
         } catch (IOException e) {
-            System.out.println("Failed to write ORB binary cache: " + e.getMessage());
+            logger.debug("Failed to write ORB binary cache: " + e.getMessage());
             return;
         }
 
@@ -645,7 +645,7 @@ public class CardIndex{
                 dos.writeUTF(h != null ? h.getHashValue().toString(16) : "");
             }
         } catch (IOException e) {
-            System.out.println("Failed to write metadata cache: " + e.getMessage());
+            logger.debug("Failed to write metadata cache: " + e.getMessage());
         }
     }
 
@@ -662,41 +662,44 @@ public class CardIndex{
 
             int version = dis.readInt();
             if (version != METADATA_FORMAT_VERSION) {
-                System.out.println("Metadata cache version mismatch detected.");
+                logger.debug("Metadata cache version mismatch detected.");
                 throw new InvalidVersionException("Metadata cache version mismatch detected.");
             }
-            int count  = dis.readInt();
+            int count = dis.readInt();
             int bitRes = dis.readInt();
-            int algId  = dis.readInt();
+            int algId = dis.readInt();
             db = new CardSignature[count];
 
             for (int i = 0; i < count; i++) {
                 boolean present = dis.readBoolean();
-                if (!present) { db[i] = null; continue; }
-                String cardID  = dis.readUTF();
+                if (!present) {
+                    db[i] = null;
+                    continue;
+                }
+                String cardID = dis.readUTF();
                 String pathStr = dis.readUTF();
-                String hex     = dis.readUTF();
-                Path img  = pathStr.isEmpty() ? null : Path.of(pathStr);
+                String hex = dis.readUTF();
+                Path img = pathStr.isEmpty() ? null : Path.of(pathStr);
                 Hash hash = hex.isEmpty() ? null : new Hash(new BigInteger(hex, 16), bitRes, algId);
                 db[i] = new CardSignature(cardID, img, hash, null, null);
             }
         } catch (IOException e) {
-            System.out.println("Failed to read metadata cache: " + e.getMessage());
+            logger.warn("Failed to read metadata cache: " + e.getMessage());
             return new CardSignature[0];
         }
 
         // Now read ORB objects...
         if (!Files.exists(orbPath)) {
-            System.out.println("Warning: ORB cache not found; ORB matching unavailable.");
+            logger.warn("Warning: ORB cache not found; ORB matching unavailable.");
             return db;
         }
         try (DataInputStream dis = new DataInputStream(new BufferedInputStream(new FileInputStream(orbPath.toFile())))) {
             int count = dis.readInt();
             if (count != db.length) {
-                System.out.println("Warning: ORB cache count mismatch; ORB matching unavailable.");
+                logger.error("Warning: ORB cache count mismatch; ORB matching unavailable.");
                 return db;
             }
-            System.out.println("\nLoading ORB objects...");
+            logger.info("\nLoading ORB objects...");
             int i;
             for (i = 0; i < count; i++) {
                 boolean hasData = dis.readBoolean();
@@ -710,9 +713,9 @@ public class CardIndex{
                 desc.data().put(descBytes);
                 long n = dis.readLong();
                 final int KP_BYTES = 28;
-                byte[] kpBytes = new byte[(int)(n * KP_BYTES)];
+                byte[] kpBytes = new byte[(int) (n * KP_BYTES)];
                 dis.readFully(kpBytes);
-                java.nio.ByteBuffer bb = java.nio.ByteBuffer.wrap(kpBytes);
+                ByteBuffer bb = ByteBuffer.wrap(kpBytes);
                 KeyPointVector kp = new KeyPointVector(n);
                 for (long k = 0; k < n; k++) {
                     float x = bb.getFloat();
@@ -728,15 +731,18 @@ public class CardIndex{
                 }
                 int checkInterval = Math.max(1, count / 10);
                 if (i % checkInterval == 0 || i == count - 1) {
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("Loading ORB objects... ");
                     String percent = String.format("%.0f", ((double) i / count) * 100);
-                    System.out.printf("Loading ORB objects...%s%%\n", percent);
-                    System.out.flush(); // Forces the console to display the text immediately
+                    sb.append(percent).append("%");
+                    logger.info(sb.toString());
+                    System.out.flush();
                 }
             }
-        } catch (IOException e){
-            System.out.println("Warning: Failed to load ORB cache: " + e.getMessage());
+        } catch (IOException e) {
+            logger.error("Warning: Failed to load ORB cache: " + e.getMessage());
         }
-        System.out.println(timer(startTime));
+        logger.debug(timer(startTime));
         return db;
     }
 
@@ -759,8 +765,8 @@ public class CardIndex{
                 }
                 writer.writeAll(data);
             }
-        } catch (IOException e){
-            System.out.println("Sorry, couldn't write to the file." + e.getMessage());
+        } catch (IOException e) {
+            logger.debug("Sorry, couldn't write to the file." + e.getMessage());
         }
     }
     /*
@@ -777,8 +783,8 @@ public class CardIndex{
         Path dir = settings.outputDir().resolve("logs/"+getTime()+args);
         try(PrintWriter pw = new PrintWriter(new FileWriter(dir.toFile()))){
            data.forEach(i -> pw.println(Arrays.toString(i)));
-        }catch(IOException e){
-            System.out.println("Sorry, this file cannot be written to. Do you have permission?");
+        }catch(IOException e) {
+            logger.debug("Sorry, this file cannot be written to. Do you have permission?");
         }
     }
 

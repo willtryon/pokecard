@@ -1,5 +1,8 @@
 package com.willtryon.pokecard;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
@@ -8,6 +11,8 @@ import java.util.concurrent.TimeUnit;
 
 
 public final class PokeocrInterface implements AutoCloseable{
+
+    private static final Logger logger = LogManager.getLogger(PokeocrInterface.class);
 
     public record Card(int index, boolean ok, int rotation, String top, String bottom, String path, String error){}
 
@@ -19,11 +24,14 @@ public final class PokeocrInterface implements AutoCloseable{
     public PokeocrInterface(PokeocrEnv env, PokeocrEnv.EnvHandle handle) throws IOException, InterruptedException {
 
         List<String> args = new ArrayList<>(env.recommendedArgs(handle.accel()));
-        args.add("--mode"); args.add("split"); args.add("-o");
-        args.add(handle.baseDir().resolve("out").toString()); args.add("--serve");
+        args.add("--mode");
+        args.add("split");
+        args.add("-o");
+        args.add(handle.baseDir().resolve("out").toString());
+        args.add("--serve");
         List<String> cmd = new ArrayList<>(List.of(handle.python().toString(), "-m", "pokeocr"));
         cmd.addAll(args);
-        System.out.println("Performing "+ cmd);
+        logger.debug("Performing " + cmd);
         ProcessBuilder pb = new ProcessBuilder(cmd).directory(handle.appDir().toFile());
         Map<String, String> e = pb.environment();
         if (handle.platform() == PokeocrEnv.Platform.MAC_ARM) {
@@ -37,11 +45,12 @@ public final class PokeocrInterface implements AutoCloseable{
         this.br = new BufferedReader(new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8));
 
         this.stderrPump = new Thread(() -> {
-            try(BufferedReader err = new BufferedReader(new InputStreamReader(proc.getErrorStream(), StandardCharsets.UTF_8))){
-                for(String line; (line = err.readLine()) != null;){
+            try (BufferedReader err = new BufferedReader(new InputStreamReader(proc.getErrorStream(), StandardCharsets.UTF_8))) {
+                for (String line; (line = err.readLine()) != null; ) {
                     System.err.println("[pokeocr] " + line);
                 }
-            }catch(IOException ignore){ }
+            } catch (IOException ignore) {
+            }
         }, "pokeocr-stderr");
         stderrPump.setDaemon(true);
         stderrPump.start();

@@ -1,5 +1,8 @@
 package com.willtryon.pokecard;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.FileNotFoundException;
@@ -14,6 +17,8 @@ import java.util.stream.Stream;
 
 public final class PokeocrEnv{
 
+    private static final Logger logger = LogManager.getLogger(PokeocrEnv.class);
+
     private static final String RESOURCE_ROOT = "/python";
     private static final String DEPS_VERSION = "2026-08-10";
     private static final List<String> BASE_DEPS = List.of(
@@ -26,24 +31,18 @@ public final class PokeocrEnv{
     public enum Accel{CUDA, ROCM, MPS, CPU}
     public record EnvHandle(Path baseDir, Path appDir, Path venvDir, Path python, Platform platform, Accel accel){}
     private final Path baseDir;
-    private final Consumer<String> log;
     private final Config.Settings settings;
 
     public PokeocrEnv(Path baseDir, Config.Settings settings){
-        this(baseDir, System.out::println, settings);
-    }
-
-    public PokeocrEnv(Path baseDir, Consumer<String> log,  Config.Settings settings){
         this.baseDir = baseDir;
-        this.log = log;
         this.settings = settings;
     }
 
-    public EnvHandle prepare() throws IOException, InterruptedException, URISyntaxException{
+    public EnvHandle prepare() throws IOException, InterruptedException, URISyntaxException {
         Platform platform = detectPlatform();
         Accel accel = detectAccel(platform);
-        log.accept("\npokeocr Environment");
-        log.accept("Detected platform:" + platform + " accelerator:"+accel);
+        logger.debug("\npokeocr Environment");
+        logger.debug("Detected platform:" + platform + " accelerator:" + accel);
 
         Path appDir = baseDir.resolve("app");
         Path venvDir = baseDir.resolve("venv");
@@ -52,31 +51,31 @@ public final class PokeocrEnv{
         Files.createDirectories(baseDir);
         extractPython(appDir);
 
-        if(envIsReady(venvDir, accel)){
-            log.accept("Found python virtual environment.");
+        if (envIsReady(venvDir, accel)) {
+            logger.debug("Found python virtual environment.");
             return new EnvHandle(baseDir, appDir, venvDir, python, platform, accel);
         }
 
         Path basePython = findBasePython();
-        log.accept("Creating venv at "+venvDir);
+        logger.debug("Creating venv at " + venvDir);
         mustExec(List.of(basePython.toString(), "-m", "venv", venvDir.toString()), baseDir);
         mustExec(List.of(python.toString(), "-m", "pip", "install", "--upgrade", "pip"), baseDir);
 
         List<String> torchCmd = new ArrayList<>(List.of(python.toString(), "-m", "pip", "install"));
         torchCmd.addAll(torchPipArgs(platform, accel));
-        log.accept("Installing torch/torchvision: " + String.join(" ", torchPipArgs(platform, accel)));
+        logger.debug("Installing torch/torchvision: " + String.join(" ", torchPipArgs(platform, accel)));
         mustExec(torchCmd, baseDir);
 
         List<String> deepCmd = new ArrayList<>(List.of(python.toString(), "-m", "pip", "install"));
         deepCmd.addAll(BASE_DEPS);
         mustExec(deepCmd, baseDir);
 
-        if(accel == Accel.CPU){
+        if (accel == Accel.CPU) {
             mustExec(List.of(python.toString(), "-m", "pip", "install", "bitsandbytes"), baseDir);
         }
 
         markReady(venvDir, accel);
-        log.accept("Python virtual environment ready.");
+        logger.debug("Python virtual environment ready.");
         return new EnvHandle(baseDir, appDir, venvDir, python, platform, accel);
     }
 
@@ -115,7 +114,7 @@ public final class PokeocrEnv{
         String model;
         if (!(settings.ocrModel().isBlank())) {
             model = settings.ocrModel();
-            System.out.println("Loaded based off of saved settings...");
+            logger.debug("Loaded based off of saved settings...");
             return switch (accel) {
                 case CUDA -> {
                     yield List.of("--engine", model, "--device", "cuda", "--load-4bit");
@@ -223,11 +222,11 @@ public final class PokeocrEnv{
         for (String c : candidates) {
             int[] v = pythonVersion(c);
             if (v != null && v[0] == 3 && v[1] >= 9 && v[1] <= 13) {
-                log.accept("Using base interpreter '" + c + "' (" + v[0] + "." + v[1] + ")");
+                logger.debug("Using base interpreter '" + c + "' (" + v[0] + "." + v[1] + ")");
                 return Path.of(c);
             }
             if (v != null) {
-                log.accept("Skipping '" + c + "' " + v[0] + "." + v[1]
+                logger.debug("Skipping '" + c + "' " + v[0] + "." + v[1]
                         + " (torch 2.6 needs Python 3.9-3.13)");
             }
         }
@@ -250,7 +249,7 @@ public final class PokeocrEnv{
         }
     }
 
-    /** Absolute path to certifi's CA bundle inside the venv, or null if unavailable. */
+    // Absolute path to certifi's CA bundle inside the venv, or null if unavailable. (macOS only.)
     private String certifiBundle(Path python) {
         try {
             Process proc = new ProcessBuilder(python.toString(), "-c",
@@ -291,7 +290,7 @@ public final class PokeocrEnv{
                 if (created) fs.close();
             }
         } else {
-            // Running from exploded target/classes (IDE / mvn javafx:run).
+            //for mvn javafx:run
             copyTree(Paths.get(uri), dest);
         }
     }
@@ -348,7 +347,7 @@ public final class PokeocrEnv{
 
     private int exec(List<String> cmd, Path cwd, Map<String, String> extraEnv)
             throws IOException, InterruptedException {
-        log.accept("$ " + String.join(" ", cmd));
+        logger.debug("$ " + String.join(" ", cmd));
         ProcessBuilder pb = new ProcessBuilder(cmd);
         if (cwd != null) pb.directory(cwd.toFile());
         if (extraEnv != null && !extraEnv.isEmpty()) pb.environment().putAll(extraEnv);
@@ -356,16 +355,16 @@ public final class PokeocrEnv{
         Process proc = pb.start();
         try (BufferedReader r = new BufferedReader(new InputStreamReader(proc.getInputStream()))) {
             String line;
-            while ((line = r.readLine()) != null) log.accept(line);
+            while ((line = r.readLine()) != null) logger.debug(line);
         }
         return proc.waitFor();
     }
 
-    /** Returns true if the command runs and exits 0 (used for GPU probing). */
+    // Returns true if the command runs and exits 0.
     private static boolean commandSucceeds(String... cmd) {
         try {
             Process p = new ProcessBuilder(cmd).redirectErrorStream(true).start();
-            p.getInputStream().readAllBytes(); // drain so the process doesn't block on a full pipe
+            p.getInputStream().readAllBytes(); //drains input stream.
             return p.waitFor() == 0;
         } catch (IOException | InterruptedException e) {
             if (e instanceof InterruptedException) Thread.currentThread().interrupt();

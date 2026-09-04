@@ -11,12 +11,15 @@ import java.util.stream.Stream;
 import dev.brachtendorf.jimagehash.hash.Hash;
 import dev.brachtendorf.jimagehash.hashAlgorithms.HashingAlgorithm;
 import dev.brachtendorf.jimagehash.hashAlgorithms.PerceptiveHash;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.bytedeco.opencv.opencv_features2d.ORB;
 
 import static com.willtryon.pokecard.PokeocrEnv.ocrDefaultCacheDir;
 import static com.willtryon.pokecard.CardIndex.timer;
 
 public class CardImportsIndex {
+    private final static Logger logger = LogManager.getLogger(CardImportsIndex.class);
     private String guess;
     private final List<CardSignature> hashed;
     private final CardIndex cardDB;
@@ -39,71 +42,72 @@ public class CardImportsIndex {
 
     public synchronized List<CardImports> scan(ScanProgress progress) throws SQLException {
         guess = "";
-        List<CardImports> ocrCandidates =  new ArrayList<>();
+        List<CardImports> ocrCandidates = new ArrayList<>();
         Path ocrDir = settings.cacheDir().resolve("ocr-victim");
-        try{
+        try {
             Files.delete(ocrDir);
-        }catch(IOException ignore){}
+        } catch (IOException ignore) {
+        }
         long beginOrbJob = System.currentTimeMillis();
-        System.out.println("Scanning "+ settings.compareDir()+" for new images...");
-        try (Stream<Path> stream = Files.walk(settings.compareDir())){
+        logger.debug("Scanning " + settings.compareDir() + " for new images...");
+        try (Stream<Path> stream = Files.walk(settings.compareDir())) {
             List<Path> imgList = stream
-                .filter(path -> {
-                    String s = path.toString().toLowerCase();
-                    return s.endsWith(".jpg") || s.endsWith(".png");
-                })
-                .toList();
+                    .filter(path -> {
+                        String s = path.toString().toLowerCase();
+                        return s.endsWith(".jpg") || s.endsWith(".png");
+                    })
+                    .toList();
             long count = imgList.size();
             int loc = 0;
-            long [] times = new long[(int)count];
-            for(int i = 0; i < count; i++){ times[i] = 0; }
-            for(Path path : imgList){
-                if(!(loc < 1)){
-                    guess = niceTimer(beginOrbJob,loc, imgList, times);
+            long[] times = new long[(int) count];
+            for (int i = 0; i < count; i++) {
+                times[i] = 0;
+            }
+            for (Path path : imgList) {
+                if (!(loc < 1)) {
+                    guess = niceTimer(beginOrbJob, loc, imgList, times);
                     beginOrbJob = System.currentTimeMillis();
                 }
                 loc++;
                 Hash qHash;
-                try{
+                try {
                     qHash = hasher.hash(new File(path.toString()));
-                }catch(IOException e){
+                } catch (IOException e) {
                     continue;
                 }
-                if(isDuplicate(qHash)){
+                if (isDuplicate(qHash)) {
                     continue;
                 }
                 CardImports result = compareOne(path, qHash, loc, count, progress, guess);
-                if (result != null){
-                    fresh.add(result);
-                    seenHashes.add(qHash);
-                    imports.add(result);
-                    //System.out.println(result.getHashedRecordHistory());
-                    //System.out.println(result.getORBRecordHistory());
-                }
-                if(result.getARecordScore(0, "orb") - result.getARecordScore(1, "orb") < 10){
+                fresh.add(result);
+                seenHashes.add(qHash);
+                imports.add(result);
+                //System.out.println(result.getHashedRecordHistory());
+                //System.out.println(result.getORBRecordHistory());
+                if (result.getARecordScore(0, "orb") - result.getARecordScore(1, "orb") < 10) {
                     ocrCandidates.add(result);
                 }
             }
-        }catch(IOException e){
+        } catch (IOException e) {
             e.printStackTrace();
         }
-        for(CardImports f : fresh){
-            if(f.howLowIsHash() == -1){
-                System.out.println("No match found for "+f.getQueryImage().getFileName().toString());
+        for (CardImports f : fresh) {
+            if (f.howLowIsHash() == -1) {
+                logger.debug("No match found for " + f.getQueryImage().getFileName().toString());
                 continue;
             }
-            System.out.println("\n"+f.getQueryImage().getFileName().toString());
-            System.out.println("The hash result that matches the orb winner " +f.getOrbWinner().cardID());
-            System.out.print(" is "+f.getARecordRecord(f.howLowIsHash(), "hash").getCardID() +"at position "+f.howLowIsHash());
+            logger.debug("\n" + f.getQueryImage().getFileName().toString());
+            logger.debug("The hash result that matches the orb winner " + f.getOrbWinner().cardID());
+            System.out.print(" is " + f.getARecordRecord(f.howLowIsHash(), "hash").getCardID() + "at position " + f.howLowIsHash());
         }
-        if(!ocrCandidates.isEmpty()){
-            try(PrintWriter pw = new PrintWriter(new FileWriter(ocrDir.toFile()))){
-                for(CardImports f : ocrCandidates){
+        if (!ocrCandidates.isEmpty()) {
+            try (PrintWriter pw = new PrintWriter(new FileWriter(ocrDir.toFile()))) {
+                for (CardImports f : ocrCandidates) {
                     pw.println(f.getQueryImage().toString());
-                    System.out.println("OCR worthy:"+f.getQueryImage().toString());
+                    logger.debug("OCR worthy:" + f.getQueryImage().toString());
                 }
-            }catch(IOException e){
-                System.out.println("Can't write to "+ocrDir.toFile());
+            } catch (IOException e) {
+                logger.debug("Can't write to " + ocrDir.toFile());
                 e.printStackTrace();
             }
         }
@@ -137,62 +141,67 @@ public class CardImportsIndex {
             topHash.offer(new Scored(cardSignature, comp));
             if (topHash.size() > 1000) topHash.poll();
         }
-		List <Scored> hashSorted = new ArrayList<>(topHash);
-		hashSorted.sort(Comparator.comparingDouble(Scored::score));
-		Scored bestHash = hashSorted.get(0);
-		System.out.println("\nUploaded image " + victim + " appears to be closest to " + bestHash.sig().getStringImgPath() + ". (pHash)");
-		System.out.println(bestHash.score());
-		CardImports.Match hashMatch = new CardImports.Match(bestHash.sig.getCardID(), bestHash.sig.getStringImgPath(), bestHash.score());
-		List<CardSignature> recordRecord = new ArrayList<>();
-		List<Double> recordScore = new ArrayList<>();
+        List<Scored> hashSorted = new ArrayList<>(topHash);
+        hashSorted.sort(Comparator.comparingDouble(Scored::score));
+        Scored bestHash = hashSorted.get(0);
+        logger.debug("\nUploaded image " + victim + " appears to be closest to " + bestHash.sig().getStringImgPath() + ". (pHash)");
+        logger.debug(bestHash.score());
+        CardImports.Match hashMatch = new CardImports.Match(bestHash.sig.getCardID(), bestHash.sig.getStringImgPath(), bestHash.score());
+        List<CardSignature> recordRecord = new ArrayList<>();
+        List<Double> recordScore = new ArrayList<>();
         for (Scored value : hashSorted) {
             recordRecord.add(value.sig());
             recordScore.add(value.score());
         }
 
-		// ---- ORB pass (higher is closer) ----
-		ORB orb = ORB.create();
-		CardIndex.Features test2 = cardDB.describe(path.toString(), orb);
-		PriorityQueue<Scored> bottomOrb = new PriorityQueue<>(Comparator.comparingDouble((Scored s)->s.score()));
-		long startTime = System.currentTimeMillis();
-        int lastPct = -1;
-        int K = 1000;
-        List<CardSignature> shortlist = hashSorted.stream().limit(K).map(Scored::sig).toList();
-        double[] orbScores = cardDB.scoreOrbParallel(test2, shortlist);
-        //double[] orbScores = cardDB.scoreOrbParallel(test2, hashed);
-        for (int i = 0; i < shortlist.size(); i++) {
-            bottomOrb.offer(new Scored(shortlist.get(i), orbScores[i]));
-            if (bottomOrb.size() > 1000) bottomOrb.poll();
+        // ---- ORB pass (higher is closer) ----
+        List<Scored> orbSorted;
+        Scored bestOrb;
+        try (ORB orb = ORB.create()) {
+            CardIndex.Features test2 = cardDB.describe(path.toString(), orb);
+            PriorityQueue<Scored> bottomOrb = new PriorityQueue<>(Comparator.comparingDouble((Scored s) -> s.score()));
+            long startTime = System.currentTimeMillis();
+            int lastPct = -1;
+            int K = 1000;
+            List<CardSignature> shortlist = hashSorted.stream().limit(K).map(Scored::sig).toList();
+            double[] orbScores = cardDB.scoreOrbParallel(test2, shortlist);
+            for (int i = 0; i < shortlist.size(); i++) {
+                bottomOrb.offer(new Scored(shortlist.get(i), orbScores[i]));
+                if (bottomOrb.size() > 1000) bottomOrb.poll();
+            }
+            if (progress != null) {
+                double overall = (double) loc / count;
+                progress.report("Scanning " + victim.getName() + "  (" + loc + "/" + count + ") " + guess + ".", overall);
+            }
+            orbSorted = new ArrayList<>(bottomOrb);
+            orbSorted.sort(Comparator.comparingDouble(Scored::score).reversed());
+            bestOrb = orbSorted.getFirst();
         }
-        if (progress != null) {
-            double overall = (double) loc / count;
-            progress.report("Scanning " + victim.getName() + "  (" + loc + "/" + count + ") " + guess + ".", overall);
-        }
-		List<Scored> orbSorted = new ArrayList<>(bottomOrb);
-		orbSorted.sort(Comparator.comparingDouble(Scored::score).reversed());
-		Scored bestOrb = orbSorted.getFirst();
-		System.out.println("\nUploaded image " + victim + " appears to be closest to " + bestOrb.sig.getStringImgPath() + ". (ORB)");
-		System.out.println(bestOrb.score());
-		CardImports.Match orbMatch = new CardImports.Match(bestOrb.sig.getCardID(), bestOrb.sig.getStringImgPath(), bestOrb.score());
+        logger.debug("\nUploaded image " + victim + " appears to be closest to " + bestOrb.sig.getStringImgPath() + ". (ORB)");
+        logger.debug(bestOrb.score());
+        CardImports.Match orbMatch = new CardImports.Match(bestOrb.sig.getCardID(), bestOrb.sig.getStringImgPath(), bestOrb.score());
         CardImports.Match ocrMatch = new CardImports.Match(null, null, 100.0);
         CardImports.Match bestMatch = new CardImports.Match(null, null, 100.0);
-		List<CardSignature> recordRecord2 = new ArrayList<>();
-		List<Double> recordScore2 = new ArrayList<>();
+        List<CardSignature> recordRecord2 = new ArrayList<>();
+        List<Double> recordScore2 = new ArrayList<>();
         for (Scored scored : orbSorted) {
             recordRecord2.add(scored.sig());
             recordScore2.add(scored.score());
         }
-        boolean isFinal = false; boolean matchOverride = false; float price = -1; String cat = "";
-		return new CardImports(path, globalCardVersion, globalFirstEdition, isFinal, matchOverride, price, cat, test, hashMatch, orbMatch, ocrMatch, bestMatch, recordScore, recordRecord, recordScore2, recordRecord2);
+        boolean isFinal = false;
+        boolean matchOverride = false;
+        float price = -1;
+        String cat = "";
+        return new CardImports(path, globalCardVersion, globalFirstEdition, isFinal, matchOverride, price, cat, test, hashMatch, orbMatch, ocrMatch, bestMatch, recordScore, recordRecord, recordScore2, recordRecord2);
     }
 
     public void runOcr(ScanProgress progress) throws IOException, URISyntaxException, InterruptedException {
-        System.out.println("I work!");
-        progress.report("OCR bullshit now", -1);
+        if(!Boolean.parseBoolean((settings.useOcr()))) return;
+        progress.report("Loading pokeocr, please wait...", -1);
         long startTime = System.currentTimeMillis();
         PokeocrEnv env = new PokeocrEnv(ocrDefaultCacheDir(), settings);
         PokeocrEnv.EnvHandle handle = env.prepare();
-        try(PokeocrInterface ocrInterface = new PokeocrInterface(env, handle)){
+        try(PokeocrInterface ocrInterface = new PokeocrInterface(env, handle)) {
             List<Path> paths = new ArrayList<>(
                     Files.readAllLines(settings.cacheDir().resolve("ocr-victim"))
                             .stream()
@@ -215,11 +224,11 @@ public class CardImportsIndex {
                     CardImports.Match m = resolveViaSql(c.top(), c.bottom(), url);
                     //CardImports.Match m = new CardImports.Match(c.top(), parent.getQueryImage().toString(), 67.0);
                     if (m != null) parent.setOcrWinner(m);
-                }else
+                } else
                     System.out.printf("card %d ERROR: %s%n", c.index(), c.error());
             }
-            System.out.println("The operation completed successfully.");
-            System.out.println("Total time: " + timer(startTime));
+            logger.debug("The operation completed successfully.");
+            logger.debug("Total time: " + timer(startTime));
             setBestMatches(fresh);
         }catch(Exception e){
             e.printStackTrace();
@@ -230,8 +239,8 @@ public class CardImportsIndex {
 
     public CardImports.Match resolveViaSql(String top, String bottom, String url) throws SQLException {
         Integer number = parseCardNumber(bottom);   // "…36/106●" -> 36,   or null
-        String  year   = parseYear(bottom);// "©2014"    -> "2014", or null
-        System.out.println(number + " " + year);
+        String year = parseYear(bottom);// "©2014"    -> "2014", or null
+        logger.debug(number + " " + year);
         // Year is a TIEBREAKER, not a filter: rows whose release year matches the
         // copyright year sort first, but a missing / off-by-one / null year never
         // drops a row. expCardNumber is zero-padded TEXT, so compare it as an int.
@@ -271,39 +280,31 @@ public class CardImportsIndex {
         return m.find() ? Integer.parseInt(m.group(1)) : null;
     }
 
-    private void setBestMatches(List<CardImports> fresh)throws SQLException{
-        for(CardImports i : fresh){
+    private void setBestMatches(List<CardImports> fresh)throws SQLException {
+        for (CardImports i : fresh) {
             if (!i.getMatchOverride()) {
-                if (i.hasOcr()){
+                if (i.hasOcr()) {
                     i.setBestMatch(i.getOcrWinner());
-                }else{
+                } else {
                     i.setBestMatch(i.getOrbWinner());
                 }
             }
-            if(i.getPrice() == -1){
-                FullCardSignature priceGetter = new FullCardSignature(cardDB.findCardId(i.getBestMatch().cardID()), settings.dbPath(), settings.cacheDir(), globalCardVersion, globalFirstEdition);
+            if (i.getPrice() == -1) {
+                FullCardSignature priceGetter = new FullCardSignature(Objects.requireNonNull(cardDB.findCardId(i.getBestMatch().cardID())), settings.dbPath(), settings.cacheDir(), globalCardVersion, globalFirstEdition);
                 i.setPrice(priceGetter.getPrice());
-                System.out.println("\n\n"+i.getPrice());
-                if(i.getPrice() >= 12.0){
+                logger.debug("\n\n" + i.getPrice());
+                if (i.getPrice() >= 12.0) {
                     i.setCat("ULTRA");
-                }else if(i.getPrice() >= 6.0 && i.getPrice() <= 11.99){
+                } else if (i.getPrice() >= 6.0 && i.getPrice() <= 11.99) {
                     i.setCat("HIGH");
-                }else if(i.getPrice() >= 3.0 && i.getPrice() <= 5.99){
+                } else if (i.getPrice() >= 3.0 && i.getPrice() <= 5.99) {
                     i.setCat("MID");
-                }else{
+                } else {
                     i.setCat("UNREMARK");
                 }
             }
         }
-        System.out.println("Updated Card Information");
-    }
-
-    public void setAsFinal(List<CardImports> candidates){
-        for (var c : candidates) {
-            c.setFinal(true);
-
-
-        }
+        logger.debug("Updated Card Information");
     }
 
     public List<CardImports> getImports() { return imports; }
@@ -367,7 +368,7 @@ public class CardImportsIndex {
                 writeRanking(dos, ci, "orb");   // same length as hash side by construction
             }
         } catch (IOException e) {
-            System.out.println("Failed to write imports cache: " + e.getMessage());
+            logger.debug("Failed to write imports cache: " + e.getMessage());
         }
     }
 
@@ -390,7 +391,7 @@ public class CardImportsIndex {
     public void readImportsFromDisk(Path currentSession) {
         File file = currentSession.toFile();
         if (!Files.exists(currentSession)) {
-            System.out.println("No imports cache found at " + currentSession);
+            logger.debug("No imports cache found at " + currentSession);
             return;
         }
 
@@ -403,7 +404,7 @@ public class CardImportsIndex {
                 new BufferedInputStream(new FileInputStream(currentSession.toFile())))) {
             int version = dis.readInt();
             if (version != IMPORTS_FORMAT_VERSION) {
-                System.out.println("Imports cache version mismatch (found " + version +
+                logger.debug("Imports cache version mismatch (found " + version +
                         ", expected " + IMPORTS_FORMAT_VERSION + "); skipping load.");
                 return;
             }
@@ -412,13 +413,13 @@ public class CardImportsIndex {
             int importCount = dis.readInt();
 
             List<CardImports> loaded = new ArrayList<>(importCount);
-            List<Hash> loadedHashes  = new ArrayList<>(importCount);
+            List<Hash> loadedHashes = new ArrayList<>(importCount);
 
             for (int j = 0; j < importCount; j++) {
                 String qStr = dis.readUTF();
                 Path q = qStr.isEmpty() ? null : Path.of(qStr);
                 String vStr = dis.readUTF();
-                String v =  vStr.isEmpty() ? null : vStr;
+                String v = vStr.isEmpty() ? null : vStr;
                 boolean f = dis.readBoolean();
                 boolean fi = dis.readBoolean();
                 boolean mo = dis.readBoolean();
@@ -429,16 +430,16 @@ public class CardImportsIndex {
                 Hash qHash = qHex.isEmpty() ? null : new Hash(new BigInteger(qHex, 16), bits, algo);
 
                 CardImports.Match hashMatch = readMatch(dis);
-                CardImports.Match orbMatch  = readMatch(dis);
+                CardImports.Match orbMatch = readMatch(dis);
                 CardImports.Match ocrMatch = readMatch(dis);
                 CardImports.Match bestMatch = readMatch(dis);
 
-                List<CardSignature> recordRecord  = new ArrayList<>();
-                List<Double>        recordScore   = new ArrayList<>();
+                List<CardSignature> recordRecord = new ArrayList<>();
+                List<Double> recordScore = new ArrayList<>();
                 readRanking(dis, byId, recordRecord, recordScore);
 
                 List<CardSignature> recordRecord2 = new ArrayList<>();
-                List<Double>        recordScore2  = new ArrayList<>();
+                List<Double> recordScore2 = new ArrayList<>();
                 readRanking(dis, byId, recordRecord2, recordScore2);
 
                 loaded.add(new CardImports(q, v, f, fi, mo, p, cStr, qHash, hashMatch, orbMatch, ocrMatch, bestMatch,
@@ -447,12 +448,14 @@ public class CardImportsIndex {
             }
 
             // overwrite in place: the results AND the dedup set that makes re-scans skip them
-            imports.clear();    imports.addAll(loaded);
-            seenHashes.clear(); seenHashes.addAll(loadedHashes);
-            System.out.println("Loaded " + loaded.size() + " imports (" +
+            imports.clear();
+            imports.addAll(loaded);
+            seenHashes.clear();
+            seenHashes.addAll(loadedHashes);
+            logger.debug("Loaded " + loaded.size() + " imports (" +
                     loadedHashes.size() + " will be skipped on re-scan).");
         } catch (IOException e) {
-            System.out.println("Failed to read imports cache: " + e.getMessage());
+            logger.debug("Failed to read imports cache: " + e.getMessage());
         }
     }
 

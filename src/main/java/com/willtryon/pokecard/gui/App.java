@@ -3,8 +3,8 @@ package com.willtryon.pokecard.gui;
 import com.willtryon.pokecard.*;
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
 import javafx.beans.property.ObjectProperty;
-import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.value.ObservableValue;
 import javafx.collections.ListChangeListener;
@@ -23,6 +23,8 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.layout.*;
 import javafx.stage.*;
 import javafx.util.StringConverter;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.controlsfx.control.PopOver;
 import org.controlsfx.control.TaskProgressView;
 import org.controlsfx.control.spreadsheet.*;
@@ -30,6 +32,8 @@ import org.controlsfx.control.PropertySheet;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.control.ComboBox;
+import org.controlsfx.property.editor.AbstractPropertyEditor;
+import org.controlsfx.property.editor.DefaultPropertyEditorFactory;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -49,18 +53,15 @@ import static com.willtryon.pokecard.CardImportsIndex.globalFirstEdition;
 import static com.willtryon.pokecard.PokeocrEnv.ocrDefaultCacheDir;
 import static com.willtryon.pokecard.TcgdbEnv.tcgdbDefaultCacheDir;
 import com.willtryon.pokecard.Config.Settings;
-import org.controlsfx.property.editor.AbstractPropertyEditor;
-import org.controlsfx.property.editor.DefaultPropertyEditorFactory;
 
-public class App extends Application {
+public final class App extends Application {
 
+    private static final Logger logger = LogManager.getLogger(App.class);
     private Config config;
     private Path sessionPath;
     private String currentSession;
     private Settings settings;
     private boolean saved;
-    private final SimpleBooleanProperty isOrb = new SimpleBooleanProperty(false);
-    private final SimpleBooleanProperty isHash = new SimpleBooleanProperty(false);
     private AppContext ctx;
 
     private Label statusBar;
@@ -70,6 +71,7 @@ public class App extends Application {
     private PopOver taskPopOver;
     private TabPane detailTabs;
     private TreeItem<SideNode> importsBranch;
+    private String toggleMode = "default";
     public static boolean firstRun = true;
 
 
@@ -123,8 +125,9 @@ public class App extends Application {
     );
 
     static boolean satisfied(Setting s, String value) {
-        if (value == null || value.isBlank()) return !s.required();
-        return s.kind().isValidValue(value);
+        if (s.kind() == Kind.BOOLEAN) return false;
+        if (value == null || value.isBlank()) return s.required();
+        return !s.kind().isValidValue(value);
     }
 
     record AppContext(CardIndex cardDB, CardImportsIndex importDB, CardSearchRepo searchDB, int size) {
@@ -199,8 +202,6 @@ public class App extends Application {
         initStage.setScene(splashScene);
         initStage.show();
 
-        isOrb.set(false); isHash.set(false);
-
         initTask.setOnSucceeded(event -> Platform.runLater(() -> {
             ctx = initTask.getValue();
             showMainStage();
@@ -221,7 +222,7 @@ public class App extends Application {
     private boolean allSettingsSatisfied() {
         for (Section sec : SECTIONS)
             for (Setting s : sec.settings())
-                if (!satisfied(s, config.get(s.key()))) return false;
+                if (satisfied(s, config.get(s.key()))) return false;
         return true;
     }
 
@@ -269,7 +270,7 @@ public class App extends Application {
                     switch (selectedRb.getText()){
                         case "Normal" -> {
                             globalCardVersion = "NORMAL";
-                            System.out.println(globalCardVersion);
+                            logger.debug(globalCardVersion);
                         }
                         case "R.Holo" -> globalCardVersion = "REVERSE HOLOFOIL";
                         case "Holo" -> globalCardVersion = "HOLOFOIL";
@@ -279,7 +280,7 @@ public class App extends Application {
             CheckBox firstEdition = new CheckBox("First Edition");
             firstEdition.setOnAction(event -> {
                 globalFirstEdition = firstEdition.isSelected();
-                System.out.println(globalFirstEdition);
+                logger.debug(globalFirstEdition);
             });
             VBox mcq =  new VBox(10, normal, revHolo, holo);
             HBox options =  new HBox(10, mcq, firstEdition);
@@ -295,7 +296,6 @@ public class App extends Application {
             dialogStage.setScene(setupScene);
             dialogStage.showAndWait();
             dialogStage.setOnCloseRequest(event -> {
-                return;
             });
 
 
@@ -405,7 +405,7 @@ public class App extends Application {
             Task<Void> priceTask = new Task<>() {
                 @Override
                 protected Void call() throws Exception {
-                    syncPrices(false, (msg, frac) -> {
+                    syncPrices((msg, frac) -> {
                         updateMessage(msg);
                         updateProgress(frac, 1.0);
                     });
@@ -422,9 +422,9 @@ public class App extends Application {
         scheduler.scheduleAtFixedRate(() -> Platform.runLater(() -> {
             Task<Void> saveTask = new Task<>() {
                 @Override
-                protected Void call() throws Exception {
-                    System.out.println("I work!");
-                    if(saved) saveSession(mainStage);
+                protected Void call(){
+                    logger.debug("I work!");
+                    if (saved) saveSession(mainStage);
                     return null;
                 }
             };
@@ -436,13 +436,13 @@ public class App extends Application {
         }), 10000, 1, TimeUnit.MINUTES);
     }
 
-    private void syncPrices(boolean force, ScanProgress progress) throws Exception {
+    private void syncPrices(ScanProgress progress) throws Exception {
         Path db = settings.cacheDir().resolve("tcg.db");
         progress.report("Retrieving price information...", -1);
         TcgdbEnv env = new TcgdbEnv(tcgdbDefaultCacheDir());
         TcgdbEnv.EnvHandle handle = env.prepare();
-        int code = env.sync(handle, db, force);
-        System.out.println("tcgdb sync exited " + code + "; db at " + db);
+        int code = env.sync(handle, db, false);
+        logger.debug("tcgdb sync exited " + code + "; db at " + db);
     }
 
     private VBox buildTop(Stage mainStage, TabPane detailTabs, ImageView view1, ImageView view2){
@@ -471,50 +471,85 @@ public class App extends Application {
         ToolBar toolBar = new ToolBar();
         Image hash1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/hash1a.png")));
         Button hash1Button = buildToolBarButton(hash1);
-        hash1Button.disableProperty().bind(isHash.not());
         Image cv1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/cv1a.png")));
         Button cv1Button = buildToolBarButton(cv1);
-        cv1Button.disableProperty().bind(isOrb.not());
         Image ocr1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/ocr1a.png")));
         Button ocr1Button = buildToolBarButton(ocr1);
         Image imp1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/imp1a.png")));
         Button imp1Button = buildToolBarButton(imp1);
         Image cd1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/cd1a.png")));
         Button cd1Button = buildToolBarButton(cd1);
+        Image prop1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/prop1a.png")));
+        Button prop1Button = buildToolBarButton(prop1);
+        Image search1 = new Image(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("icons/search1a.png")));
+        Button search1Button = buildToolBarButton(search1);
 
+        hash1Button.disableProperty().bind(Bindings.createBooleanBinding(
+                () -> currentImport() == null,
+                detailTabs.getSelectionModel().selectedItemProperty()));
         hash1Button.setOnAction(event -> {
             openSpreadSheetTab(currentImport(), "hash");
         });
 
+        cv1Button.disableProperty().bind(Bindings.createBooleanBinding(
+                () -> currentImport() == null,
+                detailTabs.getSelectionModel().selectedItemProperty()));
         cv1Button.setOnAction(event -> {
             openSpreadSheetTab(currentImport(), "orb");
         });
+
+        ocr1Button.disableProperty().bind(Bindings.createBooleanBinding(
+                () -> currentImport() == null,
+                detailTabs.getSelectionModel().selectedItemProperty()));
         ocr1Button.setOnAction(event -> {
             openSpreadSheetTab(currentImport(), "ocr");
         });
+
         imp1Button.setOnAction(event -> {
             openSpreadSheetTab(null, "session");
         });
-        cd1Button.setOnAction(event -> {
-            new Finalize(ctx, settings).finalizeImports(mainStage);
-            saveSession(mainStage);
-        });
+
         Separator sep = new Separator();
 
-        toolBar.getItems().addAll(hash1Button, cv1Button, ocr1Button, imp1Button, sep, cd1Button);
+        cd1Button.setOnAction(event -> {
+            new Finalize(ctx, settings).finalizeImports(mainStage);
+            //saveSession(mainStage);
+        });
+
+        prop1Button.disableProperty().bind(Bindings.createBooleanBinding(
+                () -> currentImport() == null,
+                detailTabs.getSelectionModel().selectedItemProperty()));
+        prop1Button.setOnAction(event -> {
+            new ImportsProperties(mainStage, ctx, currentImport(), settings);
+        });
+
+        search1Button.disableProperty().bind(Bindings.createBooleanBinding(
+                () -> currentImport() == null,
+                detailTabs.getSelectionModel().selectedItemProperty()));
+        search1Button.setOnAction(event -> {
+            CardImports imp = currentImport();
+            if (imp == null) return;
+            new CardSearchDialog(ctx.searchDB())
+                    .showAndWait(mainStage)
+                    .ifPresent(imp::applyManualMatch);
+        });
+
+
+
+        toolBar.getItems().addAll(hash1Button, cv1Button, ocr1Button, imp1Button, sep, cd1Button, prop1Button, search1Button);
 
 
         //Menu bar operations...
 
 
         newSessionItem.setOnAction(e -> {
-            System.out.println("Creating new session...");
+            logger.debug("Creating new session...");
             saved = false;
             ctx.importDB.clearSession();
             refreshImports(ctx.importDB());
             currentSession = "";
-            mainStage.setTitle("Pokecard - "+currentSession);
-            sessionPath = Path.of(settings.outputDir()+"/"+ currentSession);
+            mainStage.setTitle("Pokecard - " + currentSession);
+            sessionPath = Path.of(settings.outputDir() + "/" + currentSession);
             config.set(Config.SESSION_PATH, String.valueOf(sessionPath));
         });
 
@@ -543,16 +578,16 @@ public class App extends Application {
                         updateMessage(msg);
                         updateProgress(frac, 1.0);
                     });
-                    System.out.println("\n\n" + ctx.importDB.getLastImports().getOrbWinner());
+                    logger.debug("\n\n" + ctx.importDB.getLastImports().getOrbWinner());
                     return result;
                 }
             };
             runTask(t, found -> {
                 view1.setImage(new Image(file.toURI().toString()));
                 String foundImage = found.getOrbWinner().img();
-                System.out.println(foundImage);
+                logger.debug(foundImage);
                 view2.setImage(new Image(new File(foundImage).toURI().toString()));
-                System.out.println(ctx.importDB.getLastImports().getOrbWinner().img());
+                logger.debug(ctx.importDB.getLastImports().getOrbWinner().img());
                 //view2.setImage(new Image(ctx.importDB.getLastImports().getOrbWinner().img()));
 
             });
@@ -584,14 +619,14 @@ public class App extends Application {
                 showError(new IllegalArgumentException("No current import"));
             }
             new ImportsProperties(mainStage, ctx, currentImport(), settings);
-            saveSession(mainStage);
+            //saveSession(mainStage);
         });
 
         aboutItem.setOnAction(e -> {
             Stage aboutStage = new Stage();
             aboutStage.setTitle("About Pokecard");
             Label name = new Label("Pokecard");
-            Label version = new Label("Version 0.8.0");
+            Label version = new Label("Version 0.8.1");
             Label author = new Label("by willtryon");
             Button close = new Button("Close");
             VBox aboutLayout = new VBox(12, name, version, author, close);
@@ -616,9 +651,9 @@ public class App extends Application {
     }
 
 
-    private void saveSession(Stage owner){
-        System.out.println("Saving imports to disk:");
-        if(saved) ctx.importDB.writeImportsToDisk(currentSession);
+    private void saveSession(Stage owner) {
+        logger.debug("Saving imports to disk:");
+        if (saved) ctx.importDB.writeImportsToDisk(currentSession);
         if (!saved) {
             FileChooser fc = new FileChooser();
             fc.setTitle("Save Session");
@@ -632,8 +667,7 @@ public class App extends Application {
 
                 if (filePath.toLowerCase().endsWith(extension + extension)) {
                     filePath = filePath.substring(0, filePath.length() - extension.length());
-                }
-                else if (!filePath.toLowerCase().endsWith(extension)) {
+                } else if (!filePath.toLowerCase().endsWith(extension)) {
                     filePath += extension;
                 }
                 File fixedFile = new File(filePath);
@@ -648,22 +682,21 @@ public class App extends Application {
                 }
             }
         }
-        System.out.println("Done.");
+        logger.debug("Done.");
         saved = true;
     }
 
-    private void loadSession(Stage owner, boolean tf){
-        System.out.println("Loading imports from disk:");
+    private void loadSession(Stage owner, boolean tf) {
+        logger.debug("Loading imports from disk:");
         //statusBar.setText("Loading Session...");
         //statusProgress.setVisible(true);
         if (tf) {
             ctx.importDB.readImportsFromDisk(sessionPath);
-        }
-        else{
+        } else {
             FileChooser fc = new FileChooser();
             fc.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Binary (*.dat)", "*.dat"));
             File targetFile = fc.showOpenDialog(owner);
-            if(targetFile != null){
+            if (targetFile != null) {
                 sessionPath = targetFile.toPath();
                 ctx.importDB.readImportsFromDisk(sessionPath);
             }
@@ -676,14 +709,14 @@ public class App extends Application {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        System.out.println("Loaded " + restored.size() + " imports.");
+        logger.debug("Loaded " + restored.size() + " imports.");
         refreshImports(ctx.importDB());
         saved = true;
         /*
         if (!restored.isEmpty()) {
             System.out.println(restored.getFirst().getORBRecordHistory() + "\n" + restored.get(0).getOrbWinner());
         }*/
-        System.out.println("Done.");
+        logger.debug("Done.");
         //statusBar.setText("Ready.");
         //statusProgress.setVisible(false);
     }
@@ -786,7 +819,6 @@ public class App extends Application {
     }
 
     private void openCardTab(CardSignature sig) {
-        isOrb.set(false); isHash.set(false);
         if (focusExistingTab("card:" + sig.getCardID())) return;
         Tab tab = new Tab(sig.getCardID(), buildCardDetail(sig));
         tab.setId("card:" + sig.getCardID());
@@ -795,8 +827,8 @@ public class App extends Application {
     }
 
     private void openImportTab(CardImports imp) {
-        isOrb.set(true); isHash.set(true);
         Path q = imp.getQueryImage();
+        toggleMode = "default";
         String key = "import:" + (q == null ? String.valueOf(imp.hashCode()) : q.toString());
         if (focusExistingTab(key)) return;
         Tab tab = new Tab(q == null ? "Import" : q.getFileName().toString(), buildImportDetail(imp));
@@ -807,7 +839,6 @@ public class App extends Application {
     }
 
     private void openSpreadSheetTab(CardImports imp, String args) {
-        isOrb.set(false); isHash.set(false);
         Path q = sessionPath;
         if(!args.equals("session")) q = imp.getQueryImage();
         String key = "spreadsheet:" + (q == null ? String.valueOf(imp.hashCode()) : q.toString());
@@ -816,6 +847,7 @@ public class App extends Application {
         SpreadsheetView sv = buildSpreadsheet(imp, args);
         Tab tab = new Tab(title, sv);
         tab.setId(key);
+        tab.setUserData(imp);
         detailTabs.getTabs().add(tab);
         detailTabs.getSelectionModel().select(tab);
         if(firstRun){
@@ -876,7 +908,7 @@ public class App extends Application {
         FullCardSignature orbSig = null;
         try {
             orbSig = new FullCardSignature(sig, settings.dbPath(), settings.cacheDir(), globalCardVersion, globalFirstEdition);
-            System.out.println(orbSig.getName());
+            logger.debug(orbSig.getName());
         } catch (SQLException e) {
             showError(e);
         }
@@ -913,18 +945,19 @@ public class App extends Application {
         HBox content = new HBox(10);
         content.setPadding(new Insets(16));
 
-        //ToggleGroup group = new ToggleGroup();
+        ToggleGroup group = new ToggleGroup();
 
-        //ToggleButton overview = new ToggleButton("Overview");
-        //ToggleButton hashList = new ToggleButton("Hash");
-        //ToggleButton orbList = new ToggleButton("ORB");
-        //ToggleButton ocrList = new ToggleButton("OCR");
+        ToggleButton overview = new ToggleButton("Overview");
+        ToggleButton hashList = new ToggleButton("Hash");
+        ToggleButton orbList = new ToggleButton("ORB");
+        ToggleButton ocrList = new ToggleButton("OCR");
 
-        //ToggleButton[] buttons = { overview, hashList, orbList, ocrList };
+        ToggleButton[] buttons = { overview, hashList, orbList, ocrList };
 
-        //for(ToggleButton b : buttons){
-          //  b.setToggleGroup(group);
-        //}
+        for(ToggleButton b : buttons){
+            b.setToggleGroup(group);
+        }
+        buttons[0].setSelected(true);
 
         int size = imp.getRecordSize();
 
@@ -957,39 +990,81 @@ public class App extends Application {
         info.setSpacing(10);
 
         int[] pos = {0};
+        VBox imgStack = new VBox(10);
 
-        Runnable render = () -> {
-            if (size == 0) {
-                orbLabel.setText("ORB match: -");
-                hashLabel.setText("pHash match: -");
-                ocrLabel.setText("OCR match: -");
-                count.setText("(0 of 0)");
-                previous.setDisable(true);
-                next.setDisable(true);
-                return;
+        Runnable render = getRender(imp, size, orbLabel, hashLabel, ocrLabel, count, previous, next, pos, image2, cardName, collectorNum, series, idTCGP, cardType, rarity, price, description);
+
+        previous.setOnAction(e -> { if (pos[0] > 0)        { pos[0]--; render.run(); } });
+        next.setOnAction(e ->     { if (pos[0] < size - 1) { pos[0]++; render.run(); } });
+
+
+        Runnable updateLayout = () -> {
+            imgStack.getChildren().clear();
+            if (!toggleMode.equals("default")) {
+                imgStack.getChildren().addAll(orbLabel, hashLabel, ocrLabel, images, new HBox(16, previous, count, next));
+            } else {
+                imgStack.getChildren().addAll(images);
             }
+        };
+
+        overview.setOnAction(e -> { toggleMode = "default"; render.run(); updateLayout.run(); });
+        hashList.setOnAction(e -> { toggleMode = "hash";    render.run(); updateLayout.run(); });
+        orbList.setOnAction(e ->  { toggleMode = "orb";     render.run(); updateLayout.run(); });
+        ocrList.setOnAction(e ->  { toggleMode = "ocr";      render.run(); updateLayout.run(); });
+
+        render.run();
+        updateLayout.run(); // initial layout, replacing your old one-off if/else at the bottom
+
+        HBox bar = new HBox(10, overview, hashList, orbList, ocrList);
+        bar.setAlignment(Pos.CENTER);
+        bar.setPadding(new Insets(10));
+        bar.setSpacing(20);
+        content.getChildren().addAll(imgStack, info);
+        return new VBox(10, bar, content);
+    }
+
+    private Runnable getRender(CardImports imp, int size, Label orbLabel, Label hashLabel, Label ocrLabel, Label count, Button previous, Button next, int[] pos, ImageView image2, Label cardName, Label collectorNum, Label series, Label idTCGP, Label cardType, Label rarity, Label price, Label description) {
+        return () -> {
             int p = pos[0];
-            CardSignature orbSigVictim  = imp.getARecordRecord(p, "orb");
+            CardSignature orbSigVictim;
             FullCardSignature orbSig = null;
+            switch(toggleMode){
+                case "ocr" -> orbSigVictim = ctx.searchDB.signature(imp.getOcrWinner().cardID());
+                case "default" -> orbSigVictim = ctx.searchDB.signature(imp.getBestMatch().cardID());
+                default -> orbSigVictim  = imp.getARecordRecord(p, toggleMode);
+            }
             try {
                 orbSig = new FullCardSignature(orbSigVictim, settings.dbPath(), settings.cacheDir(), imp.getCardVersion(), imp.getFirstEdition());
-                System.out.println(orbSig.getName());
             } catch (SQLException e) {
                 showError(e);
             }
-            CardSignature hashSig = imp.getARecordRecord(p, "hash");
-            CardImports.Match ocrSig = imp.getOcrWinner();
-
-            orbLabel.setText ("ORB match: "   + (orbSig  == null ? "-" : orbSig.getCardID()  + "  (" + imp.getARecordScore(p, "orb")  + ")"));
-            hashLabel.setText("pHash match: " + (hashSig == null ? "-" : hashSig.getCardID() + "  (" + imp.getARecordScore(p, "hash") + ")"));
-            ocrLabel.setText("OCR match: " + (ocrSig == null || ocrSig.cardID() == null ? "-" : ocrSig.cardID()));
-
-            Path orbImg = (orbSig != null) ? orbSig.getImgPath() : null;
-            image2.setImage((orbImg != null && Files.exists(orbImg)) ? new Image(orbImg.toUri().toString()) : null);
-
             count.setText("(" + (p + 1) + " of " + size + ")");
             previous.setDisable(p == 0);
             next.setDisable(p >= size - 1);
+
+            if(toggleMode.equals("default")){
+                if (size == 0) {
+                    orbLabel.setText("ORB match: -");
+                    hashLabel.setText("pHash match: -");
+                    ocrLabel.setText("OCR match: -");
+                    count.setText("(0 of 0)");
+                    previous.setDisable(true);
+                    next.setDisable(true);
+                }
+                CardSignature hashSig = imp.getARecordRecord(p, "hash");
+                CardImports.Match ocrSig = imp.getOcrWinner();
+
+                orbLabel.setText ("ORB match: "   + (orbSig  == null ? "-" : orbSig.getCardID()  + "  (" + imp.getARecordScore(p, "orb")  + ")"));
+                hashLabel.setText("pHash match: " + (hashSig == null ? "-" : hashSig.getCardID() + "  (" + imp.getARecordScore(p, "hash") + ")"));
+                ocrLabel.setText("OCR match: " + (ocrSig == null || ocrSig.cardID() == null ? "-" : ocrSig.cardID()));
+
+                count.setText("(" + (p + 1) + " of " + size + ")");
+                previous.setDisable(p == 0);
+                next.setDisable(p >= size - 1);
+            }
+
+            Path orbImg = (orbSig != null) ? orbSig.getImgPath() : null;
+            image2.setImage((orbImg != null && Files.exists(orbImg)) ? new Image(orbImg.toUri().toString()) : null);
 
             cardName.setText("Name: " + (orbSig == null ? "" : orbSig.getName()));
             collectorNum.setText("Collection Number: "+(orbSig == null ? "" : orbSig.getExpCardNumber()));
@@ -1000,18 +1075,6 @@ public class App extends Application {
             price.setText("Price: "+(orbSig == null ? "" : String.valueOf(orbSig.getPrice())));
             description.setText((orbSig == null ? "" : orbSig.getDescription()));
         };
-
-        previous.setOnAction(e -> { if (pos[0] > 0)        { pos[0]--; render.run(); } });
-        next.setOnAction(e ->     { if (pos[0] < size - 1) { pos[0]++; render.run(); } });
-
-        render.run();
-
-        //HBox bar = new HBox(10, overview, hashList, orbList, ocrList);
-
-        VBox imgStack = new VBox(10);
-        imgStack.getChildren().addAll(orbLabel, hashLabel, ocrLabel, images, new HBox(16, previous, count, next));
-        content.getChildren().addAll(imgStack, info);
-        return new VBox(10, /*bar,*/ content);
     }
 
 
@@ -1156,18 +1219,20 @@ public class App extends Application {
     }
 }
 
-class InitTask extends Task<App.AppContext>{
+final class InitTask extends Task<App.AppContext>{
+
+    private static final Logger logger = LogManager.getLogger(InitTask.class);
 
     private Config.Settings settings;
 
-    protected InitTask(Settings settings) {
+    InitTask(Settings settings) {
         this.settings = settings;
     }
 
     @Override
-    protected App.AppContext call() throws Exception{
+    protected App.AppContext call() throws Exception {
         String url = "jdbc:sqlite:" + settings.dbPath();
-        System.out.println("Pokecard v0.8.0\nby willtryon\n");
+        logger.info("Pokecard v0.8.1\nby willtryon\n");
         updateMessage("Connecting to database...");
         int size;
         try (Connection conn = DriverManager.getConnection(url);
@@ -1175,11 +1240,17 @@ class InitTask extends Task<App.AppContext>{
              ResultSet rs = st.executeQuery("SELECT COUNT(*) AS n FROM cards")) {
             size = rs.next() ? rs.getInt("n") : 0;
         }
+        updateMessage("Running database tasks...");
+        new dbCleanup((msg, frac) -> {
+            updateMessage(msg);
+            updateProgress(frac, 1.0);
+        }, settings.dbPath(), settings.cacheDir().resolve("tcg.db"), false);
         Main.size = size;
-        System.out.println(settings.cacheDir().resolve("tcg.db"));
+        logger.debug(settings.cacheDir().resolve("tcg.db"));
 
         Path cacheFile = settings.cacheDir().resolve("cache_meta.dat");
         CardIndex cardDB;
+        updateProgress(-1, -1);
         if (Files.isRegularFile(cacheFile)) {
             updateMessage("Loading cache (" + size + " cards)...");
             try {
@@ -1193,14 +1264,9 @@ class InitTask extends Task<App.AppContext>{
         updateMessage("Verifying python env...");
         PokeocrEnv env = new PokeocrEnv(ocrDefaultCacheDir(), settings);
         PokeocrEnv.EnvHandle handle = env.prepare();
-        updateMessage("Running database tasks...");
         TcgdbEnv env2 = new TcgdbEnv(tcgdbDefaultCacheDir());
         TcgdbEnv.EnvHandle handle2 = env2.prepare();
-        new dbCleanup((msg, frac) -> {
-            updateMessage(msg);
-            updateProgress(frac, 1.0);
-        }, settings.dbPath(), settings.cacheDir().resolve("tcg.db"), false);
-        updateMessage("Running database tasks...");
+        updateMessage("Initializing searchDB...");
         updateProgress(1.0, 1.0);
         CardSearchRepo searchDB = new CardSearchRepo(settings.dbPath(), cardDB);
         updateMessage("Starting...");
@@ -1236,14 +1302,14 @@ class InitTask extends Task<App.AppContext>{
     }
 }
 
-class ConfigEditor {
+final class ConfigEditor {
     private final Config config;
 
-    protected ConfigEditor(Config config) {
+    ConfigEditor(Config config) {
         this.config = config;
     }
 
-    protected boolean showAndWait(Window owner) {
+    boolean showAndWait(Window owner) {
         Stage dialog = new Stage();
         if (owner != null) {
             dialog.initOwner(owner);
@@ -1285,7 +1351,7 @@ class ConfigEditor {
             for (App.Section sec : App.SECTIONS) {
                 for (App.Setting s : sec.settings()) {
                     String v = inputs.get(s.key()).getText().trim();
-                    if (!App.satisfied(s, v)) {
+                    if (App.satisfied(s, v)) {
                         error.setText("\u201C" + s.label() + "\u201D in " + sec.name() + " is missing or invalid.");
                         sidebar.getSelectionModel().select(sec);
                         return;
@@ -1328,6 +1394,7 @@ class ConfigEditor {
         int row = 0;
         for (App.Setting s : sec.settings()) {
             TextField field = new TextField();
+            field.setText(config.get(s.key()));
             switch(s.kind()){
                 case SECRET -> {
 
@@ -1345,7 +1412,6 @@ class ConfigEditor {
                             "Easy Ocr", "Got Ocr", "Trocr", "Qwen Model"
                     );
                     ComboBox<String> ocrMode = new ComboBox<>(options);
-                    System.out.println(config.get(s.key()));
                     if(config.get(s.key()).isBlank()){
                         ocrMode.setPromptText("Select an OCR model to use...");
                     }else{
@@ -1376,8 +1442,6 @@ class ConfigEditor {
                     grid.add(checkBox, 1, row);
                 }
             }
-
-            field.setText(config.get(s.key()));
             field.setPrefColumnCount(30);
             inputs.put(s.key(), field);
             if(!(s.kind()==App.Kind.MODE || s.kind()==App.Kind.BOOLEAN)){
@@ -1410,23 +1474,24 @@ class ConfigEditor {
     }
 }
 
-class Finalize{
-    private App.AppContext ctx;
+final class Finalize{
+    private final App.AppContext ctx;
     private List<CardImports> selectedItems;
     private final Settings settings;
+    ListView<CardImports> listView;
 
-    protected Finalize(App.AppContext ctx, Settings settings) {
+    Finalize(App.AppContext ctx, Settings settings) {
         this.ctx = ctx;
         this.settings = settings;
     }
 
-    protected void finalizeImports(Stage mainStage){
+    void finalizeImports(Stage mainStage){
         Stage stage = new Stage();
         stage.initModality(Modality.APPLICATION_MODAL);
         stage.initOwner(mainStage);
         stage.setTitle("Finalize Imports");
         Scene scene1 = finalizeScene1(stage, () -> {
-            stage.setScene(finalizeScene2(stage));
+            stage.setScene(finalizeScene2(stage, listView));
         });
         //Scene scene1 = finalizeScene1(stage);
         stage.setTitle("String-Based Object Checklist");
@@ -1442,7 +1507,7 @@ class Finalize{
             c.selectedProperty().set(true);
             candidates.add(c);
         }
-        ListView<CardImports> listView = new ListView<>(candidates);
+        listView = new ListView<>(candidates);
         StringConverter<CardImports> converter = new StringConverter<>() {
             @Override
             public String toString(CardImports item) {
@@ -1478,7 +1543,12 @@ class Finalize{
         return new Scene(root, 350, 200);
     }
 
-    private Scene finalizeScene2(Stage stage) {
+    private Scene finalizeScene2(Stage stage, ListView<CardImports> listView) {
+        for(CardImports c : listView.getItems()){
+            if(c.selectedProperty().get()){
+                c.setFinal(true);
+            }
+        }
         Label label = new Label("tee hee");
         VBox root = new VBox(10, label);
         return new Scene(root, 350, 200);
@@ -1486,19 +1556,19 @@ class Finalize{
 
 }
 
-class ImportsProperties{
-    private App.AppContext ctx;
-    private CardImports selected;
+final class ImportsProperties{
+    private final App.AppContext ctx;
+    private final CardImports selected;
     private final Settings settings;
 
-    protected ImportsProperties(Stage mainStage, App.AppContext ctx, CardImports selected, Settings settings) {
+    ImportsProperties(Stage mainStage, App.AppContext ctx, CardImports selected, Settings settings) {
         this.ctx = ctx;
         this.selected = selected;
         this.settings = settings;
         buildEditor(mainStage, selected);
     }
 
-    protected void buildEditor(Stage mainStage, CardImports selected) {
+    void buildEditor(Stage mainStage, CardImports selected) {
         Stage editor = new Stage();
         editor.initModality(Modality.APPLICATION_MODAL);
         editor.initOwner(mainStage);
@@ -1521,7 +1591,7 @@ class ImportsProperties{
                         Float.class, selected::getPrice, selected::setPrice),
 
                 new ImportItem<>("Match", "Best match", "The card this scan resolves to",
-                        CardImports.Match.class, selected::getBestMatch, selected::setBestMatch),
+                        CardImports.Match.class, selected::getBestMatch, selected::applyManualMatch),
 
                 new ImportItem<>("Match", "Match overridden", "Set when you pick a match by hand",
                         Boolean.class, selected::getMatchOverride, selected::setMatchOverride),
@@ -1550,10 +1620,12 @@ class ImportsProperties{
 class BestMatchEditor extends AbstractPropertyEditor<CardImports.Match, Button>{
     private ObjectProperty<CardImports.Match> value;
     private final Settings settings;
+    private App.AppContext ctx;
 
     protected BestMatchEditor(PropertySheet.Item item, App.AppContext ctx, Window owner, Settings settings) {
         super(item, new Button());
         this.settings = settings;
+        this.ctx = ctx;
         Button b = getEditor();
         b.setMaxWidth(Double.MAX_VALUE);
         b.textProperty().bind(value.map(CardImports.Match::cardID)
@@ -1565,10 +1637,12 @@ class BestMatchEditor extends AbstractPropertyEditor<CardImports.Match, Button>{
 
     @Override
     protected ObservableValue<CardImports.Match> getObservableValue() {
-        if (value == null) value = new SimpleObjectProperty<>();   // lazy: super() calls this
+        if (value == null) value = new SimpleObjectProperty<>();// lazy: super() calls this
         return value;
     }
 
     @Override
-    public void setValue(CardImports.Match m) { getObservableValue(); value.set(m); }
+    public void setValue(CardImports.Match m) {
+        getObservableValue(); value.set(m);
+    }
 }

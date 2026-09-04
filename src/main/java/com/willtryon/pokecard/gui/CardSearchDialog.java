@@ -213,7 +213,7 @@ public final class CardSearchDialog {
 
     //querying
 
-    /** Always called on the FX thread; always does its work off it. */
+    //this method is called on the Application FX thread, but all the I/O is done on a worker thread.
     private void runSearch(String text, Label status, Node busy) {
         String q = text == null ? "" : text.trim();
         final long mine = ++generation;
@@ -233,7 +233,7 @@ public final class CardSearchDialog {
         };
 
         task.setOnSucceeded(e -> {
-            if (mine != generation) return;      // a newer search already started
+            if (mine != generation) return;      //stops cascades
             List<CardHit> hits = task.getValue();
             rows.setAll(hits);
             status.setText(hits.isEmpty()

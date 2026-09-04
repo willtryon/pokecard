@@ -1,5 +1,8 @@
 package com.willtryon.pokecard;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,10 +22,11 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class dbCleanup {
+public final class dbCleanup {
 
     // --- Regexes used only by the last-resort strip (step 2c) ---
 
+    private static final Logger logger = LogManager.getLogger(dbCleanup.class);
     private static final Pattern PAREN_TAG = Pattern.compile("\\s*\\([^)]*\\)\\s*");
 
     private static final Pattern CARD_NUMBER_SUFFIX = Pattern.compile("\\s+-\\s+.*$");
@@ -72,7 +76,7 @@ public class dbCleanup {
     public void run(ScanProgress progress, Connection conn, boolean dryRun) throws SQLException {
         progress.report("Running database tasks... (1/4)", 0.25);
         loadPokedex(conn);
-        System.out.println("Loaded " + dexById.size() + " Pokédex entries.");
+        logger.debug("Loaded " + dexById.size() + " Pokédex entries.");
 
         List<Update> updates = new ArrayList<>();
         int viaFk = 0, viaHeuristic = 0, viaDict = 0, unchanged = 0, skipped = 0, shown = 0;
@@ -84,7 +88,10 @@ public class dbCleanup {
             while (rs.next()) {
                 long rowid = rs.getLong("rowid");
                 String name = rs.getString("name");
-                if (name == null) { skipped++; continue; }
+                if (name == null) {
+                    skipped++;
+                    continue;
+                }
 
                 // pokedex is INTEGER NULL -> read via getObject to detect null cleanly.
                 Object dexObj = rs.getObject("pokedex");
@@ -92,8 +99,9 @@ public class dbCleanup {
                 if (dexObj instanceof Number) {
                     dexId = ((Number) dexObj).intValue();
                 } else if (dexObj != null) {
-                    try { dexId = Integer.valueOf(dexObj.toString().trim()); }
-                    catch (NumberFormatException ignore) { /* leave null */ }
+                    try {
+                        dexId = Integer.valueOf(dexObj.toString().trim());
+                    } catch (NumberFormatException ignore) { /* leave null */ }
                 }
                 String cardType = rs.getString("cardType");
                 boolean untyped = (cardType == null || cardType.trim().isEmpty());
@@ -108,7 +116,10 @@ public class dbCleanup {
                     branch = "HEUR";
                 } else if (untyped) {
                     newName = dictionaryMatch(name);       // step 3: confident-only
-                    if (newName == null) { skipped++; continue; }
+                    if (newName == null) {
+                        skipped++;
+                        continue;
+                    }
                     branch = "DICT";
                 } else {
                     skipped++;                             // step 4: explicit non-Pokémon
@@ -154,13 +165,13 @@ public class dbCleanup {
         }
 
         System.out.println();
-        System.out.println(dryRun ? "DRY RUN (no changes written):" : "Done. Committed changes:");
-        System.out.println("  changed:   " + updates.size()
+        logger.debug(dryRun ? "DRY RUN (no changes written):" : "Done. Committed changes:");
+        logger.debug("  changed:   " + updates.size()
                 + "  (Pokédex id: " + viaFk
                 + ", Pokémon-card name parse: " + viaHeuristic
                 + ", untyped confident match: " + viaDict + ")");
-        System.out.println("  unchanged: " + unchanged + "  (already just the species name)");
-        System.out.println("  skipped:   " + skipped + "  (non-Pokémon cards, left untouched)");
+        logger.debug("  unchanged: " + unchanged + "  (already just the species name)");
+        logger.debug("  skipped:   " + skipped + "  (non-Pokémon cards, left untouched)");
     }
 
     /** Populates the Pokédex lookup structures from the `pokedex` table. */
@@ -358,20 +369,32 @@ public class dbCleanup {
                     Integer curId = (idObj instanceof Number) ? ((Number) idObj).intValue() : null;
 
                     List<Integer> groups = cross.getOrDefault(expName, List.of());
-                    if (groups.isEmpty()) { noXwalk++; continue; }
+                    if (groups.isEmpty()) {
+                        noXwalk++;
+                        continue;
+                    }
 
                     // Best name-agreeing product at this collector number, across mapped groups.
-                    Product best = null;   double bestDice = -1;   int bestGroup = -1;
-                    Product any = null;    double anyDice = -1;     boolean hadCandidate = false;
+                    Product best = null;
+                    double bestDice = -1;
+                    int bestGroup = -1;
+                    Product any = null;
+                    double anyDice = -1;
+                    boolean hadCandidate = false;
                     for (int g : groups) {
                         List<Product> ps = idx.get(key(g, cn));
                         if (ps == null) continue;
                         for (Product p : ps) {
                             hadCandidate = true;
                             double dd = dice(name, p.name());
-                            if (dd > anyDice) { anyDice = dd; any = p; }
+                            if (dd > anyDice) {
+                                anyDice = dd;
+                                any = p;
+                            }
                             if (nameAgree(name, p.name()) && dd > bestDice) {
-                                bestDice = dd; best = p; bestGroup = g;
+                                bestDice = dd;
+                                best = p;
+                                bestGroup = g;
                             }
                         }
                     }
@@ -390,7 +413,10 @@ public class dbCleanup {
                                 "number matches '" + other + "' but name differs"});
                         continue;
                     }
-                    if (curId != null && best.id() == curId) { confirmed++; continue; }
+                    if (curId != null && best.id() == curId) {
+                        confirmed++;
+                        continue;
+                    }
 
                     corrected++;
                     String[] si = setInfo.get(bestGroup);
@@ -439,16 +465,16 @@ public class dbCleanup {
             if (reportCsv != null) writeReport(reportCsv, report);
 
             System.out.println();
-            System.out.println(dryRun
+            logger.debug(dryRun
                     ? "DRY RUN (no idTCGP changes written):"
                     : "Done. Committed idTCGP changes" + (writeSetFields ? " (+ set fields):" : ":"));
-            System.out.println("  confirmed: " + confirmed + "  (already correct)");
-            System.out.println("  corrected: " + corrected + "  (idTCGP rewritten, name-verified)");
-            System.out.println("  review:    " + review + "  (number matched, name differs — left unchanged)");
-            System.out.println("  unmatched: " + unmatched + "  (no product at that number — left unchanged)");
-            System.out.println("  no_xwalk:  " + noXwalk + "  (expansion has no TCGplayer set)");
+            logger.debug("  confirmed: " + confirmed + "  (already correct)");
+            logger.debug("  corrected: " + corrected + "  (idTCGP rewritten, name-verified)");
+            logger.debug("  review:    " + review + "  (number matched, name differs — left unchanged)");
+            logger.debug("  unmatched: " + unmatched + "  (no product at that number — left unchanged)");
+            logger.debug("  no_xwalk:  " + noXwalk + "  (expansion has no TCGplayer set)");
             if (reportCsv != null) {
-                System.out.println("  report:    " + reportCsv + "  (" + report.size() + " rows)");
+                logger.debug("  report:    " + reportCsv + "  (" + report.size() + " rows)");
             }
             return new ReconcileStats(confirmed, corrected, review, unmatched, noXwalk);
 
@@ -634,7 +660,7 @@ public class dbCleanup {
             st.executeUpdate("INSERT INTO cards_fts(cards_fts) VALUES('rebuild')");
 
             try (ResultSet rs = st.executeQuery("SELECT count(*) FROM cards_fts")) {
-                System.out.println("cards_fts: indexed " + (rs.next() ? rs.getInt(1) : 0) + " cards.");
+                logger.debug("cards_fts: indexed " + (rs.next() ? rs.getInt(1) : 0) + " cards.");
             }
         }
     }

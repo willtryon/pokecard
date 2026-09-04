@@ -1,6 +1,8 @@
 package com.willtryon.pokecard;
 
 import dev.brachtendorf.jimagehash.hash.Hash;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.bytedeco.opencv.opencv_core.KeyPointVector;
 import org.bytedeco.opencv.opencv_core.Mat;
 
@@ -10,6 +12,7 @@ import java.nio.file.Path;
 import static com.willtryon.pokecard.CardImportsIndex.globalCardVersion;
 
 public class FullCardSignature extends CardSignature {
+    private static final Logger logger = LogManager.getLogger(FullCardSignature.class);
     private final int idTCGP;
     private final String name;
     private final String expIdTCGP;
@@ -142,36 +145,36 @@ public class FullCardSignature extends CardSignature {
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
                         String subType = rs.getString("sub_type");
-                        System.out.println("\n"+subType);
+                        logger.debug("\n" + subType);
                         float marketPrice = rs.getFloat("market_price");
-                        System.out.print("\tMarket Price: "+marketPrice);
+                        System.out.print("\tMarket Price: " + marketPrice);
                         float lowPrice = rs.getFloat("low_price");
-                        System.out.print("\tLow Price: "+lowPrice);
+                        System.out.print("\tLow Price: " + lowPrice);
                         float midPrice = rs.getFloat("mid_price");
-                        System.out.print("\tMid Price: "+midPrice);
+                        System.out.print("\tMid Price: " + midPrice);
                         price = Math.max(marketPrice, Math.max(lowPrice, midPrice));
-                    }else{
+                    }else {
                         rs.close();
-                        System.out.println("No data found, trying unlimited...");
-                        switch(cardVersion){
+                        logger.debug("No data found, trying unlimited...");
+                        switch (cardVersion) {
                             case "NORMAL" -> cardVersion = "UNLIMITED";
                             case "HOLOFOIL" -> cardVersion = "UNLIMITED HOLOFOIL";
                         }
                         ps.setString(2, getCardVersion());
-                        try(ResultSet rs2 = ps.executeQuery()) {
+                        try (ResultSet rs2 = ps.executeQuery()) {
                             if (rs2.next()) {
                                 String subType = rs.getString("sub_type");
-                                System.out.println(subType);
+                                logger.debug(subType);
                                 float marketPrice = rs.getFloat("market_price");
-                                System.out.print("\tMarket Price: "+marketPrice);
+                                System.out.print("\tMarket Price: " + marketPrice);
                                 float lowPrice = rs.getFloat("low_price");
-                                System.out.print("\tLow Price: "+lowPrice);
+                                System.out.print("\tLow Price: " + lowPrice);
                                 float midPrice = rs.getFloat("mid_price");
-                                System.out.print("\tMid Price: "+midPrice);
+                                System.out.print("\tMid Price: " + midPrice);
                                 price = Math.max(marketPrice, Math.max(lowPrice, midPrice));
-                            }else {
+                            } else {
                                 rs2.close();
-                                System.out.println("No price found...");
+                                logger.debug("No price found...");
                             }
                         }
 
