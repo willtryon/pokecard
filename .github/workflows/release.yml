@@ -79,7 +79,7 @@ jobs:
 
       - name: Build platform-restricted jar
         shell: bash
-        run: mvn -B clean package -Djavacpp.platform=${{ matrix.platform }} --file pom.xml
+        run: mvn -B clean package "-Djavacpp.platform=${{ matrix.platform }}" --file pom.xml
 
       - name: Name the jar for its platform
         shell: bash
