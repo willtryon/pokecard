@@ -12,6 +12,7 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
+import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -30,6 +31,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 public final class CardSearchDialog {
 
@@ -38,6 +40,7 @@ public final class CardSearchDialog {
     private static final int    CACHE_SIZE   = 300;
 
     private final CardSearchRepo repo;
+    private final Consumer<String> onOpenInDatabase;   // may be null; button only appears when set
     private final ObservableList<CardHit> rows = FXCollections.observableArrayList();
 
     /*this is required so the images in the dialog window remain in the jvm heap, otherwise whenever the
@@ -54,7 +57,12 @@ public final class CardSearchDialog {
     private long generation = 0;
 
     public CardSearchDialog(CardSearchRepo repo) {
+        this(repo, null);
+    }
+
+    public CardSearchDialog(CardSearchRepo repo, Consumer<String> onOpenInDatabase) {
         this.repo = repo;
+        this.onOpenInDatabase = onOpenInDatabase;
     }
 
     public Optional<CardImports.Match> showAndWait(Window owner) {
@@ -101,6 +109,25 @@ public final class CardSearchDialog {
         Node ok = dlg.getDialogPane().lookupButton(ButtonType.OK);
         ok.disableProperty().bind(
                 winners.getSelectionModel().selectedItemProperty().isNull());
+
+        // Optional "Open in Database" action: hand the picked card to the app, which closes the
+        // other windows and opens its Database tab. Only shown when a callback is wired in.
+        if (onOpenInDatabase != null) {
+            ButtonType openInDb = new ButtonType("Open in Database", ButtonBar.ButtonData.LEFT);
+            dlg.getDialogPane().getButtonTypes().add(openInDb);
+            Button openBtn = (Button) dlg.getDialogPane().lookupButton(openInDb);
+            openBtn.disableProperty().bind(
+                    winners.getSelectionModel().selectedItemProperty().isNull());
+            openBtn.addEventFilter(ActionEvent.ACTION, evt -> {
+                CardHit hit = winners.getSelectionModel().getSelectedItem();
+                if (hit != null) {
+                    String cardId = hit.cardId();
+                    // run after this dialog has closed, so the window teardown is clean
+                    Platform.runLater(() -> onOpenInDatabase.accept(cardId));
+                }
+                // deliberately NOT consumed: the dialog closes like any other button press
+            });
+        }
 
         // debounce is used when a pause in typing is detected, so the application doesn't perform a query every frame.
         PauseTransition debounce = new PauseTransition(Duration.millis(250));

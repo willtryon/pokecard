@@ -70,6 +70,7 @@ public final class App extends Application {
     private final ObjectProperty<Task<?>> statusTask = new SimpleObjectProperty<>();
     private PopOver taskPopOver;
     private TabPane detailTabs;
+    private Stage mainStage;        // stable handle to the primary window, so we can raise it later
     private TreeItem<SideNode> importsBranch;
     private String toggleMode = "default";
     public static boolean firstRun = true;
@@ -227,7 +228,7 @@ public final class App extends Application {
     }
 
     public void showMainStage() {
-        Stage mainStage = new Stage();
+        mainStage = new Stage();
         //Main init...
         Label title = new Label("Pokecard");
         ImageView view1 = new ImageView();
@@ -511,8 +512,8 @@ public final class App extends Application {
 
         Separator sep = new Separator();
 
-        cd1Button.setOnAction(event -> {
-            new Finalize(ctx, settings).finalizeImports(mainStage);
+            cd1Button.setOnAction(event -> {
+            new Finalize(ctx, settings, this::revealCardInDatabase).finalizeImports(mainStage);
             //saveSession(mainStage);
         });
 
@@ -520,7 +521,7 @@ public final class App extends Application {
                 () -> currentImport() == null,
                 detailTabs.getSelectionModel().selectedItemProperty()));
         prop1Button.setOnAction(event -> {
-            new ImportsProperties(mainStage, ctx, currentImport(), settings);
+            new ImportsProperties(mainStage, ctx, currentImport(), settings, this::revealCardInDatabase);
         });
 
         search1Button.disableProperty().bind(Bindings.createBooleanBinding(
@@ -529,7 +530,7 @@ public final class App extends Application {
         search1Button.setOnAction(event -> {
             CardImports imp = currentImport();
             if (imp == null) return;
-            new CardSearchDialog(ctx.searchDB())
+            new CardSearchDialog(ctx.searchDB(), this::revealCardInDatabase)
                     .showAndWait(mainStage)
                     .ifPresent(imp::applyManualMatch);
         });
@@ -618,7 +619,7 @@ public final class App extends Application {
             if(currentImport() == null){
                 showError(new IllegalArgumentException("No current import"));
             }
-            new ImportsProperties(mainStage, ctx, currentImport(), settings);
+            new ImportsProperties(mainStage, ctx, currentImport(), settings, this::revealCardInDatabase);
             //saveSession(mainStage);
         });
 
@@ -626,7 +627,7 @@ public final class App extends Application {
             Stage aboutStage = new Stage();
             aboutStage.setTitle("About Pokecard");
             Label name = new Label("Pokecard");
-            Label version = new Label("Version 0.8.1");
+            Label version = new Label("Version 0.8.2");
             Label author = new Label("by willtryon");
             Button close = new Button("Close");
             VBox aboutLayout = new VBox(12, name, version, author, close);
@@ -824,6 +825,26 @@ public final class App extends Application {
         tab.setId("card:" + sig.getCardID());
         detailTabs.getTabs().add(tab);
         detailTabs.getSelectionModel().select(tab);
+    }
+
+    /** Close every secondary window, raise the main window, and open the card's Database tab. */
+    private void revealCardInDatabase(String cardId) {
+        if (mainStage == null) return;                       // main window must exist
+
+        // close all other windows (the search dialog is already gone by now; this gets the
+        // property-sheet editor, an ORB-matches window, the scan dialog, etc.)
+        for (Window w : List.copyOf(Window.getWindows())) {
+            if (w != mainStage && w instanceof Stage s) s.close();
+        }
+
+        // bring the main window forward
+        if (!mainStage.isShowing()) mainStage.show();
+        mainStage.toFront();
+        mainStage.requestFocus();
+
+        // open (or focus) the Database tab for this card
+        CardSignature sig = ctx.cardDB.findCardId(cardId);
+        if (sig != null) openCardTab(sig);
     }
 
     private void openImportTab(CardImports imp) {
@@ -1232,7 +1253,7 @@ final class InitTask extends Task<App.AppContext>{
     @Override
     protected App.AppContext call() throws Exception {
         String url = "jdbc:sqlite:" + settings.dbPath();
-        logger.info("Pokecard v0.8.1\nby willtryon\n");
+        logger.info("Pokecard v0.8.2\nby willtryon\n");
         updateMessage("Connecting to database...");
         int size;
         try (Connection conn = DriverManager.getConnection(url);
@@ -1478,11 +1499,13 @@ final class Finalize{
     private final App.AppContext ctx;
     private List<CardImports> selectedItems;
     private final Settings settings;
+    private final Consumer<String> onReveal;
     ListView<CardImports> listView;
 
-    Finalize(App.AppContext ctx, Settings settings) {
+    Finalize(App.AppContext ctx, Settings settings, Consumer<String> onReveal) {
         this.ctx = ctx;
         this.settings = settings;
+        this.onReveal = onReveal;
     }
 
     void finalizeImports(Stage mainStage){
@@ -1533,7 +1556,7 @@ final class Finalize{
         });
         propertiesButton.setOnAction(e -> {
             CardImports temp = listView.getSelectionModel().getSelectedItem();
-            new ImportsProperties(stage, ctx, temp, settings);
+            new ImportsProperties(stage, ctx, temp, settings, onReveal);
         });
 
         HBox buttons = new HBox(10, nextButton, cancelButton, propertiesButton);
@@ -1560,11 +1583,14 @@ final class ImportsProperties{
     private final App.AppContext ctx;
     private final CardImports selected;
     private final Settings settings;
+    private final Consumer<String> onReveal;
 
-    ImportsProperties(Stage mainStage, App.AppContext ctx, CardImports selected, Settings settings) {
+    ImportsProperties(Stage mainStage, App.AppContext ctx, CardImports selected, Settings settings,
+                      Consumer<String> onReveal) {
         this.ctx = ctx;
         this.selected = selected;
         this.settings = settings;
+        this.onReveal = onReveal;
         buildEditor(mainStage, selected);
     }
 
@@ -1607,7 +1633,7 @@ final class ImportsProperties{
         DefaultPropertyEditorFactory defaults = new DefaultPropertyEditorFactory();
         sheet.setPropertyEditorFactory(item ->
                 item.getType() == CardImports.Match.class
-                        ? new BestMatchEditor(item, ctx, editor, settings)   // editor == the owning Stage
+                        ? new BestMatchEditor(item, ctx, editor, settings, onReveal)   // editor == the owning Stage
                         : defaults.call(item));
         VBox test = new VBox(10, sheet);
         test.setAlignment(Pos.CENTER);
@@ -1621,16 +1647,19 @@ class BestMatchEditor extends AbstractPropertyEditor<CardImports.Match, Button>{
     private ObjectProperty<CardImports.Match> value;
     private final Settings settings;
     private App.AppContext ctx;
+    private final Consumer<String> onReveal;
 
-    protected BestMatchEditor(PropertySheet.Item item, App.AppContext ctx, Window owner, Settings settings) {
+    protected BestMatchEditor(PropertySheet.Item item, App.AppContext ctx, Window owner,
+                              Settings settings, Consumer<String> onReveal) {
         super(item, new Button());
         this.settings = settings;
         this.ctx = ctx;
+        this.onReveal = onReveal;
         Button b = getEditor();
         b.setMaxWidth(Double.MAX_VALUE);
         b.textProperty().bind(value.map(CardImports.Match::cardID)
                 .orElse("Choose a card\u2026"));
-        b.setOnAction(e -> new CardSearchDialog(ctx.searchDB())
+        b.setOnAction(e -> new CardSearchDialog(ctx.searchDB(), onReveal)
                 .showAndWait(owner)
                 .ifPresent(value::set));
     }
