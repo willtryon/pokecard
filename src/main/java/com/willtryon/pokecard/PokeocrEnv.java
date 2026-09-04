@@ -249,7 +249,7 @@ public final class PokeocrEnv{
         }
     }
 
-    /** Absolute path to certifi's CA bundle inside the venv, or null if unavailable. */
+    // Absolute path to certifi's CA bundle inside the venv, or null if unavailable. (macOS only.)
     private String certifiBundle(Path python) {
         try {
             Process proc = new ProcessBuilder(python.toString(), "-c",
@@ -290,7 +290,7 @@ public final class PokeocrEnv{
                 if (created) fs.close();
             }
         } else {
-            // Running from exploded target/classes (IDE / mvn javafx:run).
+            //for mvn javafx:run
             copyTree(Paths.get(uri), dest);
         }
     }
@@ -360,11 +360,11 @@ public final class PokeocrEnv{
         return proc.waitFor();
     }
 
-    /** Returns true if the command runs and exits 0 (used for GPU probing). */
+    // Returns true if the command runs and exits 0.
     private static boolean commandSucceeds(String... cmd) {
         try {
             Process p = new ProcessBuilder(cmd).redirectErrorStream(true).start();
-            p.getInputStream().readAllBytes(); // drain so the process doesn't block on a full pipe
+            p.getInputStream().readAllBytes(); //drains input stream.
             return p.waitFor() == 0;
         } catch (IOException | InterruptedException e) {
             if (e instanceof InterruptedException) Thread.currentThread().interrupt();

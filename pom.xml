@@ -21,7 +21,7 @@
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-api</artifactId>
-            <version>2.24.0</version>
+            <version>2.25.4</version>
         </dependency>
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
@@ -66,6 +66,18 @@
         </dependency>
     </dependencies>
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <excludes>
+                    <exclude>**/.DS_Store</exclude>
+                    <exclude>python/scans/**</exclude>
+                    <exclude>python/out/**</exclude>
+                    <exclude>python/out2/**</exclude>
+                    <exclude>python/**/__pycache__/**</exclude>
+                </excludes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

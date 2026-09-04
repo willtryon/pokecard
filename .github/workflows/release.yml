@@ -1,15 +1,3 @@
-# Builds and publishes a release whenever a pull request is merged into master:
-#   - a runnable "fat" jar with every dependency bundled in
-#   - a macOS pokecard.app app image
-#   - a Fedora/RHEL pokecard rpm package
-# The rpm is then published to a small DNF/YUM repository hosted on GitHub
-# Pages, so `sudo dnf update` on a machine with that repo configured will
-# pick up new releases automatically.
-#
-# This workflow uses actions that are not certified by GitHub. They are
-# provided by third parties and governed by separate terms of service,
-# privacy policy, and support documentation.
-
 name: Release
 
 on:
@@ -17,7 +5,6 @@ on:
     types: [closed]
     branches: [ "master" ]
   workflow_dispatch:
-
 
 permissions:
   contents: read
@@ -52,6 +39,50 @@ jobs:
             exit 1
           fi
 
+  # One lean jar per platform. -Djavacpp.platform prunes OpenCV natives to a
+  # single OS; JavaFX natives are pruned automatically by building on the
+  # matching native runner.
+  build-jars:
+    needs: check-version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux-x86_64
+            label: linux-x86_64
+          - os: windows-latest
+            platform: windows-x86_64
+            label: windows-x86_64
+          - os: macos-latest        # macos-latest is Apple Silicon (arm64)
+            platform: macosx-arm64
+            label: macos-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build platform-restricted jar
+        run: mvn -B clean package -Djavacpp.platform=${{ matrix.platform }} --file pom.xml
+
+      - name: Name the jar for its platform
+        shell: bash          # windows-latest defaults to pwsh; force bash for the cp
+        run: |
+          cp target/pokecard-${{ needs.check-version.outputs.version }}.jar \
+             pokecard-${{ needs.check-version.outputs.version }}-${{ matrix.label }}.jar
+
+      - name: Upload jar artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pokecard-jar-${{ matrix.label }}
+          path: pokecard-${{ needs.check-version.outputs.version }}-${{ matrix.label }}.jar
+
   build-macos-app:
     needs: check-version
     runs-on: macos-latest
@@ -66,7 +97,7 @@ jobs:
           cache: maven
 
       - name: Build jar with Maven
-        run: mvn -B clean package --file pom.xml
+        run: mvn -B clean package -Djavacpp.platform=macosx-arm64 --file pom.xml
 
       - name: Package pokecard.app with jpackage
         run: |
@@ -89,7 +120,48 @@ jobs:
           name: pokecard-macos-app
           path: dist/pokecard-${{ needs.check-version.outputs.version }}-macos.zip
 
-  build-linux-rpm:
+  # Windows app image, zipped. jpackage --type app-image needs no external
+  # tooling (unlike --type msi, which on JDK 21 requires WiX 3.x). The user
+  # unzips and runs pokecard.exe. See notes below the file for the MSI variant.
+  build-windows:
+    needs: check-version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build jar with Maven
+        run: mvn -B clean package -Djavacpp.platform=windows-x86_64 --file pom.xml
+
+      - name: Package app image with jpackage
+        run: |                       # pwsh: line continuation is a backtick, not a backslash
+          jpackage `
+            --type app-image `
+            --input target `
+            --dest dist `
+            --name pokecard `
+            --main-jar pokecard-${{ needs.check-version.outputs.version }}.jar `
+            --main-class com.willtryon.pokecard.gui.Launcher `
+            --app-version ${{ needs.check-version.outputs.version }} `
+            --vendor willtryon
+
+      - name: Zip the app image
+        run: Compress-Archive -Path dist/pokecard -DestinationPath dist/pokecard-${{ needs.check-version.outputs.version }}-windows.zip
+
+      - name: Upload windows app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pokecard-windows-app
+          path: dist/pokecard-${{ needs.check-version.outputs.version }}-windows.zip
+
+  # Builds the jar once, then emits both .rpm and .deb from it.
+  build-linux-packages:
     needs: check-version
     runs-on: ubuntu-latest
     steps:
@@ -102,17 +174,12 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Install rpm packaging tools
-        run: sudo apt-get update && sudo apt-get install -y rpm createrepo-c
+      # rpm -> rpmbuild;  fakeroot -> required by jpackage's deb packaging
+      - name: Install rpm + deb packaging tools
+        run: sudo apt-get update && sudo apt-get install -y rpm createrepo-c fakeroot
 
       - name: Build jar with Maven
-        run: mvn -B clean package --file pom.xml
-
-      - name: Upload jar artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: pokecard-jar
-          path: target/pokecard-${{ needs.check-version.outputs.version }}.jar
+        run: mvn -B clean package -Djavacpp.platform=linux-x86_64 --file pom.xml
 
       - name: Package .rpm with jpackage
         run: |
@@ -126,7 +193,21 @@ jobs:
             --app-version ${{ needs.check-version.outputs.version }} \
             --vendor willtryon \
             --linux-package-name pokecard \
-            --description "PokeCard - Pokemon card scanning and collection tool"
+            --description "Pokecard - Pokemon card scanning and collection tool"
+
+      - name: Package .deb with jpackage
+        run: |
+          jpackage \
+            --type deb \
+            --input target \
+            --dest dist \
+            --name pokecard \
+            --main-jar pokecard-${{ needs.check-version.outputs.version }}.jar \
+            --main-class com.willtryon.pokecard.gui.Launcher \
+            --app-version ${{ needs.check-version.outputs.version }} \
+            --vendor willtryon \
+            --linux-package-name pokecard \
+            --description "Pokecard - Pokemon card scanning and collection tool"
 
       - name: Upload rpm artifact
         uses: actions/upload-artifact@v4
@@ -134,8 +215,14 @@ jobs:
           name: pokecard-rpm
           path: dist/*.rpm
 
+      - name: Upload deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pokecard-deb
+          path: dist/*.deb
+
   create-release:
-    needs: [check-version, build-macos-app, build-linux-rpm]
+    needs: [check-version, build-jars, build-macos-app, build-windows, build-linux-packages]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -153,12 +240,14 @@ jobs:
           name: Pokecard v${{ needs.check-version.outputs.version }}
           generate_release_notes: true
           files: |
-            artifacts/pokecard-jar/*.jar
+            artifacts/pokecard-jar-*/*.jar
             artifacts/pokecard-macos-app/*.zip
+            artifacts/pokecard-windows-app/*.zip
             artifacts/pokecard-rpm/*.rpm
+            artifacts/pokecard-deb/*.deb
 
   publish-rpm-repo:
-    needs: [build-linux-rpm, create-release]
+    needs: [build-linux-packages, create-release]
     runs-on: ubuntu-latest
     concurrency:
       group: pokecard-rpm-repo-publish
@@ -197,7 +286,7 @@ jobs:
         run: |
           cat > repo/rpm/pokecard.repo << 'EOF'
           [pokecard]
-          name=PokeCard
+          name=Pokecard
           baseurl=https://willtryon.github.io/pokecard/rpm/
           enabled=1
           gpgcheck=0
