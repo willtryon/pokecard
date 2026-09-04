@@ -5,7 +5,6 @@ import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.ObjectProperty;
-import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.value.ObservableValue;
 import javafx.collections.ListChangeListener;
@@ -126,9 +125,9 @@ public final class App extends Application {
     );
 
     static boolean satisfied(Setting s, String value) {
-        if (s.kind() == Kind.BOOLEAN) return true;
-        if (value == null || value.isBlank()) return !s.required();
-        return s.kind().isValidValue(value);
+        if (s.kind() == Kind.BOOLEAN) return false;
+        if (value == null || value.isBlank()) return s.required();
+        return !s.kind().isValidValue(value);
     }
 
     record AppContext(CardIndex cardDB, CardImportsIndex importDB, CardSearchRepo searchDB, int size) {
@@ -223,7 +222,7 @@ public final class App extends Application {
     private boolean allSettingsSatisfied() {
         for (Section sec : SECTIONS)
             for (Setting s : sec.settings())
-                if (!satisfied(s, config.get(s.key()))) return false;
+                if (satisfied(s, config.get(s.key()))) return false;
         return true;
     }
 
@@ -297,7 +296,6 @@ public final class App extends Application {
             dialogStage.setScene(setupScene);
             dialogStage.showAndWait();
             dialogStage.setOnCloseRequest(event -> {
-                return;
             });
 
 
@@ -407,7 +405,7 @@ public final class App extends Application {
             Task<Void> priceTask = new Task<>() {
                 @Override
                 protected Void call() throws Exception {
-                    syncPrices(false, (msg, frac) -> {
+                    syncPrices((msg, frac) -> {
                         updateMessage(msg);
                         updateProgress(frac, 1.0);
                     });
@@ -424,7 +422,7 @@ public final class App extends Application {
         scheduler.scheduleAtFixedRate(() -> Platform.runLater(() -> {
             Task<Void> saveTask = new Task<>() {
                 @Override
-                protected Void call() throws Exception {
+                protected Void call(){
                     logger.debug("I work!");
                     if (saved) saveSession(mainStage);
                     return null;
@@ -438,12 +436,12 @@ public final class App extends Application {
         }), 10000, 1, TimeUnit.MINUTES);
     }
 
-    private void syncPrices(boolean force, ScanProgress progress) throws Exception {
+    private void syncPrices(ScanProgress progress) throws Exception {
         Path db = settings.cacheDir().resolve("tcg.db");
         progress.report("Retrieving price information...", -1);
         TcgdbEnv env = new TcgdbEnv(tcgdbDefaultCacheDir());
         TcgdbEnv.EnvHandle handle = env.prepare();
-        int code = env.sync(handle, db, force);
+        int code = env.sync(handle, db, false);
         logger.debug("tcgdb sync exited " + code + "; db at " + db);
     }
 
@@ -628,7 +626,7 @@ public final class App extends Application {
             Stage aboutStage = new Stage();
             aboutStage.setTitle("About Pokecard");
             Label name = new Label("Pokecard");
-            Label version = new Label("Version 0.8.0");
+            Label version = new Label("Version 0.8.1");
             Label author = new Label("by willtryon");
             Button close = new Button("Close");
             VBox aboutLayout = new VBox(12, name, version, author, close);
@@ -1227,14 +1225,14 @@ final class InitTask extends Task<App.AppContext>{
 
     private Config.Settings settings;
 
-    protected InitTask(Settings settings) {
+    InitTask(Settings settings) {
         this.settings = settings;
     }
 
     @Override
     protected App.AppContext call() throws Exception {
         String url = "jdbc:sqlite:" + settings.dbPath();
-        logger.info("Pokecard v0.8.0\nby willtryon\n");
+        logger.info("Pokecard v0.8.1\nby willtryon\n");
         updateMessage("Connecting to database...");
         int size;
         try (Connection conn = DriverManager.getConnection(url);
@@ -1242,11 +1240,17 @@ final class InitTask extends Task<App.AppContext>{
              ResultSet rs = st.executeQuery("SELECT COUNT(*) AS n FROM cards")) {
             size = rs.next() ? rs.getInt("n") : 0;
         }
+        updateMessage("Running database tasks...");
+        new dbCleanup((msg, frac) -> {
+            updateMessage(msg);
+            updateProgress(frac, 1.0);
+        }, settings.dbPath(), settings.cacheDir().resolve("tcg.db"), false);
         Main.size = size;
         logger.debug(settings.cacheDir().resolve("tcg.db"));
 
         Path cacheFile = settings.cacheDir().resolve("cache_meta.dat");
         CardIndex cardDB;
+        updateProgress(-1, -1);
         if (Files.isRegularFile(cacheFile)) {
             updateMessage("Loading cache (" + size + " cards)...");
             try {
@@ -1260,14 +1264,9 @@ final class InitTask extends Task<App.AppContext>{
         updateMessage("Verifying python env...");
         PokeocrEnv env = new PokeocrEnv(ocrDefaultCacheDir(), settings);
         PokeocrEnv.EnvHandle handle = env.prepare();
-        updateMessage("Running database tasks...");
         TcgdbEnv env2 = new TcgdbEnv(tcgdbDefaultCacheDir());
         TcgdbEnv.EnvHandle handle2 = env2.prepare();
-        new dbCleanup((msg, frac) -> {
-            updateMessage(msg);
-            updateProgress(frac, 1.0);
-        }, settings.dbPath(), settings.cacheDir().resolve("tcg.db"), false);
-        updateMessage("Running database tasks...");
+        updateMessage("Initializing searchDB...");
         updateProgress(1.0, 1.0);
         CardSearchRepo searchDB = new CardSearchRepo(settings.dbPath(), cardDB);
         updateMessage("Starting...");
@@ -1352,7 +1351,7 @@ final class ConfigEditor {
             for (App.Section sec : App.SECTIONS) {
                 for (App.Setting s : sec.settings()) {
                     String v = inputs.get(s.key()).getText().trim();
-                    if (!App.satisfied(s, v)) {
+                    if (App.satisfied(s, v)) {
                         error.setText("\u201C" + s.label() + "\u201D in " + sec.name() + " is missing or invalid.");
                         sidebar.getSelectionModel().select(sec);
                         return;

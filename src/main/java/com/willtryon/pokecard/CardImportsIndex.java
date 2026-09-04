@@ -79,13 +79,11 @@ public class CardImportsIndex {
                     continue;
                 }
                 CardImports result = compareOne(path, qHash, loc, count, progress, guess);
-                if (result != null) {
-                    fresh.add(result);
-                    seenHashes.add(qHash);
-                    imports.add(result);
-                    //System.out.println(result.getHashedRecordHistory());
-                    //System.out.println(result.getORBRecordHistory());
-                }
+                fresh.add(result);
+                seenHashes.add(qHash);
+                imports.add(result);
+                //System.out.println(result.getHashedRecordHistory());
+                //System.out.println(result.getORBRecordHistory());
                 if (result.getARecordScore(0, "orb") - result.getARecordScore(1, "orb") < 10) {
                     ocrCandidates.add(result);
                 }
@@ -157,26 +155,28 @@ public class CardImportsIndex {
         }
 
         // ---- ORB pass (higher is closer) ----
-        ORB orb = ORB.create();
-        CardIndex.Features test2 = cardDB.describe(path.toString(), orb);
-        PriorityQueue<Scored> bottomOrb = new PriorityQueue<>(Comparator.comparingDouble((Scored s) -> s.score()));
-        long startTime = System.currentTimeMillis();
-        int lastPct = -1;
-        int K = 1000;
-        List<CardSignature> shortlist = hashSorted.stream().limit(K).map(Scored::sig).toList();
-        double[] orbScores = cardDB.scoreOrbParallel(test2, shortlist);
-        //double[] orbScores = cardDB.scoreOrbParallel(test2, hashed);
-        for (int i = 0; i < shortlist.size(); i++) {
-            bottomOrb.offer(new Scored(shortlist.get(i), orbScores[i]));
-            if (bottomOrb.size() > 1000) bottomOrb.poll();
+        List<Scored> orbSorted;
+        Scored bestOrb;
+        try (ORB orb = ORB.create()) {
+            CardIndex.Features test2 = cardDB.describe(path.toString(), orb);
+            PriorityQueue<Scored> bottomOrb = new PriorityQueue<>(Comparator.comparingDouble((Scored s) -> s.score()));
+            long startTime = System.currentTimeMillis();
+            int lastPct = -1;
+            int K = 1000;
+            List<CardSignature> shortlist = hashSorted.stream().limit(K).map(Scored::sig).toList();
+            double[] orbScores = cardDB.scoreOrbParallel(test2, shortlist);
+            for (int i = 0; i < shortlist.size(); i++) {
+                bottomOrb.offer(new Scored(shortlist.get(i), orbScores[i]));
+                if (bottomOrb.size() > 1000) bottomOrb.poll();
+            }
+            if (progress != null) {
+                double overall = (double) loc / count;
+                progress.report("Scanning " + victim.getName() + "  (" + loc + "/" + count + ") " + guess + ".", overall);
+            }
+            orbSorted = new ArrayList<>(bottomOrb);
+            orbSorted.sort(Comparator.comparingDouble(Scored::score).reversed());
+            bestOrb = orbSorted.getFirst();
         }
-        if (progress != null) {
-            double overall = (double) loc / count;
-            progress.report("Scanning " + victim.getName() + "  (" + loc + "/" + count + ") " + guess + ".", overall);
-        }
-        List<Scored> orbSorted = new ArrayList<>(bottomOrb);
-        orbSorted.sort(Comparator.comparingDouble(Scored::score).reversed());
-        Scored bestOrb = orbSorted.getFirst();
         logger.debug("\nUploaded image " + victim + " appears to be closest to " + bestOrb.sig.getStringImgPath() + ". (ORB)");
         logger.debug(bestOrb.score());
         CardImports.Match orbMatch = new CardImports.Match(bestOrb.sig.getCardID(), bestOrb.sig.getStringImgPath(), bestOrb.score());
@@ -197,7 +197,7 @@ public class CardImportsIndex {
 
     public void runOcr(ScanProgress progress) throws IOException, URISyntaxException, InterruptedException {
         if(!Boolean.parseBoolean((settings.useOcr()))) return;
-        progress.report("OCR bullshit now", -1);
+        progress.report("Loading pokeocr, please wait...", -1);
         long startTime = System.currentTimeMillis();
         PokeocrEnv env = new PokeocrEnv(ocrDefaultCacheDir(), settings);
         PokeocrEnv.EnvHandle handle = env.prepare();
@@ -290,7 +290,7 @@ public class CardImportsIndex {
                 }
             }
             if (i.getPrice() == -1) {
-                FullCardSignature priceGetter = new FullCardSignature(cardDB.findCardId(i.getBestMatch().cardID()), settings.dbPath(), settings.cacheDir(), globalCardVersion, globalFirstEdition);
+                FullCardSignature priceGetter = new FullCardSignature(Objects.requireNonNull(cardDB.findCardId(i.getBestMatch().cardID())), settings.dbPath(), settings.cacheDir(), globalCardVersion, globalFirstEdition);
                 i.setPrice(priceGetter.getPrice());
                 logger.debug("\n\n" + i.getPrice());
                 if (i.getPrice() >= 12.0) {
@@ -305,14 +305,6 @@ public class CardImportsIndex {
             }
         }
         logger.debug("Updated Card Information");
-    }
-
-    public void setAsFinal(List<CardImports> candidates){
-        for (var c : candidates) {
-            c.setFinal(true);
-
-
-        }
     }
 
     public List<CardImports> getImports() { return imports; }

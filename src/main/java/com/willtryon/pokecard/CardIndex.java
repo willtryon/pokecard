@@ -143,13 +143,12 @@ public final class CardIndex{
                         data.add(new String[]{"An unknown exception occurred when hashing " + cardId});
                         failedN.incrementAndGet();
                     } catch (IllegalArgumentException e) {
-                        line++;
                         Path expected = this.settings.imagesDir()
                                 .resolve(sanitizeWinPath(expName == null ? "" : expName.replace(" ", "-"), false))
                                 .resolve(sanitizeWinPath(cardId.replace("/", "-") + ".jpg", true));
                         data.add(new String[]{"File " + cardId + " cannot be found by the program.\nLocation searched (folder): "
                                 + expected.getParent()});
-                        cardDB[line] = new CardSignature(cardId, img == null ? expected : img, null, null, null);
+                        cardDB[slot] = new CardSignature(cardId, img == null ? expected : img, null, null, null);
                         failedN.incrementAndGet();
                     } catch (Exception e) {
                         throw new RuntimeException(e);
@@ -166,7 +165,7 @@ public final class CardIndex{
                 throw new RuntimeException(e);
             }
 
-            logger.debug("\n\nPassed: " + passedN + "\nFailed: " + failedN + "\nCorrupt: " + corruptN + "\nOut of: " + line);
+            logger.debug("\n\nPassed: " + passedN + "\nFailed: " + failedN + "\nCorrupt: " + corruptN + "\nOut of: " +size);
             String result = String.format("%.0f", ((double) passedN.get() / size) * 100);
             logger.debug(result + "% passed.\n\n");
             writeToTxt("log.txt", data);
@@ -391,7 +390,7 @@ public final class CardIndex{
         logger.debug("\nClosest pair: " + recordHolderA + " vs " + recordHolderB + " @ " + record);
     }
 
-    public static final class Features{
+    public static final class Features implements AutoCloseable {
         final KeyPointVector keypoints;
         final Mat descriptors;
         Features(KeyPointVector k, Mat d){
@@ -406,12 +405,18 @@ public final class CardIndex{
             return descriptors;
         }
 
+        @Override
+        public void close() throws Exception {
+            if (keypoints != null) keypoints.close();
+            if (descriptors != null) descriptors.close();
+        }
     }
 
     public Features describe(String path, ORB orb){
         Mat img = imread(path, IMREAD_GRAYSCALE);
         if (img.empty()) {
             logger.debug("Something went wrong when trying to load round 2 image: " + path);
+            throw new IllegalArgumentException();
         }
         KeyPointVector keypoints = new KeyPointVector();
         Mat descriptors = new Mat();
@@ -567,7 +572,7 @@ public final class CardIndex{
             System.err.println("Error reading the root directory: " + e.getMessage());
         }
     }*/
-    private static final int METADATA_FORMAT_VERSION = 2;
+    private static final int METADATA_FORMAT_VERSION = 1;
 
     public void writeToDisk() {
         Path xmlPath = settings.cacheDir().resolve("cache.xml");
