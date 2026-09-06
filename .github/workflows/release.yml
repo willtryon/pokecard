@@ -1,3 +1,15 @@
+# Builds and publishes a release whenever a pull request is merged into master:
+#   - one platform-restricted "fat" jar per OS (Linux x86_64, Windows x86_64, macOS arm64)
+#   - a macOS pokecard.app app image
+#   - a Windows pokecard app image (zipped; run pokecard.exe)
+#   - Fedora/RHEL .rpm and Debian/Ubuntu .deb packages
+#   - an Arch Linux .pkg.tar.zst (pacman) package
+# The rpm is then published to a small DNF/YUM repository hosted on GitHub Pages.
+#
+# This workflow uses actions that are not certified by GitHub. They are
+# provided by third parties and governed by separate terms of service,
+# privacy policy, and support documentation.
+
 name: Release
 
 on:
@@ -10,9 +22,6 @@ permissions:
   contents: read
 
 jobs:
-  # Reads the version out of pom.xml (the single source of truth) and makes
-  # sure we're not about to re-publish a release that already exists - if
-  # this fails, bump <version> in pom.xml as part of the PR you're merging.
   check-version:
     ##if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
@@ -69,10 +78,11 @@ jobs:
           cache: maven
 
       - name: Build platform-restricted jar
+        shell: bash
         run: mvn -B clean package "-Djavacpp.platform=${{ matrix.platform }}" --file pom.xml
 
       - name: Name the jar for its platform
-        shell: bash          # windows-latest defaults to pwsh; force bash for the cp
+        shell: bash
         run: |
           cp target/pokecard-${{ needs.check-version.outputs.version }}.jar \
              pokecard-${{ needs.check-version.outputs.version }}-${{ matrix.label }}.jar
@@ -120,9 +130,6 @@ jobs:
           name: pokecard-macos-app
           path: dist/pokecard-${{ needs.check-version.outputs.version }}-macos.zip
 
-  # Windows app image, zipped. jpackage --type app-image needs no external
-  # tooling (unlike --type msi, which on JDK 21 requires WiX 3.x). The user
-  # unzips and runs pokecard.exe. See notes below the file for the MSI variant.
   build-windows:
     needs: check-version
     runs-on: windows-latest
@@ -175,7 +182,6 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      # rpm -> rpmbuild;  fakeroot -> required by jpackage's deb packaging
       - name: Install rpm + deb packaging tools
         run: sudo apt-get update && sudo apt-get install -y rpm createrepo-c fakeroot
 
@@ -222,8 +228,71 @@ jobs:
           name: pokecard-deb
           path: dist/*.deb
 
+  build-arch:
+    needs: [check-version, build-jars]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download linux-x86_64 jar
+        uses: actions/download-artifact@v5
+        with:
+          name: pokecard-jar-linux-x86_64
+          path: arch
+
+      - name: Assemble packaging files
+        run: |
+          cd arch
+          mv pokecard-*-linux-x86_64.jar pokecard.jar
+
+          printf '%s\n' '#!/bin/sh' 'exec java -jar /usr/share/java/pokecard/pokecard.jar "$@"' > pokecard.sh
+
+          printf '%s\n' \
+            '[Desktop Entry]' \
+            'Type=Application' \
+            'Name=Pokecard' \
+            'Comment=Pokemon card scanning and collection tool' \
+            'Exec=pokecard' \
+            'Terminal=false' \
+            'Categories=Utility;Graphics;' \
+            > pokecard.desktop
+
+          cat > PKGBUILD <<'EOF'
+          # Maintainer: willtryon
+          pkgname=pokecard
+          pkgver=${{ needs.check-version.outputs.version }}
+          pkgrel=1
+          pkgdesc="Pokemon card scanning and collection tool"
+          arch=('x86_64')
+          url="https://github.com/willtryon/PokeImageComp"
+          license=('custom')
+          depends=('java-runtime>=21' 'gtk3' 'gtk2' 'hicolor-icon-theme')
+          source=('pokecard.jar' 'pokecard.sh' 'pokecard.desktop')
+          sha256sums=('SKIP' 'SKIP' 'SKIP')
+
+          package() {
+              install -Dm644 "$srcdir/pokecard.jar"     "$pkgdir/usr/share/java/pokecard/pokecard.jar"
+              install -Dm755 "$srcdir/pokecard.sh"      "$pkgdir/usr/bin/pokecard"
+              install -Dm644 "$srcdir/pokecard.desktop" "$pkgdir/usr/share/applications/pokecard.desktop"
+          }
+          EOF
+
+      - name: Build package with makepkg in an Arch container
+        run: |
+          docker run --rm -v "$PWD/arch:/work" archlinux:base-devel bash -c '
+            useradd -m builder &&
+            chown -R builder:builder /work &&
+            runuser -u builder -- bash -lc "cd /work && makepkg -f"
+          '
+          # docker wrote files as a different uid; reclaim them so later steps can read them
+          sudo chown -R "$(id -u):$(id -g)" arch
+
+      - name: Upload pacman package
+        uses: actions/upload-artifact@v4
+        with:
+          name: pokecard-arch
+          path: arch/*.pkg.tar.zst
+
   create-release:
-    needs: [check-version, build-jars, build-macos-app, build-windows, build-linux-packages]
+    needs: [check-version, build-jars, build-macos-app, build-windows, build-linux-packages, build-arch]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -246,3 +315,57 @@ jobs:
             artifacts/pokecard-windows-app/*.zip
             artifacts/pokecard-rpm/*.rpm
             artifacts/pokecard-deb/*.deb
+            artifacts/pokecard-arch/*.pkg.tar.zst
+
+  publish-rpm-repo:
+    needs: [build-linux-packages, create-release]
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pokecard-rpm-repo-publish
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - name: Download rpm artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: pokecard-rpm
+          path: staging
+
+      - name: Check out existing repo, if one exists yet
+        uses: actions/checkout@v6
+        continue-on-error: true
+        with:
+          ref: gh-pages
+          path: gh-pages-old
+
+      - name: Assemble repo directory
+        run: |
+          mkdir -p repo/rpm
+          if [ -d gh-pages-old/rpm ]; then
+            cp gh-pages-old/rpm/*.rpm repo/rpm/ 2>/dev/null || true
+          fi
+          cp staging/*.rpm repo/rpm/
+
+      - name: Install createrepo_c
+        run: sudo apt-get update && sudo apt-get install -y createrepo-c
+
+      - name: Generate repodata
+        run: createrepo_c --update repo/rpm
+
+      - name: Write .repo file
+        run: |
+          cat > repo/rpm/pokecard.repo << 'EOF'
+          [pokecard]
+          name=Pokecard
+          baseurl=https://willtryon.github.io/pokecard/rpm/
+          enabled=1
+          gpgcheck=0
+          EOF
+
+      - name: Publish to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./repo
+          keep_files: true

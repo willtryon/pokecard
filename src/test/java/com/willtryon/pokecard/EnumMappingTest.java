@@ -19,10 +19,10 @@ import static org.junit.jupiter.api.Assertions.assertSame;
  * also means a mapping bug is completely silent. Every card just quietly becomes NORMAL or
  * UNREMARKABLE. Tests are the only way to notice.
  *
- * <p>Some of the assertions below describe behaviour that is arguably wrong. They are written
- * against what the code actually does today, so the build stays green and so that the day someone
- * fixes the mapping, the failing test tells them exactly which callers were depending on the old
- * behaviour. A test that asserts a bug is a bookmark, not an endorsement.
+ * <p>The {@code fromXxx} methods normalize their input — trimming and matching case-insensitively
+ * against every stored form (label, dbValue, and enum name) — so both the uppercase labels the app
+ * writes and the title-case dbValues the editor writes resolve to the same constant. The fallback
+ * applies only to genuinely unrecognized input.
  */
 class EnumMappingTest {
 
@@ -52,30 +52,38 @@ class EnumMappingTest {
     }
 
     @Test
-    @DisplayName("fromDb is case-sensitive and does not trim, despite appearances")
-    void cardVersionMatchingIsStricterThanItLooks() {
-        // fromDb contains a nested check: an outer `dbValue.equals(s)` and an inner
-        // `dbValue.equalsIgnoreCase(s.trim())`. The outer test is the strict one, so the inner
-        // one can never add a match -- it is unreachable in the sense that it never changes the
-        // answer. Anything differing in case or padding therefore silently becomes NORMAL.
+    @DisplayName("fromDb ignores case and surrounding whitespace")
+    void cardVersionMatchingIgnoresCaseAndWhitespace() {
+        // fromDb now trims and compares case-insensitively against every stored form, so casing
+        // and stray padding all resolve to the same constant instead of falling back to NORMAL.
         assertAll(
                 () -> assertSame(CardVersion.HOLOFOIL, CardVersion.fromDb("Holofoil")),
-                () -> assertSame(CardVersion.NORMAL, CardVersion.fromDb("holofoil")),
-                () -> assertSame(CardVersion.NORMAL, CardVersion.fromDb("HOLOFOIL")),
-                () -> assertSame(CardVersion.NORMAL, CardVersion.fromDb("  Holofoil  ")));
+                () -> assertSame(CardVersion.HOLOFOIL, CardVersion.fromDb("holofoil")),
+                () -> assertSame(CardVersion.HOLOFOIL, CardVersion.fromDb("HOLOFOIL")),
+                () -> assertSame(CardVersion.HOLOFOIL, CardVersion.fromDb("  Holofoil  ")));
     }
 
     @Test
-    @DisplayName("toString() gives the display label, dbValue() gives the database spelling")
-    void cardVersionLabelAndDbValueAreDifferentThings() {
-        // The constructor parameters are named (name, dbValue) but assigned label = name, so the
-        // first argument in the enum declaration is the label and the second is the database
-        // value. Easy to read backwards; this test makes the actual pairing explicit.
+    @DisplayName("fromDb resolves both the label and dbValue forms")
+    void cardVersionMatchingHandlesLabelAndDbForms() {
+        // App stores the uppercase label ("HOLOFOIL"); the editor stores the dbValue ("Holofoil").
+        // Both — and stray casing/whitespace — must resolve to the same constant.
         assertAll(
-                () -> assertEquals("REVERSE HOLOFOIL", CardVersion.REVERSE_HOLOFOIL.toString()),
-                () -> assertEquals("Reverse holofoil", CardVersion.REVERSE_HOLOFOIL.dbValue()),
-                () -> assertEquals("NORMAL", CardVersion.NORMAL.toString()),
-                () -> assertEquals("Normal", CardVersion.NORMAL.dbValue()));
+                () -> assertEquals(CardVersion.HOLOFOIL, CardVersion.fromDb("HOLOFOIL")),
+                () -> assertEquals(CardVersion.HOLOFOIL, CardVersion.fromDb("Holofoil")),
+                () -> assertEquals(CardVersion.HOLOFOIL, CardVersion.fromDb("holofoil"))
+        );
+    }
+
+    @Test
+    void categoryStringsWrittenByTheAppRoundTrip() {
+        // setBestMatches writes the label form; fromCatDb must map it back.
+        assertAll(
+                () -> assertEquals(Category.ULTRA, Category.fromCatDb("ULTRA"),
+                        "label written by setBestMatches must map back to ULTRA"),
+                () -> assertEquals(Category.HIGH,  Category.fromCatDb("HIGH")),
+                () -> assertEquals(Category.MID,   Category.fromCatDb("MID"))
+        );
     }
 
     // ---------------------------------------------------------------- Category
@@ -94,34 +102,6 @@ class EnumMappingTest {
                 () -> assertSame(Category.UNREMARK, Category.fromCatDb(null)),
                 () -> assertSame(Category.UNREMARK, Category.fromCatDb("")),
                 () -> assertSame(Category.UNREMARK, Category.fromCatDb("Legendary")));
-    }
-
-    @Test
-    @DisplayName("The category strings the app itself writes do NOT map back to their enum")
-    void categoryStringsWrittenByTheAppDoNotRoundTrip() {
-        // This is the mapping bug worth knowing about.
-        //
-        // CardImportsIndex.setBestMatches assigns categories with the uppercase label:
-        //     i.setCat("ULTRA") / "HIGH" / "MID" / "UNREMARK"
-        // but fromCatDb matches on dbValue, which is title case: "Ultra" / "High" / "Mid" /
-        // "Unremarkable". So every value the app writes reads back as UNREMARK, and because
-        // fromCatDb falls back silently rather than throwing, nothing ever complains.
-        //
-        // Only the last of these four assertions looks "correct", and it is correct by accident:
-        // "UNREMARK" does not match either, it just happens to fall back to UNREMARK.
-        assertAll(
-                () -> assertSame(Category.UNREMARK, Category.fromCatDb("ULTRA"),
-                        "written by setBestMatches, but only 'Ultra' maps to ULTRA"),
-                () -> assertSame(Category.UNREMARK, Category.fromCatDb("HIGH")),
-                () -> assertSame(Category.UNREMARK, Category.fromCatDb("MID")),
-                () -> assertSame(Category.UNREMARK, Category.fromCatDb("UNREMARK")));
-
-        // And for contrast, the spellings that do work:
-        assertAll(
-                () -> assertSame(Category.ULTRA, Category.fromCatDb("Ultra")),
-                () -> assertSame(Category.HIGH, Category.fromCatDb("High")),
-                () -> assertSame(Category.MID, Category.fromCatDb("Mid")),
-                () -> assertSame(Category.UNREMARK, Category.fromCatDb("Unremarkable")));
     }
 
     @Test
