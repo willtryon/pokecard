@@ -280,7 +280,7 @@ jobs:
           docker run --rm -v "$PWD/arch:/work" archlinux:base-devel bash -c '
             useradd -m builder &&
             chown -R builder:builder /work &&
-            runuser -u builder -- bash -lc "cd /work && makepkg -f"
+            runuser -u builder -- bash -lc "cd /work && makepkg -f --nodeps"
           '
           # docker wrote files as a different uid; reclaim them so later steps can read them
           sudo chown -R "$(id -u):$(id -g)" arch
