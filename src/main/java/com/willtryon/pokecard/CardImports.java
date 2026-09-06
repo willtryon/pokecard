@@ -176,6 +176,7 @@ public class CardImports {
     }
 
     public void applyManualMatch(Match m) {
+        if (java.util.Objects.equals(this.bestMatch, m)) return;
         this.bestMatch = m;
         this.matchOverride = (m != null);
     }

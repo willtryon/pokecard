@@ -120,13 +120,14 @@ public class FullCardSignature extends CardSignature {
 
     public float calculatePrice(Path cacheDir, Path dbPath) throws SQLException{
         String url = "jdbc:sqlite:" + cacheDir.resolve("tcg.db");
+        logger.debug("\n\nCard Name: {}", name);
         if(firstEdition){
             switch (cardVersion){
                 case "NORMAL" -> cardVersion = "1ST EDITION";
                 case "HOLOFOIL" -> cardVersion = "1ST EDITION HOLOFOIL";
             }
         }
-        String sql = "SELECT pr.sub_type, pr.market_price, pr.mid_price, pr.low_price " +
+        String sql = "SELECT pr.sub_type, pr.market_price, pr.mid_price, pr.low_price, pr.high_price " +
                 "FROM iddb.cards ic " +
                 "JOIN products p ON p.product_id = ic.idTCGP " +
                 "JOIN prices pr ON pr.product_id = p.product_id " +
@@ -145,13 +146,15 @@ public class FullCardSignature extends CardSignature {
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
                         String subType = rs.getString("sub_type");
-                        logger.debug("\n" + subType);
+                        logger.debug(subType);
                         float marketPrice = rs.getFloat("market_price");
-                        System.out.print("\tMarket Price: " + marketPrice);
+                        logger.debug("Market Price: " + marketPrice);
                         float lowPrice = rs.getFloat("low_price");
-                        System.out.print("\tLow Price: " + lowPrice);
+                        logger.debug("Low Price: " + lowPrice);
                         float midPrice = rs.getFloat("mid_price");
-                        System.out.print("\tMid Price: " + midPrice);
+                        logger.debug("Mid Price: " + midPrice);
+                        float highPrice = rs.getFloat("high_price");
+                        logger.debug("High Price: " + highPrice);
                         price = Math.max(marketPrice, Math.max(lowPrice, midPrice));
                     }else {
                         rs.close();
@@ -166,11 +169,13 @@ public class FullCardSignature extends CardSignature {
                                 String subType = rs.getString("sub_type");
                                 logger.debug(subType);
                                 float marketPrice = rs.getFloat("market_price");
-                                System.out.print("\tMarket Price: " + marketPrice);
+                                logger.debug("\tMarket Price: " + marketPrice);
                                 float lowPrice = rs.getFloat("low_price");
-                                System.out.print("\tLow Price: " + lowPrice);
+                                logger.debug("\tLow Price: " + lowPrice);
                                 float midPrice = rs.getFloat("mid_price");
-                                System.out.print("\tMid Price: " + midPrice);
+                                logger.debug("\tMid Price: " + midPrice);
+                                float highPrice = rs.getFloat("high_price");
+                                logger.debug("High Price: " + highPrice);
                                 price = Math.max(marketPrice, Math.max(lowPrice, midPrice));
                             } else {
                                 rs2.close();
