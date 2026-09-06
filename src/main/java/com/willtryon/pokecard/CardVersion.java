@@ -20,10 +20,13 @@ public enum CardVersion {
     }
 
     public static CardVersion fromDb(String s){
-        if(s!=null){
-            for(CardVersion v : CardVersion.values()){
-                if(v.dbValue.equals(s)){
-                    if (v.dbValue.equalsIgnoreCase(s.trim())) return v;
+        if (s != null) {
+            String t = s.trim();
+            for (CardVersion v : CardVersion.values()) {
+                if (t.equalsIgnoreCase(v.label)
+                        || t.equalsIgnoreCase(v.dbValue)
+                        || t.equalsIgnoreCase(v.name())) {
+                    return v;
                 }
             }
         }

@@ -15,10 +15,13 @@ public enum Category{
     }
 
     public static Category fromCatDb(String s){
-        if(s!=null){
-            for(Category v : Category.values()){
-                if(v.dbValue.equals(s)){
-                    if (v.dbValue.equalsIgnoreCase(s.trim())) return v;
+        if (s != null) {
+            String t = s.trim();
+            for (Category v : Category.values()) {
+                if (t.equalsIgnoreCase(v.label)
+                        || t.equalsIgnoreCase(v.dbValue)
+                        || t.equalsIgnoreCase(v.name())) {
+                    return v;
                 }
             }
         }

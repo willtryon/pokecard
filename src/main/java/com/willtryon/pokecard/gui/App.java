@@ -627,7 +627,7 @@ public final class App extends Application {
             Stage aboutStage = new Stage();
             aboutStage.setTitle("About Pokecard");
             Label name = new Label("Pokecard");
-            Label version = new Label("Version 0.8.2");
+            Label version = new Label("Version 0.8.3");
             Label author = new Label("by willtryon");
             Button close = new Button("Close");
             VBox aboutLayout = new VBox(12, name, version, author, close);
@@ -1253,7 +1253,7 @@ final class InitTask extends Task<App.AppContext>{
     @Override
     protected App.AppContext call() throws Exception {
         String url = "jdbc:sqlite:" + settings.dbPath();
-        logger.info("Pokecard v0.8.2\nby willtryon\n");
+        logger.info("Pokecard v0.8.3\nby willtryon\n");
         updateMessage("Connecting to database...");
         int size;
         try (Connection conn = DriverManager.getConnection(url);
