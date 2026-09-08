@@ -163,6 +163,11 @@ public final class App extends Application {
             if(config.get(Config.DB_PATH).isBlank()){
                 config.set(Config.DB_PATH, appHome.resolve("pokedata/databases/data.sqlite").toString());
                 config.set(Config.IMAGES_DIR, appHome.resolve("pokedata/images").toString());
+                changed = true;
+            }
+            if(config.get(Config.COMPARE_DIR).isBlank()){
+                config.set(Config.USE_OCR, "false");
+                changed = true;
             }
             Files.createDirectories(Path.of(config.get(Config.CACHE_DIR)));
             Files.createDirectories(Path.of(config.get(Config.OUTPUT_DIR)));
@@ -323,6 +328,7 @@ public final class App extends Application {
                     // rebuilds the live TreeView's items, and doing it from this background
                     // thread races the FX layout pass -> ConcurrentModificationException.
                     Platform.runLater(() -> {
+                        updateTitle("pokecard-cv-run");
                         refreshImports(ctx.importDB());
                         scan.setDisable(false);
                     });
@@ -330,11 +336,12 @@ public final class App extends Application {
                 }
             };
 
-            runTask(orbTask, v -> {});
+            runTask(orbTask, "pokecard-cv-run", v -> {});
             orbTask.setOnSucceeded(event -> {
                 Task<Void> ocrTask = new Task<>() {
                     @Override
                     protected Void call() {
+                        updateTitle("pokeocr-ocr-run");
                         try{
                             ctx.importDB.runOcr((msg, frac) -> {
                                 updateMessage(msg);
@@ -351,7 +358,7 @@ public final class App extends Application {
                         return null;
                     }
                 };
-                runTask(ocrTask, v -> {});
+                runTask(ocrTask, "pokeocr-ocr-run",v -> {});
             });
         });
 
@@ -408,45 +415,82 @@ public final class App extends Application {
             });
         }), 0, 1, TimeUnit.MINUTES);*/
         //isOrb = false;
-        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "pokecard-price-fetcher");
+        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1, r -> {
+            Thread t = new Thread(r, "pokecard-background-tasks");
             t.setDaemon(true);          // don't keep the JVM alive after the window closes
             return t;
         });
 
-        scheduler.scheduleAtFixedRate(() -> Platform.runLater(() -> {
-            Task<Void> priceTask = new Task<>() {
-                @Override
-                protected Void call() throws Exception {
-                    syncPrices((msg, frac) -> {
-                        updateMessage(msg);
-                        updateProgress(frac, 1.0);
-                    });
-                    return null;
-                }
-            };
-            priceTask.setOnFailed(event -> {
-                Throwable ex = priceTask.getException();
-                showError(ex);
-            });
-            runTask(priceTask, v -> {
-            });
-        }), 0, 30, TimeUnit.MINUTES);
-        scheduler.scheduleAtFixedRate(() -> Platform.runLater(() -> {
-            Task<Void> saveTask = new Task<>() {
-                @Override
-                protected Void call(){
-                    logger.debug("I work!");
-                    if (saved) saveSession(mainStage);
-                    return null;
-                }
-            };
-            saveTask.setOnFailed(event -> {
-                Throwable ex = saveTask.getException();
-                showError(ex);
-            });
-            runTask(saveTask, v -> {});
-        }), 10000, 1, TimeUnit.MINUTES);
+        scheduler.scheduleAtFixedRate(() -> {
+            try {
+                Platform.runLater(() -> {
+                    Task<Void> priceTask = new Task<>() {
+                        @Override
+                        protected Void call() throws Exception {
+
+                            if(!(Files.exists(settings.cacheDir().resolve("tcg.db")))){
+                                logger.info("hit");
+                                updateMessage("Resolving python dependencies for price fetching..."); updateProgress(-1, 1);
+                                TcgdbEnv env2 = new TcgdbEnv(tcgdbDefaultCacheDir());
+                                env2.prepare();
+                            }
+                            syncPrices((msg, frac) -> {
+                                updateMessage(msg);
+                                updateProgress(frac, 1.0);
+                            });
+                            return null;
+                        }
+                    };
+                    priceTask.setOnFailed(event -> showError(priceTask.getException()));
+                    runTask(priceTask, "pokecard-price-fetcher",v -> {});
+                });
+            } catch (Throwable t) {
+                logger.error("Price sync scheduling failed", t);
+            }
+        }, 0, 30, TimeUnit.MINUTES);
+
+        scheduler.scheduleAtFixedRate(() -> {
+            try {
+                Platform.runLater(() -> {
+                    Task<Void> ocrTask = new Task<>() {
+                        @Override
+                        protected Void call() throws Exception {
+                            if(Boolean.parseBoolean(settings.useOcr())){
+                                logger.info("hit");
+                                updateMessage("Resolving python dependencies for pokeocr"); updateProgress(-1, 1);
+                                PokeocrEnv env = new PokeocrEnv(ocrDefaultCacheDir(), settings);
+                                env.prepare();
+                            }
+                            return null;
+                        }
+                    };
+                    ocrTask.setOnFailed(event -> showError(ocrTask.getException()));
+                    runTask(ocrTask, "pokeocr-dependency-fetcher",v -> {});
+                });
+            } catch (Throwable t) {
+                logger.error("OCR prep failed...", t);
+            }
+        }, 0, 30, TimeUnit.MINUTES);
+
+        scheduler.scheduleAtFixedRate(() -> {
+            try {
+                Platform.runLater(() -> {
+                    Task<Void> saveTask = new Task<>() {
+                        @Override
+                        protected Void call() {
+                            updateTitle("pokecard-auto-save");
+                            logger.debug("I work!");
+                            if (saved) saveSession(mainStage);
+                            return null;
+                        }
+                    };
+                    saveTask.setOnFailed(event -> showError(saveTask.getException()));
+                    runTask(saveTask, "pokecard-auto-save",v -> {});
+                });
+            } catch (Throwable t) {
+                logger.error("Save scheduling failed", t);
+            }
+        }, 10, 1, TimeUnit.MINUTES);
     }
 
     private void syncPrices(ScanProgress progress) throws Exception {
@@ -595,7 +639,7 @@ public final class App extends Application {
                     return result;
                 }
             };
-            runTask(t, found -> {
+            runTask(t, "noop",found -> {
                 view1.setImage(new Image(file.toURI().toString()));
                 String foundImage = found.getOrbWinner().img();
                 logger.debug(foundImage);
@@ -1221,9 +1265,13 @@ public final class App extends Application {
         else taskPopOver.show(statusProgress);
     }
 
-    private <T> void runTask(Task<T> task, Consumer<T> onSuccess) {
-        taskView.getTasks().add(task);          // before starting the thread
-        if (onSuccess != null) task.setOnSucceeded(e -> onSuccess.accept(task.getValue()));
+    private <T> void runTask(Task<T> task, String name, Consumer<T> onSuccess) {
+        taskView.getTasks().add(task);
+        if(!name.equals("noop")) logger.info("Starting task {}", name);// before starting the thread
+        if (onSuccess != null) task.setOnSucceeded(e -> {
+            onSuccess.accept(task.getValue());
+            if(!name.equals("noop")) logger.info("Finished running {}", name);
+        });
         task.setOnFailed(e -> showError(task.getException()));
         Thread t = new Thread(task);
         t.setDaemon(true);
@@ -1266,15 +1314,18 @@ final class InitTask extends Task<App.AppContext>{
 
     @Override
     protected App.AppContext call() throws Exception {
+        logger.info("Pokecard v0.8.3\nby willtryon\n");
+        updateMessage("Loading...");
         prepareGitProgress();
         if(!(Files.exists(Path.of(settings.dbPath().toUri())))){
+            updateMessage("Prepareing to clone database...");
             clonePokedata();
         }else{
-            updatePokedata(App.appHome.resolve("pokedata").toFile(), 1);
+            updateMessage("Checking for updates...");
+            updatePokedata(App.appHome.resolve("pokedata").toFile());
         }
+        updateMessage("Connecting to database..."); updateProgress(-1, 1);
         String url = "jdbc:sqlite:" + settings.dbPath();
-        logger.info("Pokecard v0.8.3\nby willtryon\n");
-        updateMessage("Connecting to database...");
         int size;
         try (Connection conn = DriverManager.getConnection(url);
              Statement st = conn.createStatement();
@@ -1302,11 +1353,6 @@ final class InitTask extends Task<App.AppContext>{
         } else {
             cardDB = calculateDB(size, url);
         }
-        updateMessage("Verifying python env...");
-        PokeocrEnv env = new PokeocrEnv(ocrDefaultCacheDir(), settings);
-        PokeocrEnv.EnvHandle handle = env.prepare();
-        TcgdbEnv env2 = new TcgdbEnv(tcgdbDefaultCacheDir());
-        TcgdbEnv.EnvHandle handle2 = env2.prepare();
         updateMessage("Initializing searchDB...");
         updateProgress(1.0, 1.0);
         CardSearchRepo searchDB = new CardSearchRepo(settings.dbPath(), cardDB);
@@ -1367,18 +1413,35 @@ final class InitTask extends Task<App.AppContext>{
         };
     }
 
-    private void clonePokedata(){
-        try{
-            Git.cloneRepository().setURI("https://github.com/willtryon/pokedata").setDirectory(App.appHome.resolve("pokedata").toFile()).setDepth(1).setProgressMonitor(mon).call();
-        }catch(Exception e){
-            updateMessage("Error: " + e.getMessage());
-            throw new RuntimeException(e);
+    private void clonePokedata()throws InterruptedException{
+        logger.warn("Database not found.");
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicBoolean saveChoice =  new AtomicBoolean(false);
+        Platform.runLater(() -> {
+            Alert alert = new Alert(Alert.AlertType.INFORMATION,
+                    "Pokemon database not found. To use this software, the database is required. Clone the database now? (About 3.5GB)",
+                    ButtonType.YES, ButtonType.NO);
+            alert.setHeaderText("Welcome!");
+            Optional<ButtonType> result = alert.showAndWait();
+            saveChoice.set(result.isPresent() && result.get() == ButtonType.YES);
+            latch.countDown();
+        });
+        latch.await();
+        if (saveChoice.get()) {
+            logger.info("Cloning database from willtryon/pokedata...");
+            try{
+                Git.cloneRepository().setURI("https://github.com/willtryon/pokedata").setDirectory(App.appHome.resolve("pokedata").toFile()).setDepth(1).setProgressMonitor(mon).call();
+            }catch(Exception e){
+                updateMessage("Error: " + e.getMessage());
+                throw new RuntimeException(e);
+            }
         }
     }
-    public void updatePokedata(File repositoryDir, int depth) {
+    private void updatePokedata(File repositoryDir) {
+        logger.info("Checking for updates...");
         try (Git git = Git.open(repositoryDir)) {
             git.fetch()
-                    .setDepth(depth)
+                    .setDepth(1)
                     .setProgressMonitor(mon)
                     .call();
 

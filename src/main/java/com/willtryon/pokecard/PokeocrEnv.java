@@ -185,9 +185,6 @@ public final class PokeocrEnv{
         if(platform == Platform.MAC_ARM) return Accel.MPS;
         if(platform == Platform.MAC_X86) return Accel.CPU;
         if(commandSucceeds("nvidia-smi", "-L")) return Accel.CUDA;
-        // ROCm probes: /opt/rocm is the Ubuntu/official-installer layout; Fedora/Nobara
-        // package ROCm under /usr instead, so also probe the CLI tools. rocminfo returning
-        // 0 means the ROCm runtime actually sees a supported GPU (was misspelled "rocm.info").
         if(platform == Platform.LINUX
         && (Files.isDirectory(Path.of("/opt/rocm"))
             || commandSucceeds("rocminfo")
