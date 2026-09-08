@@ -4,3 +4,5 @@ cache/*
 output/*
 pokecard.properties
 hashes.txt
+Dockerfile
+docker-compose.yml
