@@ -53,10 +53,17 @@ import static com.willtryon.pokecard.CardImportsIndex.globalFirstEdition;
 import static com.willtryon.pokecard.PokeocrEnv.ocrDefaultCacheDir;
 import static com.willtryon.pokecard.TcgdbEnv.tcgdbDefaultCacheDir;
 import com.willtryon.pokecard.Config.Settings;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.MergeResult;
+import org.eclipse.jgit.lib.ProgressMonitor;
+
 
 public final class App extends Application {
 
     private static final Logger logger = LogManager.getLogger(App.class);
+    static final Path appHome = Path.of(System.getProperty("user.home"), ".pokecard");
+
+    static boolean clone = false;
     private Config config;
     private Path sessionPath;
     private String currentSession;
@@ -137,7 +144,7 @@ public final class App extends Application {
     @Override
     public void start(Stage initStage) {
         // Everything the program owns lives under ~/.pokecard.
-        Path appHome = Path.of(System.getProperty("user.home"), ".pokecard");
+
         Path propsPath = appHome.resolve("pokecard.properties");
         try {
             Files.createDirectories(appHome);
@@ -153,6 +160,10 @@ public final class App extends Application {
                 config.set(Config.OUTPUT_DIR, appHome.resolve("output").toString());
                 changed = true;
             }
+            if(config.get(Config.DB_PATH).isBlank()){
+                config.set(Config.DB_PATH, appHome.resolve("pokedata/databases/data.sqlite").toString());
+                config.set(Config.IMAGES_DIR, appHome.resolve("pokedata/images").toString());
+            }
             Files.createDirectories(Path.of(config.get(Config.CACHE_DIR)));
             Files.createDirectories(Path.of(config.get(Config.OUTPUT_DIR)));
             Files.createDirectories(Path.of(config.get(Config.OUTPUT_DIR) + "/logs/"));
@@ -165,13 +176,14 @@ public final class App extends Application {
         }
 
         // Only the external inputs (DB, images, import) can block startup -- see class ConfigEditor.
+        /*
         ConfigEditor editor = new ConfigEditor(config);
         while (!allSettingsSatisfied()) {
             if (!editor.showAndWait(null)) {
                 Platform.exit();
                 return;
             }
-        }
+        }*/
 
         // (re)create in case the user pointed cache/output somewhere new under Advanced
         try {
@@ -1246,12 +1258,20 @@ final class InitTask extends Task<App.AppContext>{
 
     private Config.Settings settings;
 
+    private ProgressMonitor mon;
+
     InitTask(Settings settings) {
         this.settings = settings;
     }
 
     @Override
     protected App.AppContext call() throws Exception {
+        prepareGitProgress();
+        if(!(Files.exists(Path.of(settings.dbPath().toUri())))){
+            clonePokedata();
+        }else{
+            updatePokedata(App.appHome.resolve("pokedata").toFile(), 1);
+        }
         String url = "jdbc:sqlite:" + settings.dbPath();
         logger.info("Pokecard v0.8.3\nby willtryon\n");
         updateMessage("Connecting to database...");
@@ -1294,6 +1314,90 @@ final class InitTask extends Task<App.AppContext>{
         CardImportsIndex importDB = cardDB.newImportsIndex();
         return new App.AppContext(cardDB, importDB, searchDB, size);
     }
+
+    private void prepareGitProgress() {
+        mon = new ProgressMonitor() {
+            private int totalWork = 0;
+            private int completedWork = 0;
+            private String currentTaskTitle = "";
+
+            @Override
+            public void start(int totalTasks) {}
+
+            @Override
+            public void beginTask(String title, int totalWork) {
+                this.currentTaskTitle = title;
+                this.totalWork = totalWork; // 👈 FIX: Capture the total work variable!
+                this.completedWork = 0;
+
+                Platform.runLater(() -> {
+                    updateMessage(currentTaskTitle);
+                    if (this.totalWork == UNKNOWN) {
+                        updateProgress(-1, 1); // 👈 FIX: Correct way to set an indeterminate state
+                    } else {
+                        updateProgress(0, this.totalWork);
+                    }
+                });
+            }
+
+            @Override
+            public void update(int completed) {
+                if (totalWork != UNKNOWN && totalWork > 0) {
+                    completedWork += completed;
+                    String displayMessage = currentTaskTitle + " (" + completedWork + "/" + totalWork + ")";
+
+                    // 👈 FIX: JGit runs this on a background worker thread, force UI safety via Platform.runLater
+                    Platform.runLater(() -> {
+                        updateMessage(displayMessage);
+                        updateProgress(completedWork, totalWork);
+                    });
+                }
+            }
+
+            @Override
+            public void endTask() {}
+
+            @Override
+            public boolean isCancelled() {
+                return false;
+            }
+
+            @Override
+            public void showDuration(boolean enabled) {}
+        };
+    }
+
+    private void clonePokedata(){
+        try{
+            Git.cloneRepository().setURI("https://github.com/willtryon/pokedata").setDirectory(App.appHome.resolve("pokedata").toFile()).setDepth(1).setProgressMonitor(mon).call();
+        }catch(Exception e){
+            updateMessage("Error: " + e.getMessage());
+            throw new RuntimeException(e);
+        }
+    }
+    public void updatePokedata(File repositoryDir, int depth) {
+        try (Git git = Git.open(repositoryDir)) {
+            git.fetch()
+                    .setDepth(depth)
+                    .setProgressMonitor(mon)
+                    .call();
+
+            MergeResult result = git.merge()
+                    .include(git.getRepository().findRef("refs/remotes/origin/main"))
+                    .call();
+
+            if (!(result.getMergeStatus().isSuccessful())){
+                logger.error("Merge conflict or issue: {}", result.getMergeStatus());
+                updateMessage("Merge conflict or issue: " + result.getMergeStatus());
+                updateProgress(-1, -1);
+            }
+
+        } catch (Exception e) {
+            updateMessage("Error(database update failure): " + e.getMessage());
+            throw new RuntimeException(e);
+        }
+    }
+
 
     private CardIndex calculateDB(int size, String url) throws SQLException, FileNotFoundException, InterruptedException, TimeoutException {
         CardIndex cardDB;
