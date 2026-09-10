@@ -683,7 +683,7 @@ public final class App extends Application {
             Stage aboutStage = new Stage();
             aboutStage.setTitle("About Pokecard");
             Label name = new Label("Pokecard");
-            Label version = new Label("Version 0.9.0-beta1");
+            Label version = new Label("Version 0.9.0beta1");
             Label author = new Label("by willtryon");
             Button close = new Button("Close");
             VBox aboutLayout = new VBox(12, name, version, author, close);
@@ -1313,7 +1313,7 @@ final class InitTask extends Task<App.AppContext>{
 
     @Override
     protected App.AppContext call() throws Exception {
-        logger.info("Pokecard v0.9.0-beta1\nby willtryon\n");
+        logger.info("Pokecard v0.9.0beta1\nby willtryon\n");
         updateMessage("Loading...");
         gitUsage git = new gitUsage((msg, frac) -> {
         updateMessage(msg);
