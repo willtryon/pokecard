@@ -65,7 +65,7 @@ public final class dbCleanup {
             run(progress, conn, dryRun);
             reconcileIdTcgp(progress, dbPath, tcgDb, dryRun);
             prepareForSearch(progress, conn);
-        } catch (SQLException e) {
+        } catch (SQLException | IOException e) {
             System.err.println("Database error: " + e.getMessage());
             e.printStackTrace();
             System.exit(1);
@@ -316,7 +316,11 @@ public final class dbCleanup {
     public record ReconcileStats(int confirmed, int corrected, int review, int unmatched, int noXwalk) {}
 
     /** Convenience: idTCGP-only fix, no CSV report. */
-    public static ReconcileStats reconcileIdTcgp(ScanProgress progress, Path dataDb, Path tcgDb, boolean dryRun) {
+    public static ReconcileStats reconcileIdTcgp(ScanProgress progress, Path dataDb, Path tcgDb, boolean dryRun) throws IOException {
+        if (!Files.exists(tcgDb) || Files.size(tcgDb) == 0) {
+            logger.debug("tcg.db not present yet; skipping idTCGP reconciliation.");
+            return null; // or new ReconcileStats(0,0,0,0,0)
+        }
         return reconcileIdTcgp(progress, dataDb, tcgDb, dryRun, false, null);
     }
 
