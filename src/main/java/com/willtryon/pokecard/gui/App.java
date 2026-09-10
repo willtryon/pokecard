@@ -61,7 +61,7 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 public final class App extends Application {
 
     private static final Logger logger = LogManager.getLogger(App.class);
-    static final Path appHome = Path.of(System.getProperty("user.home"), ".pokecard");
+    public static final Path appHome = Path.of(System.getProperty("user.home"), ".pokecard");
 
     static boolean clone = false;
     private Config config;
@@ -683,7 +683,7 @@ public final class App extends Application {
             Stage aboutStage = new Stage();
             aboutStage.setTitle("About Pokecard");
             Label name = new Label("Pokecard");
-            Label version = new Label("Version 0.8.3");
+            Label version = new Label("Version 0.9.0-beta1");
             Label author = new Label("by willtryon");
             Button close = new Button("Close");
             VBox aboutLayout = new VBox(12, name, version, author, close);
@@ -1306,7 +1306,6 @@ final class InitTask extends Task<App.AppContext>{
 
     private Config.Settings settings;
 
-    private ProgressMonitor mon;
 
     InitTask(Settings settings) {
         this.settings = settings;
@@ -1314,15 +1313,19 @@ final class InitTask extends Task<App.AppContext>{
 
     @Override
     protected App.AppContext call() throws Exception {
-        logger.info("Pokecard v0.8.3\nby willtryon\n");
+        logger.info("Pokecard v0.9.0-beta1\nby willtryon\n");
         updateMessage("Loading...");
-        prepareGitProgress();
+        gitUsage git = new gitUsage((msg, frac) -> {
+        updateMessage(msg);
+        updateProgress(frac, 1.0);
+        });
+        git.prepareGitProgress();
         if(!(Files.exists(Path.of(settings.dbPath().toUri())))){
             updateMessage("Prepareing to clone database...");
-            clonePokedata();
+            git.clonePokedata();
         }else{
             updateMessage("Checking for updates...");
-            updatePokedata(App.appHome.resolve("pokedata").toFile());
+            git.updatePokedata(App.appHome.resolve("pokedata").toFile());
         }
         updateMessage("Connecting to database..."); updateProgress(-1, 1);
         String url = "jdbc:sqlite:" + settings.dbPath();
@@ -1359,106 +1362,6 @@ final class InitTask extends Task<App.AppContext>{
         updateMessage("Starting...");
         CardImportsIndex importDB = cardDB.newImportsIndex();
         return new App.AppContext(cardDB, importDB, searchDB, size);
-    }
-
-    private void prepareGitProgress() {
-        mon = new ProgressMonitor() {
-            private int totalWork = 0;
-            private int completedWork = 0;
-            private String currentTaskTitle = "";
-
-            @Override
-            public void start(int totalTasks) {}
-
-            @Override
-            public void beginTask(String title, int totalWork) {
-                this.currentTaskTitle = title;
-                this.totalWork = totalWork; // 👈 FIX: Capture the total work variable!
-                this.completedWork = 0;
-
-                Platform.runLater(() -> {
-                    updateMessage(currentTaskTitle);
-                    if (this.totalWork == UNKNOWN) {
-                        updateProgress(-1, 1); // 👈 FIX: Correct way to set an indeterminate state
-                    } else {
-                        updateProgress(0, this.totalWork);
-                    }
-                });
-            }
-
-            @Override
-            public void update(int completed) {
-                if (totalWork != UNKNOWN && totalWork > 0) {
-                    completedWork += completed;
-                    String displayMessage = currentTaskTitle + " (" + completedWork + "/" + totalWork + ")";
-
-                    // 👈 FIX: JGit runs this on a background worker thread, force UI safety via Platform.runLater
-                    Platform.runLater(() -> {
-                        updateMessage(displayMessage);
-                        updateProgress(completedWork, totalWork);
-                    });
-                }
-            }
-
-            @Override
-            public void endTask() {}
-
-            @Override
-            public boolean isCancelled() {
-                return false;
-            }
-
-            @Override
-            public void showDuration(boolean enabled) {}
-        };
-    }
-
-    private void clonePokedata()throws InterruptedException{
-        logger.warn("Database not found.");
-        CountDownLatch latch = new CountDownLatch(1);
-        AtomicBoolean saveChoice =  new AtomicBoolean(false);
-        Platform.runLater(() -> {
-            Alert alert = new Alert(Alert.AlertType.INFORMATION,
-                    "Pokemon database not found. To use this software, the database is required. Clone the database now? (About 3.5GB)",
-                    ButtonType.YES, ButtonType.NO);
-            alert.setHeaderText("Welcome!");
-            Optional<ButtonType> result = alert.showAndWait();
-            saveChoice.set(result.isPresent() && result.get() == ButtonType.YES);
-            latch.countDown();
-        });
-        latch.await();
-        if (saveChoice.get()) {
-            logger.info("Cloning database from willtryon/pokedata...");
-            try{
-                Git.cloneRepository().setURI("https://github.com/willtryon/pokedata").setDirectory(App.appHome.resolve("pokedata").toFile()).setDepth(1).setProgressMonitor(mon).call();
-            }catch(Exception e){
-                updateMessage("Error: " + e.getMessage());
-                throw new RuntimeException(e);
-            }
-        }
-    }
-    private void updatePokedata(File repositoryDir) {
-        logger.info("Checking for updates...");
-        try (Git git = Git.open(repositoryDir)) {
-            git.fetch()
-                    .setDepth(1)
-                    .setProgressMonitor(mon)
-                    .call();
-
-            MergeResult result = git.merge()
-                    .include(git.getRepository().findRef("refs/remotes/origin/main"))
-                    .call();
-
-            if (!(result.getMergeStatus().isSuccessful())){
-                logger.error("Merge conflict or issue: {}", result.getMergeStatus());
-                updateMessage("Merge conflict or issue: " + result.getMergeStatus());
-                updateProgress(-1, -1);
-            }
-
-        } catch (Exception e) {
-            updateMessage("Error(database update failure): " + e.getMessage());
-            throw new RuntimeException(e);
-        }
     }
 
 
