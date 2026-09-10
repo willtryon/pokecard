@@ -1,3 +1,15 @@
+# Builds and publishes a release whenever a pull request is merged into master:
+#   - one platform-restricted "fat" jar per OS (Linux x86_64, Windows x86_64, macOS arm64)
+#   - a macOS pokecard.app app image
+#   - a Windows pokecard app image (zipped; run pokecard.exe)
+#   - Fedora/RHEL .rpm and Debian/Ubuntu .deb packages
+#   - an Arch Linux .pkg.tar.zst (pacman) package
+# The rpm is then published to a small DNF/YUM repository hosted on GitHub Pages.
+#
+# This workflow uses actions that are not certified by GitHub. They are
+# provided by third parties and governed by separate terms of service,
+# privacy policy, and support documentation.
+
 name: Release
 
 on:
@@ -10,9 +22,6 @@ permissions:
   contents: read
 
 jobs:
-  # Reads the version out of pom.xml (the single source of truth) and makes
-  # sure we're not about to re-publish a release that already exists - if
-  # this fails, bump <version> in pom.xml as part of the PR you're merging.
   check-version:
     ##if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
@@ -121,9 +130,6 @@ jobs:
           name: pokecard-macos-app
           path: dist/pokecard-${{ needs.check-version.outputs.version }}-macos.zip
 
-  # Windows app image, zipped. jpackage --type app-image needs no external
-  # tooling (unlike --type msi, which on JDK 21 requires WiX 3.x). The user
-  # unzips and runs pokecard.exe. See notes below the file for the MSI variant.
   build-windows:
     needs: check-version
     runs-on: windows-latest
@@ -176,7 +182,6 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      # rpm -> rpmbuild;  fakeroot -> required by jpackage's deb packaging
       - name: Install rpm + deb packaging tools
         run: sudo apt-get update && sudo apt-get install -y rpm createrepo-c fakeroot
 
@@ -272,11 +277,11 @@ jobs:
 
       - name: Build package with makepkg in an Arch container
         run: |
-              docker run --rm -v "$PWD/arch:/work" archlinux:base-devel bash -c '
-              useradd -m builder &&
-              chown -R builder:builder /work &&
-              runuser -u builder -- bash -lc "cd /work && makepkg -f --nodeps"
-          
+          docker run --rm -v "$PWD/arch:/work" archlinux:base-devel bash -c '
+            useradd -m builder &&
+            chown -R builder:builder /work &&
+            runuser -u builder -- bash -lc "cd /work && makepkg -f --nodeps"
+          '
           # docker wrote files as a different uid; reclaim them so later steps can read them
           sudo chown -R "$(id -u):$(id -g)" arch
 
