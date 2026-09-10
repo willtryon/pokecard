@@ -5,6 +5,8 @@
 [![OpenCV](https://img.shields.io/badge/OpenCV-4.13.0-green.svg)](https://opencv.org/)
 [![Maven](https://img.shields.io/badge/Build-Maven-C71A36.svg)](https://maven.apache.org/)
 
+## NOTE: v0.8.3 and below require you to clone the database manually from willtryon/pokedata. When the program starts up, you need to set the data.sqlite path and cards path manually. Also note for the cards path, NAVIGATE TO IMAGES AND SET THE PATH THERE, DON"T GO TO CARDS AND SET IT. The ui instruction is incorrect.
+
 **pokecard** is an automated Pokémon Trading Card Game (TCG) identification, visual comparison, cataloging, and market valuation platform. It combines computer vision, perceptual hashing, deep learning OCR/VLMs, and TCGplayer pricing feeds into a unified desktop application built with JavaFX.
 I designed this software with the main goal of selling a large part of my collection, since having to manually check each card's value would take tens of hours.
 
