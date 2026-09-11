@@ -17,7 +17,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: '25'
           cache: 'maven'
       - name: Run Maven (Ubuntu, Windows, macOS)
         if: matrix.os != 'fedora'
@@ -33,7 +33,7 @@ jobs:
           run: |
             dnf install -y adoptium-temurin-java-repository
             fedora-third-party enable
-            dnf install -y temurin-21-jdk maven
-            export JAVA_HOME=$(dirname $(dirname $(rpm -ql temurin-21-jdk | grep '/bin/javac$' | head -1)))
+            dnf install -y temurin-25-jdk maven
+            export JAVA_HOME=$(dirname $(dirname $(rpm -ql temurin-25-jdk | grep '/bin/javac$' | head -1)))
             echo "JAVA_HOME=$JAVA_HOME"
             mvn clean verify
