@@ -68,7 +68,7 @@ public final class App extends Application {
     private Path sessionPath;
     private String currentSession;
     private Settings settings;
-    private boolean saved;
+    boolean saved;
     private AppContext ctx;
 
     private Label statusBar;
@@ -77,7 +77,7 @@ public final class App extends Application {
     private final ObjectProperty<Task<?>> statusTask = new SimpleObjectProperty<>();
     private PopOver taskPopOver;
     private TabPane detailTabs;
-    private Stage mainStage;        // stable handle to the primary window, so we can raise it later
+    Stage mainStage;        // stable handle to the primary window, so we can raise it later
     private TreeItem<SideNode> importsBranch;
     private String toggleMode = "default";
     public static boolean firstRun = true;
@@ -415,85 +415,10 @@ public final class App extends Application {
             });
         }), 0, 1, TimeUnit.MINUTES);*/
         //isOrb = false;
-        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1, r -> {
-            Thread t = new Thread(r, "pokecard-background-tasks");
-            t.setDaemon(true);          // don't keep the JVM alive after the window closes
-            return t;
-        });
-
-        scheduler.scheduleAtFixedRate(() -> {
-            try {
-                Platform.runLater(() -> {
-                    Task<Void> priceTask = new Task<>() {
-                        @Override
-                        protected Void call() throws Exception {
-
-                            if(!(Files.exists(settings.cacheDir().resolve("tcg.db")))){
-                                logger.info("hit");
-                                updateMessage("Resolving python dependencies for price fetching..."); updateProgress(-1, 1);
-                                TcgdbEnv env2 = new TcgdbEnv(tcgdbDefaultCacheDir());
-                                env2.prepare();
-                            }
-                            syncPrices((msg, frac) -> {
-                                updateMessage(msg);
-                                updateProgress(frac, 1.0);
-                            });
-                            return null;
-                        }
-                    };
-                    priceTask.setOnFailed(event -> showError(priceTask.getException()));
-                    runTask(priceTask, "pokecard-price-fetcher",v -> {});
-                });
-            } catch (Throwable t) {
-                logger.error("Price sync scheduling failed", t);
-            }
-        }, 0, 30, TimeUnit.MINUTES);
-
-        scheduler.scheduleAtFixedRate(() -> {
-            try {
-                Platform.runLater(() -> {
-                    Task<Void> ocrTask = new Task<>() {
-                        @Override
-                        protected Void call() throws Exception {
-                            if(Boolean.parseBoolean(settings.useOcr())){
-                                logger.info("hit");
-                                updateMessage("Resolving python dependencies for pokeocr"); updateProgress(-1, 1);
-                                PokeocrEnv env = new PokeocrEnv(ocrDefaultCacheDir(), settings);
-                                env.prepare();
-                            }
-                            return null;
-                        }
-                    };
-                    ocrTask.setOnFailed(event -> showError(ocrTask.getException()));
-                    runTask(ocrTask, "pokeocr-dependency-fetcher",v -> {});
-                });
-            } catch (Throwable t) {
-                logger.error("OCR prep failed...", t);
-            }
-        }, 0, 30, TimeUnit.MINUTES);
-
-        scheduler.scheduleAtFixedRate(() -> {
-            try {
-                Platform.runLater(() -> {
-                    Task<Void> saveTask = new Task<>() {
-                        @Override
-                        protected Void call() {
-                            updateTitle("pokecard-auto-save");
-                            logger.debug("I work!");
-                            if (saved) saveSession(mainStage);
-                            return null;
-                        }
-                    };
-                    saveTask.setOnFailed(event -> showError(saveTask.getException()));
-                    runTask(saveTask, "pokecard-auto-save",v -> {});
-                });
-            } catch (Throwable t) {
-                logger.error("Save scheduling failed", t);
-            }
-        }, 10, 1, TimeUnit.MINUTES);
+        backgroundServices services = new backgroundServices(this, settings);
     }
 
-    private void syncPrices(ScanProgress progress) throws Exception {
+    void syncPrices(ScanProgress progress) throws Exception {
         Path db = settings.cacheDir().resolve("tcg.db");
         progress.report("Retrieving price information...", -1);
         TcgdbEnv env = new TcgdbEnv(tcgdbDefaultCacheDir());
@@ -683,7 +608,7 @@ public final class App extends Application {
             Stage aboutStage = new Stage();
             aboutStage.setTitle("About Pokecard");
             Label name = new Label("Pokecard");
-            Label version = new Label("Version 0.9.0.01");
+            Label version = new Label("Version 0.9.0.02");
             Label author = new Label("by willtryon");
             Button close = new Button("Close");
             VBox aboutLayout = new VBox(12, name, version, author, close);
@@ -708,7 +633,7 @@ public final class App extends Application {
     }
 
 
-    private void saveSession(Stage owner) {
+    void saveSession(Stage owner) {
         logger.debug("Saving imports to disk:");
         if (saved) ctx.importDB.writeImportsToDisk(currentSession);
         if (!saved) {
@@ -1265,7 +1190,7 @@ public final class App extends Application {
         else taskPopOver.show(statusProgress);
     }
 
-    private <T> void runTask(Task<T> task, String name, Consumer<T> onSuccess) {
+    <T> void runTask(Task<T> task, String name, Consumer<T> onSuccess) {
         taskView.getTasks().add(task);
         if(!name.equals("noop")) logger.info("Starting task {}", name);// before starting the thread
         if (onSuccess != null) task.setOnSucceeded(e -> {
@@ -1288,7 +1213,7 @@ public final class App extends Application {
         }
     }
 
-    private void showError(Throwable ex){
+    void showError(Throwable ex){
         ex.printStackTrace();
         Alert a = new Alert(Alert.AlertType.ERROR, String.valueOf(ex.getMessage()), ButtonType.OK);
         a.setHeaderText("Something went wrong.");
@@ -1313,7 +1238,7 @@ final class InitTask extends Task<App.AppContext>{
 
     @Override
     protected App.AppContext call() throws Exception {
-        logger.info("Pokecard v0.9.0.01\nby willtryon\n");
+        logger.info("Pokecard v0.9.0.02\nby willtryon\n");
         updateMessage("Loading...");
         gitUsage git = new gitUsage((msg, frac) -> {
         updateMessage(msg);

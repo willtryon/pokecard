@@ -56,7 +56,6 @@ public final class gitUsage {
                     completedWork += completed;
                     String displayMessage = currentTaskTitle + " (" + completedWork + "/" + totalWork + ")";
 
-                    // 👈 FIX: JGit runs this on a background worker thread, force UI safety via Platform.runLater
                     Platform.runLater(() -> {
                         float percent = ((float) completedWork /totalWork);
                         progress.report(displayMessage, percent);
