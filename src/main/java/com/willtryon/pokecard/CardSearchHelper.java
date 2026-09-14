@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-public final class CardSearchRepo implements AutoCloseable {
+public final class CardSearchHelper implements AutoCloseable {
 
     public record CardHit(String cardId, String name, String expName,
                           String expCardNumber, String rarity, Path img) {
@@ -33,7 +33,7 @@ public final class CardSearchRepo implements AutoCloseable {
     private final boolean ftsAvailable;
     private final Map<String, CardSignature> byId;
 
-    public CardSearchRepo(Path dbPath, CardIndex index) throws SQLException {
+    public CardSearchHelper(Path dbPath, CardIndex index) throws SQLException {
         // read only so the db can't get corrupted by an opp which is read only by design.
         SQLiteConfig cfg = new SQLiteConfig();
         cfg.setReadOnly(true);

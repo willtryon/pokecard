@@ -19,9 +19,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.willtryon.pokecard.PokeocrEnv.ocrDefaultCacheDir;
 import static com.willtryon.pokecard.TcgdbEnv.tcgdbDefaultCacheDir;
-import static com.willtryon.pokecard.gui.InitTask.calculateDB;
 
-class backgroundServices implements AutoCloseable{
+class BackgroundServices implements AutoCloseable{
 
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1, r -> {
         Thread t = new Thread(r, "pokecard-background-tasks");
@@ -29,11 +28,11 @@ class backgroundServices implements AutoCloseable{
         return t;
     });
 
-    public static final Logger logger = LogManager.getLogger(backgroundServices.class);
+    public static final Logger logger = LogManager.getLogger(BackgroundServices.class);
     private final Config.Settings settings;
     private final App app;
 
-    backgroundServices(App app, Config.Settings settings) {
+    BackgroundServices(App app, Config.Settings settings) {
         this.app = app;
         this.settings = settings;
         startBackgroundServices();
@@ -45,6 +44,7 @@ class backgroundServices implements AutoCloseable{
                     Task<Void> priceTask = new Task<>() {
                         @Override
                         protected Void call() throws Exception {
+                            updateTitle("pokecard-price-fetcher");
                             if(!(Files.exists(settings.cacheDir().resolve("tcg.db")))){
                                 updateMessage("Resolving python dependencies for price fetching..."); updateProgress(-1, 1);
                                 TcgdbEnv env2 = new TcgdbEnv(tcgdbDefaultCacheDir());
@@ -71,6 +71,7 @@ class backgroundServices implements AutoCloseable{
                     Task<Void> ocrTask = new Task<>() {
                         @Override
                         protected Void call() throws Exception {
+                            updateTitle("pokeocr-dependency-fetcher");
                             if(Boolean.parseBoolean(settings.useOcr())){
                                 updateMessage("Resolving python dependencies for pokeocr"); updateProgress(-1, 1);
                                 PokeocrEnv env = new PokeocrEnv(ocrDefaultCacheDir(), settings);

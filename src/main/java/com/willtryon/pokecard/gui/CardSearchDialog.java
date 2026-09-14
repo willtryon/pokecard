@@ -1,8 +1,8 @@
 package com.willtryon.pokecard.gui;
 
 import com.willtryon.pokecard.CardImports;
-import com.willtryon.pokecard.CardSearchRepo;
-import com.willtryon.pokecard.CardSearchRepo.CardHit;
+import com.willtryon.pokecard.CardSearchHelper;
+import com.willtryon.pokecard.CardSearchHelper.CardHit;
 import com.willtryon.pokecard.CardSignature;
 
 import javafx.animation.PauseTransition;
@@ -39,7 +39,7 @@ public final class CardSearchDialog {
     private static final double ROW_HEIGHT   = 96;
     private static final int    CACHE_SIZE   = 300;
 
-    private final CardSearchRepo repo;
+    private final CardSearchHelper repo;
     private final Consumer<String> onOpenInDatabase;   // may be null; button only appears when set
     private final ObservableList<CardHit> rows = FXCollections.observableArrayList();
 
@@ -56,11 +56,11 @@ public final class CardSearchDialog {
    //similar idea to gc generations
     private long generation = 0;
 
-    public CardSearchDialog(CardSearchRepo repo) {
+    public CardSearchDialog(CardSearchHelper repo) {
         this(repo, null);
     }
 
-    public CardSearchDialog(CardSearchRepo repo, Consumer<String> onOpenInDatabase) {
+    public CardSearchDialog(CardSearchHelper repo, Consumer<String> onOpenInDatabase) {
         this.repo = repo;
         this.onOpenInDatabase = onOpenInDatabase;
     }

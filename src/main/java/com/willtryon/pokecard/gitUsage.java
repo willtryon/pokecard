@@ -7,15 +7,11 @@ import javafx.scene.control.ButtonType;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.MergeResult;
 import org.eclipse.jgit.api.ResetCommand;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.TransportException;
 import org.eclipse.jgit.diff.DiffEntry;
-import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.lib.*;
-import org.eclipse.jgit.transport.FetchResult;
-import org.eclipse.jgit.transport.TrackingRefUpdate;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 
@@ -125,7 +121,7 @@ public final class gitUsage {
                 progress.report("Error: " + e.getMessage(), -1);
                 throw new RuntimeException();
             }catch(Exception e){
-                logger.error("Error: " + e.getMessage());
+                logger.error("Error: {}", e.getMessage());
                 progress.report("Error: " + e.getMessage(), -1);
                 throw new RuntimeException(e);
             }
@@ -196,7 +192,7 @@ public final class gitUsage {
             return false;
         }
     }
-    public Set<DataArea> updatePokedata(File repositoryDir) throws GitAPIException {
+    public Set<DataArea> updatePokedata(File repositoryDir){
         logger.info("Updating resources...");
         //progress.report("Updating resources...", -1);
         try (Git git = Git.open(repositoryDir)) {
