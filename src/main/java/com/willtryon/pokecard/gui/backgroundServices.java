@@ -1,21 +1,25 @@
 package com.willtryon.pokecard.gui;
 
-import com.willtryon.pokecard.Config;
-import com.willtryon.pokecard.PokeocrEnv;
-import com.willtryon.pokecard.TcgdbEnv;
-import com.willtryon.pokecard.gitUsage;
+import com.willtryon.pokecard.*;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.nio.file.Files;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.willtryon.pokecard.PokeocrEnv.ocrDefaultCacheDir;
 import static com.willtryon.pokecard.TcgdbEnv.tcgdbDefaultCacheDir;
+import static com.willtryon.pokecard.gui.InitTask.calculateDB;
 
 class backgroundServices implements AutoCloseable{
 
@@ -41,9 +45,7 @@ class backgroundServices implements AutoCloseable{
                     Task<Void> priceTask = new Task<>() {
                         @Override
                         protected Void call() throws Exception {
-
                             if(!(Files.exists(settings.cacheDir().resolve("tcg.db")))){
-                                logger.info("hit");
                                 updateMessage("Resolving python dependencies for price fetching..."); updateProgress(-1, 1);
                                 TcgdbEnv env2 = new TcgdbEnv(tcgdbDefaultCacheDir());
                                 env2.prepare();
@@ -70,7 +72,6 @@ class backgroundServices implements AutoCloseable{
                         @Override
                         protected Void call() throws Exception {
                             if(Boolean.parseBoolean(settings.useOcr())){
-                                logger.info("hit");
                                 updateMessage("Resolving python dependencies for pokeocr"); updateProgress(-1, 1);
                                 PokeocrEnv env = new PokeocrEnv(ocrDefaultCacheDir(), settings);
                                 env.prepare();
@@ -93,7 +94,6 @@ class backgroundServices implements AutoCloseable{
                         @Override
                         protected Void call() {
                             updateTitle("pokecard-auto-save");
-                            logger.debug("I work!");
                             if (app.saved) app.saveSession(app.mainStage);
                             return null;
                         }
@@ -109,25 +109,62 @@ class backgroundServices implements AutoCloseable{
         scheduler.scheduleAtFixedRate(() -> {
             try {
                 Platform.runLater(() -> {
-                    Task<Void> fetchTask = new Task<>() {
+                    Task<Set<gitUsage.DataArea>> fetchTask = new Task<>() {
                         @Override
-                        protected Void call() {
+                        protected Set<gitUsage.DataArea> call() {
                             updateTitle("pokecard-auto-update");
                             gitUsage git = new gitUsage((msg, frac) -> {
                                 updateMessage(msg);
                                 updateProgress(frac, 1);
                             });
-                            git.updatePokedata(App.appHome.resolve("pokedata").toFile());
-                            return null;
+                            git.prepareGitProgress();
+                            return git.fetch(App.appHome.resolve("pokedata").toFile());
                         }
                     };
                     fetchTask.setOnFailed(event -> app.showError(fetchTask.getException()));
-                    app.runTask(fetchTask, "pokecard-auto-update",v -> {});
+                    app.runTask(fetchTask, "pokecard-auto-update", changed -> {
+                        if (changed.contains(gitUsage.DataArea.IMAGES)) {
+                            Task<CardIndex> recompute = new Task<>() {
+                                @Override
+                                protected CardIndex call() throws Exception {
+                                    updateTitle("pokecard-db-recompute");
+                                    InitTask.calculateDB((msg, frac) -> {
+                                        updateMessage(msg);
+                                        updateProgress(frac, 1.0);
+                                    }, settings);
+                                    CountDownLatch latch = new CountDownLatch(1);
+                                    AtomicBoolean saveChoice = new AtomicBoolean(false);
+                                    Platform.runLater(() -> {
+                                        Alert alert = new Alert(
+                                                Alert.AlertType.CONFIRMATION,
+                                                "Restart the program to apply the changes?",
+                                                ButtonType.YES, ButtonType.NO
+                                        );
+                                        alert.setHeaderText("Update available");
+                                        Optional<ButtonType> choice = alert.showAndWait();
+                                        saveChoice.set(choice.isPresent() && choice.get() == ButtonType.YES);
+                                        latch.countDown();
+                                    });
+                                    latch.await();
+                                    if(saveChoice.get()){
+                                        App.restartApplication();
+                                    }
+                                    return null;
+                                }
+                            };
+                            recompute.setOnFailed(event -> app.showError(recompute.getException()));
+                            app.runTask(recompute, "pokecard-db-recompute", newDB -> {
+                            });
+                        }
+                        if (changed.contains(gitUsage.DataArea.DATABASE)) {
+                            // data.sqlite changed -> reconnect / reload
+                        }
+                    });
                 });
             } catch (Throwable t) {
-                logger.error("Update fetching failed.", t);
+                logger.error("Save scheduling failed", t);
             }
-        }, 0, 30, TimeUnit.MINUTES);
+        }, 0, 24, TimeUnit.HOURS);
     }
 
     @Override

@@ -63,7 +63,6 @@ public final class App extends Application {
     private static final Logger logger = LogManager.getLogger(App.class);
     public static final Path appHome = Path.of(System.getProperty("user.home"), ".pokecard");
 
-    static boolean clone = false;
     private Config config;
     private Path sessionPath;
     private String currentSession;
@@ -138,7 +137,7 @@ public final class App extends Application {
         return !s.kind().isValidValue(value);
     }
 
-    record AppContext(CardIndex cardDB, CardImportsIndex importDB, CardSearchRepo searchDB, int size) {
+    record AppContext(CardIndex cardDB, CardImportsIndex importDB, CardSearchRepo searchDB) {
     }
 
     @Override
@@ -436,9 +435,10 @@ public final class App extends Application {
         MenuItem importItem = new MenuItem("Import an image to scan...");
         MenuItem closeTabsItem = new MenuItem("Close tabs");
         MenuItem settingsItem = new MenuItem("Settings...");
+        MenuItem restartItem = new MenuItem("Restart");
         MenuItem exitItem = new MenuItem("Quit");
         Menu fileMenu = new Menu("File");
-        fileMenu.getItems().addAll(newSessionItem, saveSessionItem, loadSessionItem, importItem, settingsItem, new SeparatorMenuItem(),closeTabsItem, new SeparatorMenuItem(), exitItem);
+        fileMenu.getItems().addAll(newSessionItem, saveSessionItem, loadSessionItem, importItem, settingsItem, new SeparatorMenuItem(),closeTabsItem, new SeparatorMenuItem(), restartItem, exitItem);
         Menu editMenu = new Menu("Edit");
         MenuItem editImportItem = new MenuItem("Edit import...");
         editMenu.getItems().addAll(editImportItem);
@@ -590,6 +590,10 @@ public final class App extends Application {
             }
         });
 
+        restartItem.setOnAction(e -> {
+            restartApplication();
+        });
+
         exitItem.setOnAction(e -> {
             ctx.cardDB.shutdown();
             Platform.exit();
@@ -608,7 +612,7 @@ public final class App extends Application {
             Stage aboutStage = new Stage();
             aboutStage.setTitle("About Pokecard");
             Label name = new Label("Pokecard");
-            Label version = new Label("Version 0.9.0.02");
+            Label version = new Label("Version 0.9.0.03");
             Label author = new Label("by willtryon");
             Button close = new Button("Close");
             VBox aboutLayout = new VBox(12, name, version, author, close);
@@ -1220,6 +1224,26 @@ public final class App extends Application {
         a.showAndWait();
     }
 
+    static void restartApplication() {
+        try {
+            logger.info("Restarting application...");
+            ProcessHandle.Info info = ProcessHandle.current().info();
+            String cmd = info.command().orElseThrow();
+            String[] args = info.arguments().orElse(new String[0]);
+
+            List<String> command = new ArrayList<>();
+            command.add(cmd);
+            command.addAll(Arrays.asList(args));
+
+            new ProcessBuilder(command).inheritIO().start();
+            Platform.exit();
+            System.exit(0);
+
+        } catch (Exception e) {
+            logger.error("Failed to restart application", e);
+        }
+    }
+
     public static void main(String[] args){
         launch(args);
     }
@@ -1238,21 +1262,59 @@ final class InitTask extends Task<App.AppContext>{
 
     @Override
     protected App.AppContext call() throws Exception {
-        logger.info("Pokecard v0.9.0.02\nby willtryon\n");
+        logger.info("Pokecard v0.9.0.03\nby willtryon\n");
         updateMessage("Loading...");
-        gitUsage git = new gitUsage((msg, frac) -> {
-        updateMessage(msg);
-        updateProgress(frac, 1.0);
-        });
-        git.prepareGitProgress();
         if(!(Files.exists(Path.of(settings.dbPath().toUri())))){
             updateMessage("Prepareing to clone database...");
+            gitUsage git = new gitUsage((msg, frac) -> {
+                updateMessage(msg);
+                updateProgress(frac, 1.0);
+            });
+            git.prepareGitProgress();
             git.clonePokedata();
-        }else{
+        }/*else{
             updateMessage("Checking for updates...");
             git.updatePokedata(App.appHome.resolve("pokedata").toFile());
+        }*/
+
+        updateMessage("Running database tasks...");
+        new dbCleanup((msg, frac) -> {
+            updateMessage(msg);
+            updateProgress(frac, 1.0);
+        }, settings.dbPath(), settings.cacheDir().resolve("tcg.db"), false);
+        logger.debug(settings.cacheDir().resolve("tcg.db"));
+
+        Path cacheFile = settings.cacheDir().resolve("cache_meta.dat");
+        CardIndex cardDB;
+        updateProgress(-1, -1);
+        if (Files.isRegularFile(cacheFile)) {
+            updateMessage("Loading resources...");
+            try {
+                cardDB = new CardIndex(settings);
+            } catch (InvalidVersionException e) {
+                cardDB = calculateDB((msg, frac) -> {
+                    updateMessage(msg);
+                    updateProgress(frac, 1.0);
+                }, settings);
+            }
+        } else {
+            cardDB = calculateDB((msg, frac) -> {
+                updateMessage(msg);
+                updateProgress(frac, 1.0);
+            }, settings);
         }
-        updateMessage("Connecting to database..."); updateProgress(-1, 1);
+        updateMessage("Initializing searchDB...");
+        updateProgress(1.0, 1.0);
+        CardSearchRepo searchDB = new CardSearchRepo(settings.dbPath(), cardDB);
+        updateMessage("Starting...");
+        CardImportsIndex importDB = cardDB.newImportsIndex();
+        return new App.AppContext(cardDB, importDB, searchDB);
+    }
+
+
+    static CardIndex calculateDB(ScanProgress progress, Settings settings)
+            throws SQLException, FileNotFoundException, InterruptedException, TimeoutException {
+        progress.report("Connecting to database...", -1);
         String url = "jdbc:sqlite:" + settings.dbPath();
         int size;
         try (Connection conn = DriverManager.getConnection(url);
@@ -1260,60 +1322,10 @@ final class InitTask extends Task<App.AppContext>{
              ResultSet rs = st.executeQuery("SELECT COUNT(*) AS n FROM cards")) {
             size = rs.next() ? rs.getInt("n") : 0;
         }
-        updateMessage("Running database tasks...");
-        new dbCleanup((msg, frac) -> {
-            updateMessage(msg);
-            updateProgress(frac, 1.0);
-        }, settings.dbPath(), settings.cacheDir().resolve("tcg.db"), false);
-        Main.size = size;
-        logger.debug(settings.cacheDir().resolve("tcg.db"));
-
-        Path cacheFile = settings.cacheDir().resolve("cache_meta.dat");
-        CardIndex cardDB;
-        updateProgress(-1, -1);
-        if (Files.isRegularFile(cacheFile)) {
-            updateMessage("Loading cache (" + size + " cards)...");
-            try {
-                cardDB = new CardIndex(settings);
-            } catch (InvalidVersionException e) {
-                cardDB = calculateDB(size, url);
-            }
-        } else {
-            cardDB = calculateDB(size, url);
-        }
-        updateMessage("Initializing searchDB...");
-        updateProgress(1.0, 1.0);
-        CardSearchRepo searchDB = new CardSearchRepo(settings.dbPath(), cardDB);
-        updateMessage("Starting...");
-        CardImportsIndex importDB = cardDB.newImportsIndex();
-        return new App.AppContext(cardDB, importDB, searchDB, size);
-    }
-
-
-    private CardIndex calculateDB(int size, String url) throws SQLException, FileNotFoundException, InterruptedException, TimeoutException {
-        CardIndex cardDB;
-        updateMessage("Computing image data for " + size + " cards...");
-        cardDB = new CardIndex(size, url, settings);
-        CountDownLatch latch = new CountDownLatch(1);
-        AtomicBoolean saveChoice = new AtomicBoolean(false);
-
-        Platform.runLater(() -> {
-            Alert alert = new Alert(
-                    Alert.AlertType.INFORMATION,
-                    "Done calculating image data. Writing the data to the disk will take about 620MB. Do you want to save the data?",
-                    ButtonType.YES, ButtonType.NO
-            );
-            alert.setHeaderText("Save image data");
-            Optional<ButtonType> result = alert.showAndWait();
-            saveChoice.set(result.isPresent() && result.get() == ButtonType.YES);
-            latch.countDown();
-        });
-
-        latch.await(); // block the background thread until the user answers
-
-        if (saveChoice.get()) {
-            cardDB.writeToDisk();
-        }
+        progress.report("Computing image data for " + size + " cards...", -1);
+        CardIndex cardDB = new CardIndex(size, url, settings);
+        progress.report("Saving cache...", -1);
+        cardDB.writeToDisk();
         return cardDB;
     }
 }
