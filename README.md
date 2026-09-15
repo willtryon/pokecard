@@ -28,7 +28,7 @@ I designed this software with the main goal of selling a large part of my collec
 - **TCGplayer Market Pricing Integration (`tcgdb`)**:
   - Background synchronization with TCGCSV to mirror current market prices, direct low prices, and price history into local SQLite storage.
   - Supports card variants: Normal, Holofoil, Reverse Holofoil, 1st Edition, and unlimited variants.
-- **Fast Search & Database Browsing (`CardSearchRepo`)**:
+- **Fast Search & Database Browsing (`CardSearchHelper`)**:
   - Indexed SQLite catalog with SQLite FTS5 full-text search and BM25 ranking for instant manual lookups and candidate overrides in the case that the program is wrong.
 
 ---

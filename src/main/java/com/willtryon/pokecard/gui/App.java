@@ -14,6 +14,10 @@ import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.scene.chart.CategoryAxis;
+import javafx.scene.chart.LineChart;
+import javafx.scene.chart.NumberAxis;
+import javafx.scene.chart.XYChart;
 import javafx.scene.control.*;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.cell.CheckBoxListCell;
@@ -50,12 +54,8 @@ import java.util.function.Consumer;
 
 import static com.willtryon.pokecard.CardImportsIndex.globalCardVersion;
 import static com.willtryon.pokecard.CardImportsIndex.globalFirstEdition;
-import static com.willtryon.pokecard.PokeocrEnv.ocrDefaultCacheDir;
 import static com.willtryon.pokecard.TcgdbEnv.tcgdbDefaultCacheDir;
 import com.willtryon.pokecard.Config.Settings;
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.MergeResult;
-import org.eclipse.jgit.lib.ProgressMonitor;
 
 
 public final class App extends Application {
@@ -63,12 +63,11 @@ public final class App extends Application {
     private static final Logger logger = LogManager.getLogger(App.class);
     public static final Path appHome = Path.of(System.getProperty("user.home"), ".pokecard");
 
-    static boolean clone = false;
     private Config config;
     private Path sessionPath;
     private String currentSession;
     private Settings settings;
-    private boolean saved;
+    boolean saved;
     private AppContext ctx;
 
     private Label statusBar;
@@ -77,7 +76,7 @@ public final class App extends Application {
     private final ObjectProperty<Task<?>> statusTask = new SimpleObjectProperty<>();
     private PopOver taskPopOver;
     private TabPane detailTabs;
-    private Stage mainStage;        // stable handle to the primary window, so we can raise it later
+    Stage mainStage;        // stable handle to the primary window, so we can raise it later
     private TreeItem<SideNode> importsBranch;
     private String toggleMode = "default";
     public static boolean firstRun = true;
@@ -138,7 +137,7 @@ public final class App extends Application {
         return !s.kind().isValidValue(value);
     }
 
-    record AppContext(CardIndex cardDB, CardImportsIndex importDB, CardSearchRepo searchDB, int size) {
+    record AppContext(CardIndex cardDB, CardImportsIndex importDB, CardSearchHelper searchDB) {
     }
 
     @Override
@@ -229,7 +228,7 @@ public final class App extends Application {
             Throwable ex = initTask.getException();
             statusLabel.textProperty().unbind();
             statusLabel.setText("Exception occurred:" + ex.getMessage());
-            ex.printStackTrace(); showError(ex);
+            logger.error(ex.getMessage()); showError(ex);
             System.exit(1);
         });
         Thread initThread = new Thread(initTask, "pokecard-init");
@@ -304,9 +303,7 @@ public final class App extends Application {
             HBox options =  new HBox(10, mcq, firstEdition);
             options.setAlignment(Pos.CENTER);
             Button start = new Button("Start");
-            start.setOnAction(event -> {
-                dialogStage.close();
-            });
+            start.setOnAction(event -> dialogStage.close());
             VBox setup = new VBox(10, instructions, options, start);
             setup.setAlignment(Pos.CENTER);
             setup.setSpacing(10);
@@ -415,85 +412,10 @@ public final class App extends Application {
             });
         }), 0, 1, TimeUnit.MINUTES);*/
         //isOrb = false;
-        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1, r -> {
-            Thread t = new Thread(r, "pokecard-background-tasks");
-            t.setDaemon(true);          // don't keep the JVM alive after the window closes
-            return t;
-        });
-
-        scheduler.scheduleAtFixedRate(() -> {
-            try {
-                Platform.runLater(() -> {
-                    Task<Void> priceTask = new Task<>() {
-                        @Override
-                        protected Void call() throws Exception {
-
-                            if(!(Files.exists(settings.cacheDir().resolve("tcg.db")))){
-                                logger.info("hit");
-                                updateMessage("Resolving python dependencies for price fetching..."); updateProgress(-1, 1);
-                                TcgdbEnv env2 = new TcgdbEnv(tcgdbDefaultCacheDir());
-                                env2.prepare();
-                            }
-                            syncPrices((msg, frac) -> {
-                                updateMessage(msg);
-                                updateProgress(frac, 1.0);
-                            });
-                            return null;
-                        }
-                    };
-                    priceTask.setOnFailed(event -> showError(priceTask.getException()));
-                    runTask(priceTask, "pokecard-price-fetcher",v -> {});
-                });
-            } catch (Throwable t) {
-                logger.error("Price sync scheduling failed", t);
-            }
-        }, 0, 30, TimeUnit.MINUTES);
-
-        scheduler.scheduleAtFixedRate(() -> {
-            try {
-                Platform.runLater(() -> {
-                    Task<Void> ocrTask = new Task<>() {
-                        @Override
-                        protected Void call() throws Exception {
-                            if(Boolean.parseBoolean(settings.useOcr())){
-                                logger.info("hit");
-                                updateMessage("Resolving python dependencies for pokeocr"); updateProgress(-1, 1);
-                                PokeocrEnv env = new PokeocrEnv(ocrDefaultCacheDir(), settings);
-                                env.prepare();
-                            }
-                            return null;
-                        }
-                    };
-                    ocrTask.setOnFailed(event -> showError(ocrTask.getException()));
-                    runTask(ocrTask, "pokeocr-dependency-fetcher",v -> {});
-                });
-            } catch (Throwable t) {
-                logger.error("OCR prep failed...", t);
-            }
-        }, 0, 30, TimeUnit.MINUTES);
-
-        scheduler.scheduleAtFixedRate(() -> {
-            try {
-                Platform.runLater(() -> {
-                    Task<Void> saveTask = new Task<>() {
-                        @Override
-                        protected Void call() {
-                            updateTitle("pokecard-auto-save");
-                            logger.debug("I work!");
-                            if (saved) saveSession(mainStage);
-                            return null;
-                        }
-                    };
-                    saveTask.setOnFailed(event -> showError(saveTask.getException()));
-                    runTask(saveTask, "pokecard-auto-save",v -> {});
-                });
-            } catch (Throwable t) {
-                logger.error("Save scheduling failed", t);
-            }
-        }, 10, 1, TimeUnit.MINUTES);
+        new BackgroundServices(this, settings);
     }
 
-    private void syncPrices(ScanProgress progress) throws Exception {
+    void syncPrices(ScanProgress progress) throws Exception {
         Path db = settings.cacheDir().resolve("tcg.db");
         progress.report("Retrieving price information...", -1);
         TcgdbEnv env = new TcgdbEnv(tcgdbDefaultCacheDir());
@@ -511,9 +433,10 @@ public final class App extends Application {
         MenuItem importItem = new MenuItem("Import an image to scan...");
         MenuItem closeTabsItem = new MenuItem("Close tabs");
         MenuItem settingsItem = new MenuItem("Settings...");
+        MenuItem restartItem = new MenuItem("Restart");
         MenuItem exitItem = new MenuItem("Quit");
         Menu fileMenu = new Menu("File");
-        fileMenu.getItems().addAll(newSessionItem, saveSessionItem, loadSessionItem, importItem, settingsItem, new SeparatorMenuItem(),closeTabsItem, new SeparatorMenuItem(), exitItem);
+        fileMenu.getItems().addAll(newSessionItem, saveSessionItem, loadSessionItem, importItem, settingsItem, new SeparatorMenuItem(),closeTabsItem, new SeparatorMenuItem(), restartItem, exitItem);
         Menu editMenu = new Menu("Edit");
         MenuItem editImportItem = new MenuItem("Edit import...");
         editMenu.getItems().addAll(editImportItem);
@@ -544,27 +467,19 @@ public final class App extends Application {
         hash1Button.disableProperty().bind(Bindings.createBooleanBinding(
                 () -> currentImport() == null,
                 detailTabs.getSelectionModel().selectedItemProperty()));
-        hash1Button.setOnAction(event -> {
-            openSpreadSheetTab(currentImport(), "hash");
-        });
+        hash1Button.setOnAction(event -> openSpreadSheetTab(currentImport(), "hash"));
 
         cv1Button.disableProperty().bind(Bindings.createBooleanBinding(
                 () -> currentImport() == null,
                 detailTabs.getSelectionModel().selectedItemProperty()));
-        cv1Button.setOnAction(event -> {
-            openSpreadSheetTab(currentImport(), "orb");
-        });
+        cv1Button.setOnAction(event -> openSpreadSheetTab(currentImport(), "orb"));
 
         ocr1Button.disableProperty().bind(Bindings.createBooleanBinding(
                 () -> currentImport() == null,
                 detailTabs.getSelectionModel().selectedItemProperty()));
-        ocr1Button.setOnAction(event -> {
-            openSpreadSheetTab(currentImport(), "ocr");
-        });
+        ocr1Button.setOnAction(event -> openSpreadSheetTab(currentImport(), "ocr"));
 
-        imp1Button.setOnAction(event -> {
-            openSpreadSheetTab(null, "session");
-        });
+        imp1Button.setOnAction(event -> openSpreadSheetTab(null, "session"));
 
         Separator sep = new Separator();
 
@@ -576,9 +491,7 @@ public final class App extends Application {
         prop1Button.disableProperty().bind(Bindings.createBooleanBinding(
                 () -> currentImport() == null,
                 detailTabs.getSelectionModel().selectedItemProperty()));
-        prop1Button.setOnAction(event -> {
-            new ImportsProperties(mainStage, ctx, currentImport(), settings, this::revealCardInDatabase);
-        });
+        prop1Button.setOnAction(event -> new ImportsProperties(mainStage, ctx, currentImport(), settings, this::revealCardInDatabase));
 
         search1Button.disableProperty().bind(Bindings.createBooleanBinding(
                 () -> currentImport() == null,
@@ -665,6 +578,10 @@ public final class App extends Application {
             }
         });
 
+        restartItem.setOnAction(e -> {
+            restartApplication();
+        });
+
         exitItem.setOnAction(e -> {
             ctx.cardDB.shutdown();
             Platform.exit();
@@ -683,7 +600,7 @@ public final class App extends Application {
             Stage aboutStage = new Stage();
             aboutStage.setTitle("About Pokecard");
             Label name = new Label("Pokecard");
-            Label version = new Label("Version 0.9.0.01");
+            Label version = new Label("Version 0.9.0.04");
             Label author = new Label("by willtryon");
             Button close = new Button("Close");
             VBox aboutLayout = new VBox(12, name, version, author, close);
@@ -708,7 +625,7 @@ public final class App extends Application {
     }
 
 
-    private void saveSession(Stage owner) {
+    void saveSession(Stage owner) {
         logger.debug("Saving imports to disk:");
         if (saved) ctx.importDB.writeImportsToDisk(currentSession);
         if (!saved) {
@@ -791,7 +708,7 @@ public final class App extends Application {
         statusProgress.setOnMouseClicked(e -> toggleTaskPopOver());
         taskView.getTasks().addListener((ListChangeListener<Task<?>>) c -> {
             var live = taskView.getTasks();
-            statusTask.set(live.isEmpty() ? null : live.get(live.size() - 1));
+            statusTask.set(live.isEmpty() ? null : live.getLast());
         });
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -820,7 +737,6 @@ public final class App extends Application {
                         Path q = i.imp().getQueryImage();
                         yield q == null ? "(unknown image)" : q.getFileName().toString();
                     }
-                    default -> throw new IllegalStateException("Unexpected value: " + node);
 
                 });
 
@@ -920,7 +836,7 @@ public final class App extends Application {
         if(!args.equals("session")) q = imp.getQueryImage();
         String key = "spreadsheet:" + (q == null ? String.valueOf(imp.hashCode()) : q.toString());
         if (focusExistingTab(key)) return;
-        String title = (q == null ? "Import" : q.getFileName().toString()) + " \u2013 ORB matches";
+        String title = (q == null ? "Import" : q.getFileName().toString()) + " – ORB matches";
         SpreadsheetView sv = buildSpreadsheet(imp, args);
         Tab tab = new Tab(title, sv);
         tab.setId(key);
@@ -933,13 +849,11 @@ public final class App extends Application {
             firstRun = false;
         }
 
-        Platform.runLater(() ->{
-            sv.setOnKeyPressed(event -> {
-                if(event.isShortcutDown() && event.getCode() == KeyCode.C) {
-                    sv.copyClipboard();
-                }
-            });
-        });
+        Platform.runLater(() -> sv.setOnKeyPressed(event -> {
+            if(event.isShortcutDown() && event.getCode() == KeyCode.C) {
+                sv.copyClipboard();
+            }
+        }));
 
     }
 
@@ -1018,7 +932,7 @@ public final class App extends Application {
     }
 
 
-    private Node buildImportDetail(CardImports imp) {
+    Node buildImportDetail(CardImports imp) {
         HBox content = new HBox(10);
         content.setPadding(new Insets(16));
 
@@ -1028,8 +942,9 @@ public final class App extends Application {
         ToggleButton hashList = new ToggleButton("Hash");
         ToggleButton orbList = new ToggleButton("ORB");
         ToggleButton ocrList = new ToggleButton("OCR");
+        ToggleButton priceChart = new ToggleButton("Price");
 
-        ToggleButton[] buttons = { overview, hashList, orbList, ocrList };
+        ToggleButton[] buttons = { overview, hashList, orbList, ocrList, priceChart};
 
         for(ToggleButton b : buttons){
             b.setToggleGroup(group);
@@ -1077,10 +992,11 @@ public final class App extends Application {
 
         Runnable updateLayout = () -> {
             imgStack.getChildren().clear();
-            if (!toggleMode.equals("default")) {
-                imgStack.getChildren().addAll(orbLabel, hashLabel, ocrLabel, images, new HBox(16, previous, count, next));
-            } else {
-                imgStack.getChildren().addAll(images);
+            switch (toggleMode) {
+                case "default" -> imgStack.getChildren().addAll(images);
+                case "price"   -> imgStack.getChildren().add(buildPriceChart(imp));
+                default        -> imgStack.getChildren().addAll(
+                        orbLabel, hashLabel, ocrLabel, images, new HBox(16, previous, count, next));
             }
         };
 
@@ -1088,16 +1004,62 @@ public final class App extends Application {
         hashList.setOnAction(e -> { toggleMode = "hash";    render.run(); updateLayout.run(); });
         orbList.setOnAction(e ->  { toggleMode = "orb";     render.run(); updateLayout.run(); });
         ocrList.setOnAction(e ->  { toggleMode = "ocr";      render.run(); updateLayout.run(); });
+        priceChart.setOnAction(e ->  { toggleMode = "price";      render.run(); updateLayout.run(); });
+
 
         render.run();
         updateLayout.run(); // initial layout, replacing your old one-off if/else at the bottom
 
-        HBox bar = new HBox(10, overview, hashList, orbList, ocrList);
+        HBox bar = new HBox(10, overview, hashList, orbList, ocrList, priceChart);
         bar.setAlignment(Pos.CENTER);
         bar.setPadding(new Insets(10));
         bar.setSpacing(20);
         content.getChildren().addAll(imgStack, info);
         return new VBox(10, bar, content);
+    }
+
+    private Node buildPriceChart(CardImports imp) {
+        CategoryAxis x = new CategoryAxis();
+        x.setTickLabelRotation(-60);
+
+        NumberAxis y = new NumberAxis();
+        y.setForceZeroInRange(false);
+
+        LineChart<String, Number> chart = new LineChart<>(x, y);
+        chart.setCreateSymbols(false);
+        chart.setAnimated(false);
+        chart.setPrefSize(720, 380);
+
+        CardImports.Match m = imp.getBestMatch();
+        if (m == null || m.cardID() == null) {
+            chart.setTitle("No match to price");
+            return chart;
+        }
+
+        try{
+            FullCardSignature sig = new FullCardSignature(ctx.searchDB.signature(m.cardID()), settings.dbPath(), settings.cacheDir(), imp.getCardVersion(), imp.getFirstEdition());
+            var points  = PriceHistoryHelper.load(settings.cacheDir(), sig.getIdTCGP(), sig.getCardVersion());
+            if(points.isEmpty()){
+                chart.setTitle(sig.getName() + "– no price history");
+                return chart;
+            }
+            chart.setTitle(sig.getName() + " (" + sig.getCardVersion() + ")");
+            XYChart.Series<String, Number> market = new XYChart.Series<>(); market.setName("Market");
+            XYChart.Series<String, Number> mid    = new XYChart.Series<>(); mid.setName("Mid");
+            XYChart.Series<String, Number> low    = new XYChart.Series<>(); low.setName("Low");
+
+            for(var p : points){
+                String date = p.date().toString();
+                if (p.market() != 0.0f) market.getData().add(new XYChart.Data<>(date, p.market()));
+                if (p.mid() != 0.0f) mid.getData().add(new XYChart.Data<>(date, p.mid()));
+                if (p.low() != 0.0f) low.getData().add(new XYChart.Data<>(date, p.low()));
+            }
+            chart.getData().addAll(market, mid, low);
+        } catch (SQLException e) {
+            logger.error(e.getMessage());
+            showError(e);
+        }
+        return chart;
     }
 
     private Runnable getRender(CardImports imp, int size, Label orbLabel, Label hashLabel, Label ocrLabel, Label count, Button previous, Button next, int[] pos, ImageView image2, Label cardName, Label collectorNum, Label series, Label idTCGP, Label cardType, Label rarity, Label price, Label description) {
@@ -1107,7 +1069,7 @@ public final class App extends Application {
             FullCardSignature orbSig = null;
             switch(toggleMode){
                 case "ocr" -> orbSigVictim = ctx.searchDB.signature(imp.getOcrWinner().cardID());
-                case "default" -> orbSigVictim = ctx.searchDB.signature(imp.getBestMatch().cardID());
+                case "default", "price" -> orbSigVictim = ctx.searchDB.signature(imp.getBestMatch().cardID());
                 default -> orbSigVictim  = imp.getARecordRecord(p, toggleMode);
             }
             try {
@@ -1204,7 +1166,7 @@ public final class App extends Application {
                 Path p1 = (rowImp == null) ? null : rowImp.getQueryImage();
                 if(p1 != null && Files.exists(p1)){
                     Image thumb = new Image(p1.toUri().toString(), 120, 0, true, true, true);
-                    ImageView iv = new ImageView(thumb);;
+                    ImageView iv = new ImageView(thumb);
                     iv.setPreserveRatio(true);
                     iv.setFitHeight(130);
                     subCell.setGraphic(iv);
@@ -1265,7 +1227,11 @@ public final class App extends Application {
         else taskPopOver.show(statusProgress);
     }
 
-    private <T> void runTask(Task<T> task, String name, Consumer<T> onSuccess) {
+    private final ExecutorService taskExecutor = Executors.newThreadPerTaskExecutor(
+            Thread.ofVirtual().name("pokecard-task-", 0).factory()
+    );
+
+    <T> void runTask(Task<T> task, String name, Consumer<T> onSuccess) {
         taskView.getTasks().add(task);
         if(!name.equals("noop")) logger.info("Starting task {}", name);// before starting the thread
         if (onSuccess != null) task.setOnSucceeded(e -> {
@@ -1273,9 +1239,7 @@ public final class App extends Application {
             if(!name.equals("noop")) logger.info("Finished running {}", name);
         });
         task.setOnFailed(e -> showError(task.getException()));
-        Thread t = new Thread(task);
-        t.setDaemon(true);
-        t.start();
+        taskExecutor.submit(task);
     }
 
     private void finishTask(Task<?> task){
@@ -1288,11 +1252,31 @@ public final class App extends Application {
         }
     }
 
-    private void showError(Throwable ex){
+    void showError(Throwable ex){
         ex.printStackTrace();
         Alert a = new Alert(Alert.AlertType.ERROR, String.valueOf(ex.getMessage()), ButtonType.OK);
         a.setHeaderText("Something went wrong.");
         a.showAndWait();
+    }
+
+    static void restartApplication() {
+        try {
+            logger.info("Restarting application...");
+            ProcessHandle.Info info = ProcessHandle.current().info();
+            String cmd = info.command().orElseThrow();
+            String[] args = info.arguments().orElse(new String[0]);
+
+            List<String> command = new ArrayList<>();
+            command.add(cmd);
+            command.addAll(Arrays.asList(args));
+
+            new ProcessBuilder(command).inheritIO().start();
+            Platform.exit();
+            System.exit(0);
+
+        } catch (Exception e) {
+            logger.error("Failed to restart application", e);
+        }
     }
 
     public static void main(String[] args){
@@ -1313,21 +1297,55 @@ final class InitTask extends Task<App.AppContext>{
 
     @Override
     protected App.AppContext call() throws Exception {
-        logger.info("Pokecard v0.9.0.01\nby willtryon\n");
+        logger.info("Pokecard v0.9.0.04\nby willtryon\n");
         updateMessage("Loading...");
-        gitUsage git = new gitUsage((msg, frac) -> {
-        updateMessage(msg);
-        updateProgress(frac, 1.0);
-        });
-        git.prepareGitProgress();
         if(!(Files.exists(Path.of(settings.dbPath().toUri())))){
-            updateMessage("Prepareing to clone database...");
+            updateMessage("Preparing to clone database...");
+            gitUsage git = new gitUsage((msg, frac) -> {
+                updateMessage(msg);
+                updateProgress(frac, 1.0);
+            });
+            git.prepareGitProgress();
             git.clonePokedata();
-        }else{
-            updateMessage("Checking for updates...");
-            git.updatePokedata(App.appHome.resolve("pokedata").toFile());
         }
-        updateMessage("Connecting to database..."); updateProgress(-1, 1);
+        updateMessage("Running database tasks...");
+        new dbCleanup((msg, frac) -> {
+            updateMessage(msg);
+            updateProgress(frac, 1.0);
+        }, settings.dbPath(), settings.cacheDir().resolve("tcg.db"), false);
+        logger.debug(settings.cacheDir().resolve("tcg.db"));
+
+        Path cacheFile = settings.cacheDir().resolve("cache_meta.dat");
+        CardIndex cardDB;
+        updateProgress(-1, -1);
+        if (Files.isRegularFile(cacheFile)) {
+            updateMessage("Loading resources...");
+            try {
+                cardDB = new CardIndex(settings);
+            } catch (InvalidVersionException e) {
+                cardDB = calculateDB((msg, frac) -> {
+                    updateMessage(msg);
+                    updateProgress(frac, 1.0);
+                }, settings);
+            }
+        } else {
+            cardDB = calculateDB((msg, frac) -> {
+                updateMessage(msg);
+                updateProgress(frac, 1.0);
+            }, settings);
+        }
+        updateMessage("Initializing searchDB...");
+        updateProgress(1.0, 1.0);
+        CardSearchHelper searchDB = new CardSearchHelper(settings.dbPath(), cardDB);
+        updateMessage("Starting...");
+        CardImportsIndex importDB = cardDB.newImportsIndex();
+        return new App.AppContext(cardDB, importDB, searchDB);
+    }
+
+
+    static CardIndex calculateDB(ScanProgress progress, Settings settings)
+            throws SQLException, FileNotFoundException, InterruptedException, TimeoutException {
+        progress.report("Connecting to database...", -1);
         String url = "jdbc:sqlite:" + settings.dbPath();
         int size;
         try (Connection conn = DriverManager.getConnection(url);
@@ -1335,60 +1353,10 @@ final class InitTask extends Task<App.AppContext>{
              ResultSet rs = st.executeQuery("SELECT COUNT(*) AS n FROM cards")) {
             size = rs.next() ? rs.getInt("n") : 0;
         }
-        updateMessage("Running database tasks...");
-        new dbCleanup((msg, frac) -> {
-            updateMessage(msg);
-            updateProgress(frac, 1.0);
-        }, settings.dbPath(), settings.cacheDir().resolve("tcg.db"), false);
-        Main.size = size;
-        logger.debug(settings.cacheDir().resolve("tcg.db"));
-
-        Path cacheFile = settings.cacheDir().resolve("cache_meta.dat");
-        CardIndex cardDB;
-        updateProgress(-1, -1);
-        if (Files.isRegularFile(cacheFile)) {
-            updateMessage("Loading cache (" + size + " cards)...");
-            try {
-                cardDB = new CardIndex(settings);
-            } catch (InvalidVersionException e) {
-                cardDB = calculateDB(size, url);
-            }
-        } else {
-            cardDB = calculateDB(size, url);
-        }
-        updateMessage("Initializing searchDB...");
-        updateProgress(1.0, 1.0);
-        CardSearchRepo searchDB = new CardSearchRepo(settings.dbPath(), cardDB);
-        updateMessage("Starting...");
-        CardImportsIndex importDB = cardDB.newImportsIndex();
-        return new App.AppContext(cardDB, importDB, searchDB, size);
-    }
-
-
-    private CardIndex calculateDB(int size, String url) throws SQLException, FileNotFoundException, InterruptedException, TimeoutException {
-        CardIndex cardDB;
-        updateMessage("Computing image data for " + size + " cards...");
-        cardDB = new CardIndex(size, url, settings);
-        CountDownLatch latch = new CountDownLatch(1);
-        AtomicBoolean saveChoice = new AtomicBoolean(false);
-
-        Platform.runLater(() -> {
-            Alert alert = new Alert(
-                    Alert.AlertType.INFORMATION,
-                    "Done calculating image data. Writing the data to the disk will take about 620MB. Do you want to save the data?",
-                    ButtonType.YES, ButtonType.NO
-            );
-            alert.setHeaderText("Save image data");
-            Optional<ButtonType> result = alert.showAndWait();
-            saveChoice.set(result.isPresent() && result.get() == ButtonType.YES);
-            latch.countDown();
-        });
-
-        latch.await(); // block the background thread until the user answers
-
-        if (saveChoice.get()) {
-            cardDB.writeToDisk();
-        }
+        progress.report("Computing image data for " + size + " cards...", -1);
+        CardIndex cardDB = new CardIndex(size, url, settings);
+        progress.report("Saving cache...", -1);
+        cardDB.writeToDisk();
         return cardDB;
     }
 }
@@ -1624,6 +1592,7 @@ final class Finalize{
         cancelButton.setOnAction(e -> {
             stage.close();
         });
+        //TODO fix.
         propertiesButton.setOnAction(e -> {
             CardImports temp = listView.getSelectionModel().getSelectedItem();
             new ImportsProperties(stage, ctx, temp, settings, onReveal);
@@ -1666,8 +1635,8 @@ final class ImportsProperties{
 
     void buildEditor(Stage mainStage, CardImports selected) {
         Stage editor = new Stage();
-        editor.initModality(Modality.APPLICATION_MODAL);
-        editor.initOwner(mainStage);
+        //editor.initModality(Modality.APPLICATION_MODAL);
+        //editor.initOwner(mainStage);
         editor.setTitle("Editing "+selected.getQueryImage().getFileName());
         ObservableList<PropertySheet.Item> items = FXCollections.observableArrayList(
                 new ImportItem<>("Card", "Version", "Foiling / print variant",
