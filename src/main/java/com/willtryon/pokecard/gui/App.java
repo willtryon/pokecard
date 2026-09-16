@@ -50,6 +50,7 @@ import java.sql.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import static com.willtryon.pokecard.CardImportsIndex.globalCardVersion;
@@ -67,6 +68,7 @@ public final class App extends Application {
     private Path sessionPath;
     private String currentSession;
     private Settings settings;
+    boolean changed;
     boolean saved;
     private AppContext ctx;
 
@@ -80,6 +82,8 @@ public final class App extends Application {
     private TreeItem<SideNode> importsBranch;
     private String toggleMode = "default";
     public static boolean firstRun = true;
+
+    public static final boolean DEBUG = false;
 
 
 
@@ -261,6 +265,7 @@ public final class App extends Application {
         result.setWrapText(true);
 
         mainStage.setOnCloseRequest(event -> {
+            if(changed) saveSession(mainStage, true);
            Platform.exit();
            System.exit(0);
         });
@@ -317,13 +322,12 @@ public final class App extends Application {
             Task<Void> orbTask = new Task<>() {
                 @Override
                 protected Void call() throws SQLException {
+                    List<CardImports> temp = ctx.importDB.getImports();
                     ctx.cardDB.scanImports(ctx.importDB(), (msg, frac) -> {
                         updateMessage(msg);
                         updateProgress(frac, 1.0);
                     });
-                    // Scene-graph mutations must run on the FX thread: refreshImports
-                    // rebuilds the live TreeView's items, and doing it from this background
-                    // thread races the FX layout pass -> ConcurrentModificationException.
+                    changed = ctx.importDB.equals(temp);
                     Platform.runLater(() -> {
                         updateTitle("pokecard-cv-run");
                         refreshImports(ctx.importDB());
@@ -344,6 +348,7 @@ public final class App extends Application {
                                 updateMessage(msg);
                                 updateProgress(frac, 1.0);
                             });
+                            changed = true;
                         }catch(Exception e){
                             Platform.runLater(() -> showError(e));
                         }
@@ -484,14 +489,14 @@ public final class App extends Application {
         Separator sep = new Separator();
 
             cd1Button.setOnAction(event -> {
-            new Finalize(ctx, settings, this::revealCardInDatabase).finalizeImports(mainStage);
+            new Finalize(this, ctx, settings, this::revealCardInDatabase).finalizeImports(mainStage);
             //saveSession(mainStage);
         });
 
         prop1Button.disableProperty().bind(Bindings.createBooleanBinding(
                 () -> currentImport() == null,
                 detailTabs.getSelectionModel().selectedItemProperty()));
-        prop1Button.setOnAction(event -> new ImportsProperties(mainStage, ctx, currentImport(), settings, this::revealCardInDatabase));
+        prop1Button.setOnAction(event -> new ImportsProperties(this, mainStage, ctx, currentImport(), settings, this::revealCardInDatabase));
 
         search1Button.disableProperty().bind(Bindings.createBooleanBinding(
                 () -> currentImport() == null,
@@ -514,7 +519,7 @@ public final class App extends Application {
 
         newSessionItem.setOnAction(e -> {
             logger.debug("Creating new session...");
-            saved = false;
+            saved = false; changed = false;
             ctx.importDB.clearSession();
             refreshImports(ctx.importDB());
             currentSession = "";
@@ -524,7 +529,7 @@ public final class App extends Application {
         });
 
         saveSessionItem.setOnAction(e -> {
-            saveSession(mainStage);
+            saveSession(mainStage, false);
             mainStage.setTitle("Pokecard - "+currentSession);
         });
 
@@ -579,11 +584,13 @@ public final class App extends Application {
         });
 
         restartItem.setOnAction(e -> {
+            if(changed) saveSession(mainStage, true);
             restartApplication();
         });
 
         exitItem.setOnAction(e -> {
             ctx.cardDB.shutdown();
+            if(changed) saveSession(mainStage, true);
             Platform.exit();
             System.exit(0);
         });
@@ -592,7 +599,7 @@ public final class App extends Application {
             if(currentImport() == null){
                 showError(new IllegalArgumentException("No current import"));
             }
-            new ImportsProperties(mainStage, ctx, currentImport(), settings, this::revealCardInDatabase);
+            new ImportsProperties(this, mainStage, ctx, currentImport(), settings, this::revealCardInDatabase);
             //saveSession(mainStage);
         });
 
@@ -600,7 +607,7 @@ public final class App extends Application {
             Stage aboutStage = new Stage();
             aboutStage.setTitle("About Pokecard");
             Label name = new Label("Pokecard");
-            Label version = new Label("Version 0.9.0.04");
+            Label version = new Label("Version 0.9.0.05");
             Label author = new Label("by willtryon");
             Button close = new Button("Close");
             VBox aboutLayout = new VBox(12, name, version, author, close);
@@ -625,39 +632,102 @@ public final class App extends Application {
     }
 
 
-    void saveSession(Stage owner) {
+    void saveSession(Stage owner, boolean prompt) {
         logger.debug("Saving imports to disk:");
-        if (saved) ctx.importDB.writeImportsToDisk(currentSession);
-        if (!saved) {
-            FileChooser fc = new FileChooser();
-            fc.setTitle("Save Session");
-            fc.getExtensionFilters().addAll(
-                    new FileChooser.ExtensionFilter("Binary (*.dat)", "*.dat")
-            );
-            File targetFile = fc.showSaveDialog(owner);
-            if (targetFile != null) {
-                String filePath = targetFile.getAbsolutePath();
-                String extension = ".dat";
 
-                if (filePath.toLowerCase().endsWith(extension + extension)) {
-                    filePath = filePath.substring(0, filePath.length() - extension.length());
-                } else if (!filePath.toLowerCase().endsWith(extension)) {
-                    filePath += extension;
-                }
-                File fixedFile = new File(filePath);
-                sessionPath = fixedFile.toPath();
-                currentSession = sessionPath.getFileName().toString();
-                ctx.importDB.writeImportsToDisk(currentSession);
-                config.set(Config.SESSION_PATH, fixedFile.getAbsolutePath());
-                try {
-                    config.save();
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
+        boolean onFxThread = Platform.isFxApplicationThread();
+
+        if (prompt) {
+            boolean saveChoice;
+            if (onFxThread) {
+                saveChoice = confirmSave();
+            } else {
+                saveChoice = Boolean.TRUE.equals(runOnFxThreadAndWait(this::confirmSave));
+            }
+            if (!saveChoice) {
+                return;
             }
         }
+
+        if (changed) {
+            ctx.importDB.writeImportsToDisk(currentSession);
+        }
+
+        if (!saved) {
+            if (!onFxThread) {
+                logger.debug("Skipping autosave: session has not been saved to a file yet.");
+                return;
+            }
+
+            File targetFile = chooseSaveFile(owner);
+            if (targetFile == null) {
+                logger.debug("Save cancelled by user.");
+                return;
+            }
+
+            String filePath = targetFile.getAbsolutePath();
+            String extension = ".dat";
+            if (filePath.toLowerCase().endsWith(extension + extension)) {
+                filePath = filePath.substring(0, filePath.length() - extension.length());
+            } else if (!filePath.toLowerCase().endsWith(extension)) {
+                filePath += extension;
+            }
+
+            File fixedFile = new File(filePath);
+            sessionPath = fixedFile.toPath();
+            currentSession = sessionPath.getFileName().toString();
+            ctx.importDB.writeImportsToDisk(currentSession);
+            config.set(Config.SESSION_PATH, fixedFile.getAbsolutePath());
+            try {
+                config.save();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
         logger.debug("Done.");
         saved = true;
+        changed = false;
+    }
+
+    private boolean confirmSave() {
+        Alert alert = new Alert(
+                Alert.AlertType.CONFIRMATION,
+                "Do you want to save the changes to " + sessionPath.getFileName(),
+                ButtonType.YES, ButtonType.NO
+        );
+        alert.setHeaderText("Save changes");
+        Optional<ButtonType> choice = alert.showAndWait();
+        return choice.isPresent() && choice.get() == ButtonType.YES;
+    }
+
+    private File chooseSaveFile(Stage owner) {
+        FileChooser fc = new FileChooser();
+        fc.setTitle("Save Session");
+        fc.getExtensionFilters().add(
+                new FileChooser.ExtensionFilter("Binary (*.dat)", "*.dat")
+        );
+        return fc.showSaveDialog(owner);
+    }
+
+    private <T> T runOnFxThreadAndWait(java.util.function.Supplier<T> action) {
+        AtomicReference<T> result = new AtomicReference<>();
+        CountDownLatch latch = new CountDownLatch(1);
+        Platform.runLater(() -> {
+            try {
+                result.set(action.get());
+            } finally {
+                latch.countDown();
+            }
+        });
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            logger.error("jvm interrupted save prompt, exiting...", e);
+            return null;
+        }
+        return result.get();
     }
 
     private void loadSession(Stage owner, boolean tf) {
@@ -685,7 +755,7 @@ public final class App extends Application {
         }
         logger.debug("Loaded " + restored.size() + " imports.");
         refreshImports(ctx.importDB());
-        saved = true;
+        saved = true; changed = false;
         /*
         if (!restored.isEmpty()) {
             System.out.println(restored.getFirst().getORBRecordHistory() + "\n" + restored.get(0).getOrbWinner());
@@ -1259,7 +1329,7 @@ public final class App extends Application {
         a.showAndWait();
     }
 
-    static void restartApplication() {
+    void restartApplication() {
         try {
             logger.info("Restarting application...");
             ProcessHandle.Info info = ProcessHandle.current().info();
@@ -1269,7 +1339,7 @@ public final class App extends Application {
             List<String> command = new ArrayList<>();
             command.add(cmd);
             command.addAll(Arrays.asList(args));
-
+            if(changed) saveSession(mainStage, true);
             new ProcessBuilder(command).inheritIO().start();
             Platform.exit();
             System.exit(0);
@@ -1297,7 +1367,7 @@ final class InitTask extends Task<App.AppContext>{
 
     @Override
     protected App.AppContext call() throws Exception {
-        logger.info("Pokecard v0.9.0.04\nby willtryon\n");
+        logger.info("Pokecard v0.9.0.05\nby willtryon\n");
         updateMessage("Loading...");
         if(!(Files.exists(Path.of(settings.dbPath().toUri())))){
             updateMessage("Preparing to clone database...");
@@ -1534,13 +1604,16 @@ final class ConfigEditor {
 }
 
 final class Finalize{
+
+    private final App app;
     private final App.AppContext ctx;
     private List<CardImports> selectedItems;
     private final Settings settings;
     private final Consumer<String> onReveal;
     ListView<CardImports> listView;
 
-    Finalize(App.AppContext ctx, Settings settings, Consumer<String> onReveal) {
+    Finalize(App app, App.AppContext ctx, Settings settings, Consumer<String> onReveal) {
+        this.app = app;
         this.ctx = ctx;
         this.settings = settings;
         this.onReveal = onReveal;
@@ -1595,7 +1668,7 @@ final class Finalize{
         //TODO fix.
         propertiesButton.setOnAction(e -> {
             CardImports temp = listView.getSelectionModel().getSelectedItem();
-            new ImportsProperties(stage, ctx, temp, settings, onReveal);
+            new ImportsProperties(app, stage, ctx, temp, settings, onReveal);
         });
 
         HBox buttons = new HBox(10, nextButton, cancelButton, propertiesButton);
@@ -1611,6 +1684,7 @@ final class Finalize{
                 c.setFinal(true);
             }
         }
+        app.changed = true;
         Label label = new Label("tee hee");
         VBox root = new VBox(10, label);
         return new Scene(root, 350, 200);
@@ -1619,13 +1693,16 @@ final class Finalize{
 }
 
 final class ImportsProperties{
+
+    private final App app;
     private final App.AppContext ctx;
     private final CardImports selected;
     private final Settings settings;
     private final Consumer<String> onReveal;
 
-    ImportsProperties(Stage mainStage, App.AppContext ctx, CardImports selected, Settings settings,
+    ImportsProperties(App app, Stage mainStage, App.AppContext ctx, CardImports selected, Settings settings,
                       Consumer<String> onReveal) {
+        this.app = app;
         this.ctx = ctx;
         this.selected = selected;
         this.settings = settings;
@@ -1672,25 +1749,29 @@ final class ImportsProperties{
         DefaultPropertyEditorFactory defaults = new DefaultPropertyEditorFactory();
         sheet.setPropertyEditorFactory(item ->
                 item.getType() == CardImports.Match.class
-                        ? new BestMatchEditor(item, ctx, editor, settings, onReveal)   // editor == the owning Stage
+                        ? new BestMatchEditor(app, item, ctx, editor, settings, onReveal)   // editor == the owning Stage
                         : defaults.call(item));
         VBox test = new VBox(10, sheet);
         test.setAlignment(Pos.CENTER);
         test.setPadding(new Insets(10));
         editor.setScene(new Scene(test));
         editor.show();
+        app.changed = true;
     }
 }
 
 class BestMatchEditor extends AbstractPropertyEditor<CardImports.Match, Button>{
+
+    private final App app;
     private ObjectProperty<CardImports.Match> value;
     private final Settings settings;
     private App.AppContext ctx;
     private final Consumer<String> onReveal;
 
-    protected BestMatchEditor(PropertySheet.Item item, App.AppContext ctx, Window owner,
+    protected BestMatchEditor(App app, PropertySheet.Item item, App.AppContext ctx, Window owner,
                               Settings settings, Consumer<String> onReveal) {
         super(item, new Button());
+        this.app = app;
         this.settings = settings;
         this.ctx = ctx;
         this.onReveal = onReveal;
@@ -1712,5 +1793,6 @@ class BestMatchEditor extends AbstractPropertyEditor<CardImports.Match, Button>{
     @Override
     public void setValue(CardImports.Match m) {
         getObservableValue(); value.set(m);
+        app.changed = true;
     }
 }

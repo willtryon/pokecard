@@ -90,22 +90,27 @@ class BackgroundServices implements AutoCloseable{
 
         scheduler.scheduleAtFixedRate(() -> {
             try {
-                Platform.runLater(() -> {
-                    Task<Void> saveTask = new Task<>() {
-                        @Override
-                        protected Void call() {
-                            updateTitle("pokecard-auto-save");
-                            if (app.saved) app.saveSession(app.mainStage);
-                            return null;
-                        }
-                    };
-                    saveTask.setOnFailed(event -> app.showError(saveTask.getException()));
-                    app.runTask(saveTask, "pokecard-auto-save",v -> {});
-                });
+                if(app.changed) {
+                    Platform.runLater(() -> {
+                        Task<Void> saveTask = new Task<>() {
+                            @Override
+                            protected Void call() {
+                                updateTitle("pokecard-auto-save");
+                                if (app.changed) {
+                                    app.saveSession(app.mainStage, false);
+                                }
+                                return null;
+                            }
+                        };
+                        saveTask.setOnFailed(event -> app.showError(saveTask.getException()));
+                        app.runTask(saveTask, "pokecard-auto-save", v -> {
+                        });
+                    });
+                }
             } catch (Throwable t) {
                 logger.error("Save scheduling failed", t);
             }
-        }, 10, 1, TimeUnit.MINUTES);
+        }, 0, 1, TimeUnit.MINUTES);
 
         scheduler.scheduleAtFixedRate(() -> {
             try {
@@ -141,14 +146,14 @@ class BackgroundServices implements AutoCloseable{
                                                 "Restart the program to apply the changes?",
                                                 ButtonType.YES, ButtonType.NO
                                         );
-                                        alert.setHeaderText("Update available");
+                                        alert.setHeaderText("Restart program and apply updates");
                                         Optional<ButtonType> choice = alert.showAndWait();
                                         saveChoice.set(choice.isPresent() && choice.get() == ButtonType.YES);
                                         latch.countDown();
                                     });
                                     latch.await();
                                     if(saveChoice.get()){
-                                        App.restartApplication();
+                                        app.restartApplication();
                                     }
                                     return null;
                                 }
@@ -166,7 +171,30 @@ class BackgroundServices implements AutoCloseable{
                 logger.error("Save scheduling failed", t);
             }
         }, 0, 24, TimeUnit.HOURS);
+
+        if(App.DEBUG){
+            scheduler.scheduleAtFixedRate(() -> {
+                try {
+                    Platform.runLater(() -> {
+                        Task<Void> saveTask = new Task<>() {
+                            @Override
+                            protected Void call() {
+                                updateTitle("pokecard-changed-test");
+                                logger.info("changed = "+app.changed);
+                                return null;
+                            }
+                        };
+                        saveTask.setOnFailed(event -> app.showError(saveTask.getException()));
+                        app.runTask(saveTask, "pokecard-changed-test",v -> {});
+                    });
+                } catch (Throwable t) {
+                    logger.error("changed-test failed", t);
+                }
+            }, 0, 1, TimeUnit.SECONDS);
+        }
     }
+
+
 
     @Override
     public void close() throws Exception {

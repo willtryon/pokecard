@@ -309,6 +309,11 @@ public class CardImportsIndex {
 
     public List<CardImports> getImports() { return imports; }
 
+
+    public boolean equals(List<CardImports> args){
+        return args.equals(this.imports);
+    }
+
     public CardImports getLastImports() {
         return imports.isEmpty() ? null : imports.getLast();
     }
