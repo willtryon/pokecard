@@ -48,7 +48,8 @@ public class Main {
                         cardDB = new CardIndex(settings);
                     } else {
                         logger.debug("Calculating image data, please wait...\n");
-                        cardDB = new CardIndex(size, url, settings);
+                        cardDB = new CardIndex(size, url, settings, (msg, frac) -> {
+                        });
                     }
                     logger.debug("Verifying Python env...");
                     PokeocrEnv env = new PokeocrEnv(ocrDefaultCacheDir(), settings);

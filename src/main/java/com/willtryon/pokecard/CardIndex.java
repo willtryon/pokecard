@@ -107,7 +107,7 @@ public final class CardIndex{
 
     /*Approach so far is the query sql db and dump its contents for every hit to a new Card obj, which is stored
     in an array of cards...*/
-    public CardIndex(int size, String url, Settings settings) throws SQLException, TimeoutException {
+    public CardIndex(int size, String url, Settings settings, ScanProgress progress) throws SQLException, TimeoutException {
         this.settings = settings;
         this.executor = Executors.newFixedThreadPool(this.settings.scanThreads());
         List<String[]> data = Collections.synchronizedList(new ArrayList<>());
@@ -134,6 +134,8 @@ public final class CardIndex{
                     try {
                         computeData(slot, cardId, img, startTime, size);
                         passedN.incrementAndGet();
+                        double frac = (double) passedN.get() / size;
+                        progress.report("Computing image data for " + size + " cards...", frac);
                     } catch (IllegalStateException e) {
                         assert img != null;
                         data.add(new String[]{"File " + cardId + " appears to be corrupt (found at "

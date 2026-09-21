@@ -47,6 +47,9 @@ import java.math.RoundingMode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.*;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -70,13 +73,22 @@ public final class App extends Application {
     private Settings settings;
     boolean changed;
     boolean saved;
-    private AppContext ctx;
+    AppContext ctx;
+
+    SyncResult presult;
 
     private Label statusBar;
     private ProgressBar statusProgress;
     private final TaskProgressView<Task<?>> taskView = new TaskProgressView<>();
     private final ObjectProperty<Task<?>> statusTask = new SimpleObjectProperty<>();
     private PopOver taskPopOver;
+
+    private final NotificationCenter notices = new NotificationCenter();
+
+    private final ListView<NotificationCenter.Notice> noticeList = new ListView<>();
+
+    private PopOver noticePopOver;
+    private Button bell;
     private TabPane detailTabs;
     Stage mainStage;
     private TreeItem<SideNode> importsBranch;
@@ -111,6 +123,8 @@ public final class App extends Application {
 
     record Section(String name, List<Setting> settings) {
     }
+
+    record SyncResult(boolean changed, String summary){}
 
     static final List<Section> SECTIONS = List.of(
             new Section("Paths", List.of(
@@ -246,6 +260,7 @@ public final class App extends Application {
 
     public void showMainStage() {
         mainStage = new Stage();
+        Services services = new Services(this, settings);
         //Main init...
         Label title = new Label("Pokecard");
         ImageView view1 = new ImageView();
@@ -270,7 +285,6 @@ public final class App extends Application {
         Button scan = new Button("Scan folder...");
         scan.setOnAction(e -> {
             scan.setDisable(true);
-
             Stage dialogStage = new Stage();
             dialogStage.initOwner(mainStage);
             dialogStage.initModality(Modality.WINDOW_MODAL);
@@ -312,53 +326,8 @@ public final class App extends Application {
             Scene setupScene = new Scene(setup, 300, 200);
             dialogStage.setScene(setupScene);
             dialogStage.showAndWait();
-            dialogStage.setOnCloseRequest(event -> {
-            });
-
-
-            Task<Void> orbTask = new Task<>() {
-                @Override
-                protected Void call() throws SQLException {
-                    List<CardImports> temp = ctx.importDB.getImports();
-                    ctx.cardDB.scanImports(ctx.importDB(), (msg, frac) -> {
-                        updateMessage(msg);
-                        updateProgress(frac, 1.0);
-                    });
-                    changed = ctx.importDB.equals(temp);
-                    Platform.runLater(() -> {
-                        updateTitle("pokecard-cv-run");
-                        refreshImports(ctx.importDB());
-                        scan.setDisable(false);
-                    });
-                    return null;
-                }
-            };
-
-            runTask(orbTask, "pokecard-cv-run", v -> {});
-            orbTask.setOnSucceeded(event -> {
-                Task<Void> ocrTask = new Task<>() {
-                    @Override
-                    protected Void call() {
-                        updateTitle("pokeocr-ocr-run");
-                        try{
-                            ctx.importDB.runOcr((msg, frac) -> {
-                                updateMessage(msg);
-                                updateProgress(frac, 1.0);
-                            });
-                            changed = true;
-                        }catch(Exception e){
-                            Platform.runLater(() -> showError(e));
-                        }
-                        // FX-thread only (see orbTask): refreshImports touches the live tree.
-                        Platform.runLater(() -> {
-                            refreshImports(ctx.importDB());
-                            scan.setDisable(false);
-                        });
-                        return null;
-                    }
-                };
-                runTask(ocrTask, "pokeocr-ocr-run",v -> {});
-            });
+            services.runOrb();
+            scan.setDisable(false);
         });
 
         HBox imageView = new HBox(20, view1, view2);
@@ -387,6 +356,8 @@ public final class App extends Application {
         mainStage.setScene(new Scene(root, 1200, 600));
         mainStage.getScene().getRoot().setStyle("-fx-base: #2a2a2a;");
         mainStage.show();
+        notices.setOwner(mainStage);
+        services.startBackgroundServices();
 
 
         /*ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
@@ -414,16 +385,22 @@ public final class App extends Application {
             });
         }), 0, 1, TimeUnit.MINUTES);*/
         //isOrb = false;
-        new BackgroundServices(this, settings);
     }
 
     void syncPrices(ScanProgress progress) throws Exception {
+        long start = System.currentTimeMillis();
         Path db = settings.cacheDir().resolve("tcg.db");
         progress.report("Retrieving price information...", -1);
         TcgdbEnv env = new TcgdbEnv(tcgdbDefaultCacheDir());
         TcgdbEnv.EnvHandle handle = env.prepare();
         int code = env.sync(handle, db, false);
         logger.debug("tcgdb sync exited " + code + "; db at " + db);
+        long now = System.currentTimeMillis();
+        if( now  - start < 2000){
+            presult = new SyncResult(false, "No changes found.");
+        }else{
+            presult = new SyncResult(true, "Updated price database.");
+        }
     }
 
     private VBox buildTop(Stage mainStage, TabPane detailTabs, ImageView view1, ImageView view2){
@@ -582,7 +559,7 @@ public final class App extends Application {
 
         restartItem.setOnAction(e -> {
             if(changed) saveSession(mainStage, true);
-            restartApplication();
+            restartApplication("");
         });
 
         exitItem.setOnAction(e -> {
@@ -604,7 +581,7 @@ public final class App extends Application {
             Stage aboutStage = new Stage();
             aboutStage.setTitle("About Pokecard");
             Label name = new Label("Pokecard");
-            Label version = new Label("Version 0.9.0.06");
+            Label version = new Label("Version 0.9.0.07");
             Label author = new Label("by willtryon");
             Button close = new Button("Close");
             VBox aboutLayout = new VBox(12, name, version, author, close);
@@ -749,9 +726,13 @@ public final class App extends Application {
             var live = taskView.getTasks();
             statusTask.set(live.isEmpty() ? null : live.getLast());
         });
+        bell = new Button();
+        bell.textProperty().bind(notices.unreadProperty()
+                .map(n -> n.intValue() == 0 ? "\uD83D\uDD14" : "\uD83D\uDD14 " + n));
+        bell.setOnAction(a -> toggleNoticePopOver());
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox bar = new HBox(8, statusBar, spacer, statusProgress);
+        HBox bar = new HBox(8, statusBar, spacer, statusProgress, bell);
         bar.setAlignment(Pos.CENTER_LEFT);
         bar.setPadding(new Insets(4, 8, 4, 8));
         bar.setStyle("-fx-border-color: #cccccc; -fx-border-width: 1 0 0 0;");
@@ -815,7 +796,7 @@ public final class App extends Application {
         return importsBranch;
     }
 
-    private void refreshImports(CardImportsIndex importDB) {
+    void refreshImports(CardImportsIndex importDB) {
         importsBranch.getChildren().clear();
         for (CardImports imp : importDB.getImports()) {
             importsBranch.getChildren().add(new TreeItem<>(new ImportEntry(imp)));
@@ -970,7 +951,7 @@ public final class App extends Application {
     }
 
 
-    Node buildImportDetail(CardImports imp) {
+    Node buildImportDetail(CardImports imp) throws NullPointerException{
         HBox content = new HBox(10);
         content.setPadding(new Insets(16));
 
@@ -1030,6 +1011,10 @@ public final class App extends Application {
 
         Runnable updateLayout = () -> {
             imgStack.getChildren().clear();
+            hashList.setDisable(imp.getHashWinner() == null);
+            orbList.setDisable(imp.getOrbWinner() == null);
+            ocrList.setDisable(!imp.hasOcr());
+
             switch (toggleMode) {
                 case "default" -> imgStack.getChildren().addAll(
                         orbLabel, hashLabel, ocrLabel, images);
@@ -1100,7 +1085,7 @@ public final class App extends Application {
         return chart;
     }
 
-    private Runnable getRender(CardImports imp, int size, Label orbLabel, Label hashLabel, Label ocrLabel, Label count, Button previous, Button next, int[] pos, ImageView image2, Label cardName, Label collectorNum, Label series, Label idTCGP, Label cardType, Label rarity, Label price, Label description) {
+    private Runnable getRender(CardImports imp, int size, Label orbLabel, Label hashLabel, Label ocrLabel, Label count, Button previous, Button next, int[] pos, ImageView image2, Label cardName, Label collectorNum, Label series, Label idTCGP, Label cardType, Label rarity, Label price, Label description)throws NullPointerException{
         return () -> {
             int p = pos[0];
             CardSignature orbSigVictim;
@@ -1252,6 +1237,49 @@ public final class App extends Application {
         return sv;
     }
 
+    NotificationCenter notices(){
+        return notices;
+    }
+
+    private void toggleNoticePopOver(){
+        notices.setOwner(mainStage);
+        if(noticePopOver == null){
+            noticeList.setItems(notices.getHistory());
+            noticeList.setPrefSize(420, 360);
+            noticeList.setPlaceholder(new Label("Notifications will appear here..."));
+            noticeList.setCellFactory(f -> new ListCell<>(){
+                @Override
+                protected void updateItem(NotificationCenter.Notice n, boolean empty){
+                    super.updateItem(n, empty);
+                    if(empty || n == null){
+                        setText(null);
+                        setGraphic(null);
+                        return;
+                    }
+                    Label title = new Label(n.title());
+                    title.setStyle("-fx-font-weight: bold;");
+                    Label body = new Label(n.text());
+                    body.setWrapText(true);
+                    Label when = new Label(DateTimeFormatter.ofPattern("HH:mm").format(n.at().atZone(ZoneId.systemDefault())));
+                    when.setStyle("-fx-opacity: 0.6;");
+                    VBox box = new VBox(2, title, body, when);
+                    box.setPadding(new Insets(4));
+                    setGraphic(box);
+                    setOnMouseClicked(a -> {if(n.onClick() != null) n.onClick().run();});
+                }
+            });
+            noticePopOver = new PopOver(noticeList);
+            noticePopOver.setArrowLocation(PopOver.ArrowLocation.BOTTOM_RIGHT);
+            noticePopOver.setOnShown(a -> notices.markAllRead());
+        }
+        if(noticePopOver.isShowing()){
+            noticePopOver.hide();
+        }else{
+            noticePopOver.show(bell);
+        }
+
+    }
+
     private Task<?> currentStatusTask;
     private final AtomicBoolean scanRunning = new AtomicBoolean(false);
 
@@ -1270,18 +1298,21 @@ public final class App extends Application {
     );
 
     <T> void runTask(Task<T> task, String name, Consumer<T> onSuccess) {
+        long startTime = System.nanoTime();
         taskView.getTasks().add(task);
-        if(!name.equals("noop")) logger.info("Starting task {}", name);// before starting the thread
+        if(!name.equals("noop")) logger.info("Starting task {}", name);
         if (onSuccess != null) task.setOnSucceeded(e -> {
+            long duration = System.nanoTime() - startTime;
+            double seconds = duration / 1_000_000_000.0;
             onSuccess.accept(task.getValue());
-            if(!name.equals("noop")) logger.info("Finished running {}", name);
+            if(!name.equals("noop")) logger.info("Finished running {} in {} seconds.", name, seconds);
         });
         task.setOnFailed(e -> showError(task.getException()));
         taskExecutor.submit(task);
     }
 
     private void finishTask(Task<?> task){
-        if (currentStatusTask == task) {      // only the task that's still "current" may unbind
+        if (currentStatusTask == task) {
             statusBar.textProperty().unbind();
             statusProgress.progressProperty().unbind();
             statusBar.setText("Ready.");
@@ -1291,19 +1322,32 @@ public final class App extends Application {
     }
 
     void showError(Throwable ex){
-        ex.printStackTrace();
-        Alert a = new Alert(Alert.AlertType.ERROR, String.valueOf(ex.getMessage()), ButtonType.OK);
-        a.setHeaderText("Something went wrong.");
-        a.showAndWait();
+        logger.error(ex.getMessage(), ex);
+        Runnable runnable = () -> {
+            Alert a = new Alert(Alert.AlertType.ERROR, String.valueOf(ex.getMessage()), ButtonType.OK);
+            a.setHeaderText("Something went wrong.");
+            a.showAndWait();
+        };
+        notices.post(new NotificationCenter.Notice(Instant.now(), NotificationCenter.Severity.ERROR, "Something went wrong.", "Exception occured in "+ ex.getStackTrace()[0].getClassName(), runnable));
+
     }
 
-    void restartApplication() {
+    void restartApplication(String mode) {
+        if(mode.equals("update-service")){
+            Alert alert = new Alert(Alert.AlertType.CONFIRMATION, "Restart pokecard to apply the changes in resources?", ButtonType.YES, ButtonType.NO);
+            alert.setHeaderText("Pokecard and Resource Updates");
+            alert.initModality(Modality.APPLICATION_MODAL);
+            alert.initOwner(mainStage);
+            alert.showAndWait();
+            if(alert.getResult() != ButtonType.YES){
+                return;
+            }
+        }
         try {
             logger.info("Restarting application...");
             ProcessHandle.Info info = ProcessHandle.current().info();
             String cmd = info.command().orElseThrow();
             String[] args = info.arguments().orElse(new String[0]);
-
             List<String> command = new ArrayList<>();
             command.add(cmd);
             command.addAll(Arrays.asList(args));
@@ -1335,7 +1379,7 @@ final class InitTask extends Task<App.AppContext>{
 
     @Override
     protected App.AppContext call() throws Exception {
-        logger.info("Pokecard v0.9.0.06\nby willtryon\n");
+        logger.info("Pokecard v0.9.0.07\nby willtryon\n");
         updateMessage("Loading...");
         //Thread.sleep(5000);
         if(!(Files.exists(Path.of(settings.dbPath().toUri())))){
@@ -1393,7 +1437,7 @@ final class InitTask extends Task<App.AppContext>{
             size = rs.next() ? rs.getInt("n") : 0;
         }
         progress.report("Computing image data for " + size + " cards...", -1);
-        CardIndex cardDB = new CardIndex(size, url, settings);
+        CardIndex cardDB = new CardIndex(size, url, settings, progress);
         progress.report("Saving cache...", -1);
         cardDB.writeToDisk();
         return cardDB;
@@ -1450,7 +1494,7 @@ final class ConfigEditor {
                 for (App.Setting s : sec.settings()) {
                     String v = inputs.get(s.key()).getText().trim();
                     if (App.satisfied(s, v)) {
-                        error.setText("\u201C" + s.label() + "\u201D in " + sec.name() + " is missing or invalid.");
+                        error.setText("“" + s.label() + "” in " + sec.name() + " is missing or invalid.");
                         sidebar.getSelectionModel().select(sec);
                         return;
                     }
@@ -1498,10 +1542,9 @@ final class ConfigEditor {
 
                 }
                 case TEXT -> {
-                    //field = new TextField();
+
                 }
                 case DIRECTORY,  FILE -> {
-                    //field = new TextField();
                     Button browse = createBrowse(owner, s, field);
                     grid.add(browse, 2, row);
                 }
@@ -1515,7 +1558,6 @@ final class ConfigEditor {
                     }else{
                         ocrMode.setPromptText(config.get(s.key()));
                     }
-                    //ocrMode.setVisibleRowCount(4);
                     ocrMode.setOnAction(e -> {
                         switch(ocrMode.getValue()){
                             case "Easy Ocr" -> field.setText("easy-ocr");
@@ -1554,7 +1596,7 @@ final class ConfigEditor {
     }
 
     private static Button createBrowse(Window owner, App.Setting s, TextField field) {
-        Button browse = new Button("Browse\u2026");
+        Button browse = new Button("Browse…");
         browse.setOnAction(e -> {
             File f;
             if (s.kind() == App.Kind.DIRECTORY) {
@@ -1730,7 +1772,6 @@ final class ImportsProperties{
 }
 
 class BestMatchEditor extends AbstractPropertyEditor<CardImports.Match, Button>{
-
     private final App app;
     private ObjectProperty<CardImports.Match> value;
     private final Settings settings;

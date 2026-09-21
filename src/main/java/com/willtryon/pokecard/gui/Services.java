@@ -3,40 +3,38 @@ package com.willtryon.pokecard.gui;
 import com.willtryon.pokecard.*;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
-import javafx.scene.control.Alert;
-import javafx.scene.control.ButtonType;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.nio.file.Files;
-import java.util.Optional;
+import java.sql.SQLException;
+import java.time.Instant;
+import java.util.List;
 import java.util.Set;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.willtryon.pokecard.PokeocrEnv.ocrDefaultCacheDir;
 import static com.willtryon.pokecard.TcgdbEnv.tcgdbDefaultCacheDir;
 
-class BackgroundServices implements AutoCloseable{
+final class Services implements AutoCloseable {
 
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1, r -> {
-        Thread t = new Thread(r, "pokecard-background-tasks");
+        Thread t = new Thread(r, "pokecard-service-dispatcher");
         t.setDaemon(true);          // don't keep the JVM alive after the window closes
         return t;
     });
 
-    public static final Logger logger = LogManager.getLogger(BackgroundServices.class);
+    public static final Logger logger = LogManager.getLogger(Services.class);
     private final Config.Settings settings;
     private final App app;
 
-    BackgroundServices(App app, Config.Settings settings) {
+    Services(App app, Config.Settings settings) {
         this.app = app;
         this.settings = settings;
-        startBackgroundServices();
     }
+
     void startBackgroundServices() {
         scheduler.scheduleAtFixedRate(() -> {
             try {
@@ -45,8 +43,9 @@ class BackgroundServices implements AutoCloseable{
                         @Override
                         protected Void call() throws Exception {
                             updateTitle("pokecard-price-fetcher");
-                            if(!(Files.exists(settings.cacheDir().resolve("tcg.db")))){
-                                updateMessage("Resolving python dependencies for price fetching..."); updateProgress(-1, 1);
+                            if (!(Files.exists(settings.cacheDir().resolve("tcg.db")))) {
+                                updateMessage("Resolving python dependencies for price fetching...");
+                                updateProgress(-1, 1);
                                 TcgdbEnv env2 = new TcgdbEnv(tcgdbDefaultCacheDir());
                                 env2.prepare();
                             }
@@ -58,7 +57,9 @@ class BackgroundServices implements AutoCloseable{
                         }
                     };
                     priceTask.setOnFailed(event -> app.showError(priceTask.getException()));
-                    app.runTask(priceTask, "pokecard-price-fetcher",v -> {});
+                    app.runTask(priceTask, "pokecard-price-fetcher", r -> {
+                        if (app.presult.changed()) app.notices().info("Prices updated", app.presult.summary());
+                    });
                 });
             } catch (Throwable t) {
                 logger.error("Price sync scheduling failed", t);
@@ -72,8 +73,9 @@ class BackgroundServices implements AutoCloseable{
                         @Override
                         protected Void call() throws Exception {
                             updateTitle("pokeocr-dependency-fetcher");
-                            if(Boolean.parseBoolean(settings.useOcr())){
-                                updateMessage("Resolving python dependencies for pokeocr"); updateProgress(-1, 1);
+                            if (Boolean.parseBoolean(settings.useOcr())) {
+                                updateMessage("Resolving python dependencies for pokeocr");
+                                updateProgress(-1, 1);
                                 PokeocrEnv env = new PokeocrEnv(ocrDefaultCacheDir(), settings);
                                 env.prepare();
                             }
@@ -81,7 +83,8 @@ class BackgroundServices implements AutoCloseable{
                         }
                     };
                     ocrTask.setOnFailed(event -> app.showError(ocrTask.getException()));
-                    app.runTask(ocrTask, "pokeocr-dependency-fetcher",v -> {});
+                    app.runTask(ocrTask, "pokeocr-dependency-fetcher", v -> {
+                    });
                 });
             } catch (Throwable t) {
                 logger.error("OCR prep failed...", t);
@@ -90,13 +93,13 @@ class BackgroundServices implements AutoCloseable{
 
         scheduler.scheduleAtFixedRate(() -> {
             try {
-                if(app.changed) {
+                if (app.changed) {
                     Platform.runLater(() -> {
                         Task<Void> saveTask = new Task<>() {
                             @Override
                             protected Void call() {
                                 updateTitle("pokecard-auto-save");
-                                    app.saveSession(app.mainStage, false);
+                                app.saveSession(app.mainStage, false);
                                 return null;
                             }
                         };
@@ -113,9 +116,9 @@ class BackgroundServices implements AutoCloseable{
         scheduler.scheduleAtFixedRate(() -> {
             try {
                 Platform.runLater(() -> {
-                    Task<Set<gitUsage.DataArea>> fetchTask = new Task<>() {
+                    Task<Boolean> fetchTask = new Task<>() {
                         @Override
-                        protected Set<gitUsage.DataArea> call() {
+                        protected Boolean call() {
                             updateTitle("pokecard-auto-update");
                             gitUsage git = new gitUsage((msg, frac) -> {
                                 updateMessage(msg);
@@ -127,42 +130,9 @@ class BackgroundServices implements AutoCloseable{
                     };
                     fetchTask.setOnFailed(event -> app.showError(fetchTask.getException()));
                     app.runTask(fetchTask, "pokecard-auto-update", changed -> {
-                        if (changed.contains(gitUsage.DataArea.IMAGES)) {
-                            Task<CardIndex> recompute = new Task<>() {
-                                @Override
-                                protected CardIndex call() throws Exception {
-                                    updateTitle("pokecard-db-recompute");
-                                    InitTask.calculateDB((msg, frac) -> {
-                                        updateMessage(msg);
-                                        updateProgress(frac, 1.0);
-                                    }, settings);
-                                    CountDownLatch latch = new CountDownLatch(1);
-                                    AtomicBoolean saveChoice = new AtomicBoolean(false);
-                                    Platform.runLater(() -> {
-                                        Alert alert = new Alert(
-                                                Alert.AlertType.CONFIRMATION,
-                                                "Restart the program to apply the changes?",
-                                                ButtonType.YES, ButtonType.NO
-                                        );
-                                        alert.setHeaderText("Restart program and apply updates");
-                                        Optional<ButtonType> choice = alert.showAndWait();
-                                        saveChoice.set(choice.isPresent() && choice.get() == ButtonType.YES);
-                                        latch.countDown();
-                                    });
-                                    latch.await();
-                                    if(saveChoice.get()){
-                                        app.restartApplication();
-                                    }
-                                    return null;
-                                }
-                            };
-                            recompute.setOnFailed(event -> app.showError(recompute.getException()));
-                            app.runTask(recompute, "pokecard-db-recompute", newDB -> {
-                            });
-                        }
-                        if (changed.contains(gitUsage.DataArea.DATABASE)) {
-                            // data.sqlite changed -> reconnect / reload
-                        }
+                        if (!changed) return;
+                        app.notices().post(new NotificationCenter.Notice(Instant.now(), NotificationCenter.Severity.INFO,
+                                "Update available", "Update available for database resources", this::updateResources));
                     });
                 });
             } catch (Throwable t) {
@@ -170,7 +140,7 @@ class BackgroundServices implements AutoCloseable{
             }
         }, 0, 24, TimeUnit.HOURS);
 
-        if(App.DEBUG){
+        if (App.DEBUG) {
             scheduler.scheduleAtFixedRate(() -> {
                 try {
                     Platform.runLater(() -> {
@@ -178,12 +148,13 @@ class BackgroundServices implements AutoCloseable{
                             @Override
                             protected Void call() {
                                 updateTitle("pokecard-changed-test");
-                                logger.info("changed = "+app.changed);
+                                logger.info("changed = " + app.changed);
                                 return null;
                             }
                         };
                         saveTask.setOnFailed(event -> app.showError(saveTask.getException()));
-                        app.runTask(saveTask, "pokecard-changed-test",v -> {});
+                        app.runTask(saveTask, "pokecard-changed-test", v -> {
+                        });
                     });
                 } catch (Throwable t) {
                     logger.error("changed-test failed", t);
@@ -192,7 +163,84 @@ class BackgroundServices implements AutoCloseable{
         }
     }
 
+    void runOrb() {
+        Platform.runLater(() -> {
+            Task<Void> orbTask = new Task<>() {
+                @Override
+                protected Void call() throws SQLException {
+                    List<CardImports> temp = app.ctx.importDB().getImports();
+                    app.ctx.cardDB().scanImports(app.ctx.importDB(), (msg, frac) -> {
+                        updateMessage(msg);
+                        updateProgress(frac, 1.0);
+                    });
+                    app.changed = app.ctx.importDB().equals(temp);
+                    Platform.runLater(() -> {
+                        updateTitle("pokecard-cv-run");
+                        app.refreshImports(app.ctx.importDB());
+                    });
+                    return null;
+                }
+            };
+            app.runTask(orbTask, "pokecard-cv-run", v -> {
+                app.notices().info("CV job finished.", "Finished running fast card matching.");
+            });
+            orbTask.setOnSucceeded(event -> {
+                Task<Void> ocrTask = new Task<>() {
+                    @Override
+                    protected Void call() {
+                        updateTitle("pokeocr-ocr-run");
+                        try {
+                            app.ctx.importDB().runOcr((msg, frac) -> {
+                                updateMessage(msg);
+                                updateProgress(frac, 1.0);
+                            });
+                            app.changed = true;
+                        } catch (Exception e) {
+                            Platform.runLater(() -> app.showError(e));
+                        }
+                        Platform.runLater(() -> {
+                            app.refreshImports(app.ctx.importDB());
+                        });
+                        return null;
+                    }
+                };
+                app.runTask(ocrTask, "pokeocr-ocr-run", v -> {
+                    app.notices().info("Card import job finished.", "Finished running card matching.");
+                });
+            });
+        });
+    }
 
+    void updateResources() {
+        Task<CardIndex> recompute = new Task<>() {
+            @Override
+            protected CardIndex call() throws Exception {
+                updateTitle("pokecard-update-runner");
+                gitUsage git = new gitUsage((msg, frac) -> {
+                    updateMessage(msg);
+                    updateProgress(frac, 1);
+                });
+                git.prepareGitProgress();
+                Set<gitUsage.DataArea> result = git.prepareToUpdate(App.appHome.resolve("pokedata").toFile());
+                if (result.contains(gitUsage.DataArea.IMAGES) || result.contains(gitUsage.DataArea.DATABASE)) {
+                    InitTask.calculateDB((msg, frac) -> {
+                        updateMessage(msg);
+                        updateProgress(frac, 1.0);
+                    }, settings);
+                }
+                return null;
+            }
+        };
+        recompute.setOnFailed(event -> app.showError(recompute.getException()));
+        app.runTask(recompute, "pokecard-db-recompute", newDB -> {
+
+            app.notices().post(new NotificationCenter.Notice(
+                    Instant.now(), NotificationCenter.Severity.INFO,
+                    "Card images updated",
+                    "Restart to apply the new database.",() -> app.restartApplication("update-service")
+                    ));
+        });
+    }
 
     @Override
     public void close() throws Exception {
