@@ -109,8 +109,8 @@ class EnumMappingTest {
     void categoryToStringIsTheConstantName() {
         // CardVersion overrides toString() to return the label; Category does not. If a Category
         // ever reaches a UI label or a CSV cell directly, this is what shows up.
-        assertEquals("ULTRA", Category.ULTRA.toString());
-        assertEquals("Ultra", Category.ULTRA.dbValue());
+        assertEquals("ULTRA", Category.ULTRA.dbValue());
+        assertEquals("Ultra", Category.ULTRA.toString());
         assertNotNull(Category.valueOf("HIGH"));
     }
 }

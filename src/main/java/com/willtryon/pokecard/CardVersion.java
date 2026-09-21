@@ -1,9 +1,9 @@
 package com.willtryon.pokecard;
 
 public enum CardVersion {
-    NORMAL          ("NORMAL",           "Normal"),
-    HOLOFOIL        ("HOLOFOIL",         "Holofoil"),
-    REVERSE_HOLOFOIL("REVERSE HOLOFOIL", "Reverse holofoil");
+    NORMAL          ("Normal",           "NORMAL"),
+    HOLOFOIL        ("Holofoil",         "HOLOFOIL"),
+    REVERSE_HOLOFOIL("Reverse holofoil", "REVERSE HOLOFOIL");
 
     final String dbValue, label;
     CardVersion(final String name, final String dbValue) {

@@ -309,6 +309,11 @@ public class CardImportsIndex {
 
     public List<CardImports> getImports() { return imports; }
 
+
+    public boolean equals(List<CardImports> args){
+        return args.equals(this.imports);
+    }
+
     public CardImports getLastImports() {
         return imports.isEmpty() ? null : imports.getLast();
     }
@@ -325,10 +330,9 @@ public class CardImportsIndex {
     //I write session information to the disk
     private static final int IMPORTS_FORMAT_VERSION = 6;
 
-    public void writeImportsToDisk(String currentSession) {
-        Path path = settings.outputDir().resolve(currentSession);
+    public void writeImportsToDisk(Path currentSession) {
         try (DataOutputStream dos = new DataOutputStream(
-                new BufferedOutputStream(new FileOutputStream(path.toFile())))) {
+                new BufferedOutputStream(new FileOutputStream(currentSession.toFile())))) {
 
             // query-hash params are identical for every import (one hasher)
             int bits = 0, algo = 0;
@@ -389,7 +393,6 @@ public class CardImportsIndex {
     }
 
     public void readImportsFromDisk(Path currentSession) {
-        File file = currentSession.toFile();
         if (!Files.exists(currentSession)) {
             logger.debug("No imports cache found at " + currentSession);
             return;
