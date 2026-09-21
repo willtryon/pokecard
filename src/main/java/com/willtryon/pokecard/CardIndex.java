@@ -199,8 +199,9 @@ public final class CardIndex{
 
    public CardIndex(Settings settings) {
         this.settings = settings;
-        this.cardDB = readFromDisk();
         this.executor = Executors.newFixedThreadPool(settings.scanThreads());
+        this.cardDB = readFromDisk();
+
     }
 
     private Path resolveImage(String expName, String cardId, String expCardNumber){
@@ -700,53 +701,57 @@ public final class CardIndex{
                 return db;
             }
             logger.info("\nLoading ORB objects...");
-            int i;
-            for (i = 0; i < count; i++) {
+            List<Future<?>> futures = new ArrayList<>();
+            for (int i = 0; i < count; i++) {
                 boolean hasData = dis.readBoolean();
                 if (!hasData) continue;
+
                 int rows = dis.readInt();
                 int cols = dis.readInt();
                 int type = dis.readInt();
                 byte[] descBytes = new byte[rows * cols];
                 dis.readFully(descBytes);
-                Mat desc = new Mat(rows, cols, type);
-                desc.data().put(descBytes);
                 long n = dis.readLong();
-                final int KP_BYTES = 28;
-                byte[] kpBytes = new byte[(int) (n * KP_BYTES)];
+                byte[] kpBytes = new byte[(int) (n * 28)];
                 dis.readFully(kpBytes);
-                ByteBuffer bb = ByteBuffer.wrap(kpBytes);
-                KeyPointVector kp = new KeyPointVector(n);
-                for (long k = 0; k < n; k++) {
-                    float x = bb.getFloat();
-                    float y = bb.getFloat();
-                    bb.position(bb.position() + 20);
-                    kp.get(k).pt().x(x);
-                    kp.get(k).pt().y(y);
-                }
-                if (db[i] != null) {
-                    String pStr = db[i].getStringImgPath();
-                    Path imgP = (pStr != null && !pStr.isEmpty()) ? Path.of(pStr) : null;
-                    db[i] = new CardSignature(db[i].getCardID(), imgP, db[i].getBinaryHash(), desc, kp);
-                }
-                int checkInterval = Math.max(1, count / 10);
-                if (i % checkInterval == 0 || i == count - 1) {
-                    StringBuilder sb = new StringBuilder();
-                    sb.append("Loading ORB objects... ");
-                    String percent = String.format("%.0f", ((double) i / count) * 100);
-                    sb.append(percent).append("%");
-                    logger.info(sb.toString());
-                    System.out.flush();
-                }
+
+                final int finalI = i;
+                futures.add(executor.submit(() -> {
+                    Mat desc = new Mat(rows, cols, type);
+                    desc.data().put(descBytes);
+                    ByteBuffer bb = ByteBuffer.wrap(kpBytes);
+                    KeyPointVector kp = new KeyPointVector(n);
+                    for (long k = 0; k < n; k++) {
+                        float x = bb.getFloat();
+                        float y = bb.getFloat();
+                        bb.position(bb.position() + 20);
+                        kp.get(k).pt().x(x);
+                        kp.get(k).pt().y(y);
+                    }
+                    if (db[finalI] != null) {
+                        String pStr = db[finalI].getStringImgPath();
+                        Path imgP = (pStr != null && !pStr.isEmpty()) ? Path.of(pStr) : null;
+                        db[finalI] = new CardSignature(db[finalI].getCardID(), imgP, db[finalI].getBinaryHash(), desc, kp);
+                    }
+                }));
             }
+            executor.shutdown();
+            executor.awaitTermination(1, TimeUnit.MINUTES);
+            for (Future<?> f : futures) f.get();
+            logger.debug(timer(startTime));
+            return db;
+        } catch (FileNotFoundException e) {
+            throw new RuntimeException(e);
         } catch (IOException e) {
-            logger.error("Warning: Failed to load ORB cache: " + e.getMessage());
+            throw new RuntimeException(e);
+        } catch (ExecutionException e) {
+            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         }
-        logger.debug(timer(startTime));
-        return db;
     }
 
-    private String nodeToString(FileNode n){
+        private String nodeToString(FileNode n){
         if (n == null || n.isNone() || !n.isString()) return "";
         BytePointer bp = n.string();
         return bp != null ? bp.getString() : "";

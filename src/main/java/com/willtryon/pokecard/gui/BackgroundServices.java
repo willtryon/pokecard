@@ -96,9 +96,7 @@ class BackgroundServices implements AutoCloseable{
                             @Override
                             protected Void call() {
                                 updateTitle("pokecard-auto-save");
-                                if (app.changed) {
                                     app.saveSession(app.mainStage, false);
-                                }
                                 return null;
                             }
                         };
@@ -168,7 +166,7 @@ class BackgroundServices implements AutoCloseable{
                     });
                 });
             } catch (Throwable t) {
-                logger.error("Save scheduling failed", t);
+                logger.error("Auto update failed...", t);
             }
         }, 0, 24, TimeUnit.HOURS);
 

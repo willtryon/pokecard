@@ -78,7 +78,7 @@ public final class App extends Application {
     private final ObjectProperty<Task<?>> statusTask = new SimpleObjectProperty<>();
     private PopOver taskPopOver;
     private TabPane detailTabs;
-    Stage mainStage;        // stable handle to the primary window, so we can raise it later
+    Stage mainStage;
     private TreeItem<SideNode> importsBranch;
     private String toggleMode = "default";
     public static boolean firstRun = true;
@@ -124,7 +124,6 @@ public final class App extends Application {
             )),
             new Section("eBay API", List.of(
                     new Setting(Config.EBAY_API_KEY, "API key", Kind.SECRET, false)
-                    // add more eBay fields here as you build that integration
             )),
             new Section("Performance", List.of(
                     new Setting(Config.SCAN_THREADS, "Threads", Kind.TEXT, false)
@@ -192,8 +191,6 @@ public final class App extends Application {
                 return;
             }
         }*/
-
-        // (re)create in case the user pointed cache/output somewhere new under Advanced
         try {
             Files.createDirectories(Path.of(config.get(Config.OUTPUT_DIR)));
             Files.createDirectories(Path.of(config.get(Config.CACHE_DIR)));
@@ -607,7 +604,7 @@ public final class App extends Application {
             Stage aboutStage = new Stage();
             aboutStage.setTitle("About Pokecard");
             Label name = new Label("Pokecard");
-            Label version = new Label("Version 0.9.0.05");
+            Label version = new Label("Version 0.9.0.06");
             Label author = new Label("by willtryon");
             Button close = new Button("Close");
             VBox aboutLayout = new VBox(12, name, version, author, close);
@@ -633,10 +630,7 @@ public final class App extends Application {
 
 
     void saveSession(Stage owner, boolean prompt) {
-        logger.debug("Saving imports to disk:");
-
         boolean onFxThread = Platform.isFxApplicationThread();
-
         if (prompt) {
             boolean saveChoice;
             if (onFxThread) {
@@ -649,43 +643,24 @@ public final class App extends Application {
             }
         }
 
-        if (changed) {
-            ctx.importDB.writeImportsToDisk(currentSession);
-        }
-
         if (!saved) {
             if (!onFxThread) {
                 logger.debug("Skipping autosave: session has not been saved to a file yet.");
                 return;
             }
-
             File targetFile = chooseSaveFile(owner);
-            if (targetFile == null) {
-                logger.debug("Save cancelled by user.");
-                return;
-            }
-
+            if (targetFile == null) { logger.debug("Save cancelled by user."); return; }
+            // ...extension fixup...
             String filePath = targetFile.getAbsolutePath();
-            String extension = ".dat";
-            if (filePath.toLowerCase().endsWith(extension + extension)) {
-                filePath = filePath.substring(0, filePath.length() - extension.length());
-            } else if (!filePath.toLowerCase().endsWith(extension)) {
-                filePath += extension;
-            }
-
-            File fixedFile = new File(filePath);
-            sessionPath = fixedFile.toPath();
+            sessionPath = new File(filePath).toPath();
             currentSession = sessionPath.getFileName().toString();
-            ctx.importDB.writeImportsToDisk(currentSession);
-            config.set(Config.SESSION_PATH, fixedFile.getAbsolutePath());
-            try {
-                config.save();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
+            config.set(Config.SESSION_PATH, sessionPath.toAbsolutePath().toString());
+            try { config.save(); } catch (IOException e) { throw new RuntimeException(e); }
         }
 
-        logger.debug("Done.");
+        if (changed) {
+            ctx.importDB.writeImportsToDisk(sessionPath);   // single write, after the path exists
+        }
         saved = true;
         changed = false;
     }
@@ -756,13 +731,7 @@ public final class App extends Application {
         logger.debug("Loaded " + restored.size() + " imports.");
         refreshImports(ctx.importDB());
         saved = true; changed = false;
-        /*
-        if (!restored.isEmpty()) {
-            System.out.println(restored.getFirst().getORBRecordHistory() + "\n" + restored.get(0).getOrbWinner());
-        }*/
         logger.debug("Done.");
-        //statusBar.setText("Ready.");
-        //statusProgress.setVisible(false);
     }
 
     private HBox buildStatusBar() {
@@ -807,7 +776,6 @@ public final class App extends Application {
                         Path q = i.imp().getQueryImage();
                         yield q == null ? "(unknown image)" : q.getFileName().toString();
                     }
-
                 });
 
             }
@@ -1063,10 +1031,10 @@ public final class App extends Application {
         Runnable updateLayout = () -> {
             imgStack.getChildren().clear();
             switch (toggleMode) {
-                case "default" -> imgStack.getChildren().addAll(images);
+                case "default" -> imgStack.getChildren().addAll(
+                        orbLabel, hashLabel, ocrLabel, images);
                 case "price"   -> imgStack.getChildren().add(buildPriceChart(imp));
-                default        -> imgStack.getChildren().addAll(
-                        orbLabel, hashLabel, ocrLabel, images, new HBox(16, previous, count, next));
+                default        -> imgStack.getChildren().addAll(images, new HBox(16, previous, count, next));
             }
         };
 
@@ -1367,8 +1335,9 @@ final class InitTask extends Task<App.AppContext>{
 
     @Override
     protected App.AppContext call() throws Exception {
-        logger.info("Pokecard v0.9.0.05\nby willtryon\n");
+        logger.info("Pokecard v0.9.0.06\nby willtryon\n");
         updateMessage("Loading...");
+        //Thread.sleep(5000);
         if(!(Files.exists(Path.of(settings.dbPath().toUri())))){
             updateMessage("Preparing to clone database...");
             gitUsage git = new gitUsage((msg, frac) -> {

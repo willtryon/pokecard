@@ -33,7 +33,7 @@ I designed this software with the main goal of selling a large part of my collec
 
 ---
 
-## Architecture Overview (curtsy of claude)
+## Architecture Overview (courtesy of claude)
 
 ```mermaid
 graph TD

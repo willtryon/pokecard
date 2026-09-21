@@ -1,9 +1,9 @@
 package com.willtryon.pokecard;
 public enum Category{
-    UNREMARK ("UNREMARK","Unremarkable"),
-    MID ("MID","Mid"),
-    HIGH ("HIGH", "High"),
-    ULTRA ("ULTRA", "Ultra");
+    UNREMARK ("Unremarkable","UNREMARK"),
+    MID ("Mid","MID"),
+    HIGH ("High", "HIGH"),
+    ULTRA ("Ultra", "ULTRA");
 
     final String dbValue, label;
     Category(final String name, final String dbValue) {
@@ -12,6 +12,11 @@ public enum Category{
     }
     public String dbValue() {
         return dbValue;
+    }
+
+    @Override
+    public String toString() {
+        return label;
     }
 
     public static Category fromCatDb(String s){

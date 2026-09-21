@@ -3,16 +3,14 @@ package com.willtryon.pokecard;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.FileNotFoundException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.*;
 import java.util.*;
-import java.util.function.Consumer;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 import java.util.stream.Stream;
 
 public final class PokeocrEnv{
@@ -265,30 +263,25 @@ public final class PokeocrEnv{
 
     private void extractPython(Path dest) throws IOException, URISyntaxException {
         URL res = PokeocrEnv.class.getResource(RESOURCE_ROOT);
-        if (res == null) {
-            throw new FileNotFoundException("Bundled python not found on classpath: " + RESOURCE_ROOT);
-        }
+        if (res == null) throw new FileNotFoundException("Bundled python not found: " + RESOURCE_ROOT);
         URI uri = res.toURI();
-        if ("jar".equals(uri.getScheme())) {
-            // e.g. jar:file:/path/pokecard.jar!/python  ->  filesystem is the part before "!/"
-            String full = uri.toString();
-            URI fsUri = URI.create(full.substring(0, full.indexOf("!/")));
-            FileSystem fs;
-            boolean created = false;
-            try {
-                fs = FileSystems.newFileSystem(fsUri, Map.of());
-                created = true;
-            } catch (FileSystemAlreadyExistsException e) {
-                fs = FileSystems.getFileSystem(fsUri);
+        if (!"jar".equals(uri.getScheme())) { copyTree(Paths.get(uri), dest); return; }
+
+        String full = uri.toString();
+        Path jarPath = Path.of(URI.create(full.substring("jar:".length(), full.indexOf("!/"))));
+        String prefix = RESOURCE_ROOT.substring(1) + "/";          // "python/"
+        try (JarFile jar = new JarFile(jarPath.toFile())) {
+            for (JarEntry e : (Iterable<JarEntry>) jar.stream()::iterator) {
+                if (!e.getName().startsWith(prefix)) continue;
+                Path rel = Path.of(e.getName().substring(prefix.length()));
+                if (isSkipped(rel)) continue;
+                Path target = dest.resolve(rel);
+                if (e.isDirectory()) { Files.createDirectories(target); continue; }
+                Files.createDirectories(target.getParent());
+                try (InputStream in = jar.getInputStream(e)) {
+                    Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
+                }
             }
-            try {
-                copyTree(fs.getPath(RESOURCE_ROOT), dest);
-            } finally {
-                if (created) fs.close();
-            }
-        } else {
-            //for mvn javafx:run
-            copyTree(Paths.get(uri), dest);
         }
     }
 
