@@ -1,5 +1,6 @@
 package com.willtryon.pokecard;
 
+import java.lang.ref.SoftReference;
 import java.nio.file.Path;
 
 import org.bytedeco.opencv.opencv_core.KeyPointVector;

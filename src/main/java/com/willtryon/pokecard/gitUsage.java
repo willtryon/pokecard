@@ -131,33 +131,38 @@ public final class gitUsage {
         }
     }
 
-    public Set<DataArea> fetch(File repositoryDir){
+    public boolean fetch(File repositoryDir){
         logger.info("Checking for updates...");
         progress.report("Checking for updates...", -1);
         try{
             if (isUpdateAvailable(repositoryDir)) {
-                CountDownLatch latch = new CountDownLatch(1);
-                AtomicBoolean saveChoice = new AtomicBoolean(false);
-                Platform.runLater(() -> {
-                    Alert alert = new Alert(
-                            Alert.AlertType.CONFIRMATION,
-                            "Resource update found. Do you want to apply the update?",
-                            ButtonType.YES, ButtonType.NO
-                        );
-                    alert.setHeaderText("Update available");
-                    Optional<ButtonType> choice = alert.showAndWait();
-                    saveChoice.set(choice.isPresent() && choice.get() == ButtonType.YES);
-                    latch.countDown();
-                    });
-                latch.await();
-                if(saveChoice.get()) {
-                    return updatePokedata(repositoryDir);
-                }
+                return true;
             }
         } catch (Exception e) {
             logger.error(e.getMessage());
             progress.report("Error(unknown exception): " + e.getMessage(), -1);
             throw new RuntimeException();
+        }
+        return false;
+    }
+
+    public Set<DataArea> prepareToUpdate(File repositoryDir) throws InterruptedException {
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicBoolean saveChoice = new AtomicBoolean(false);
+        Platform.runLater(() -> {
+            Alert alert = new Alert(
+                    Alert.AlertType.CONFIRMATION,
+                    "Resource update found. Do you want to apply the update?",
+                    ButtonType.YES, ButtonType.NO
+            );
+            alert.setHeaderText("Update available");
+            Optional<ButtonType> choice = alert.showAndWait();
+            saveChoice.set(choice.isPresent() && choice.get() == ButtonType.YES);
+            latch.countDown();
+        });
+        latch.await();
+        if(saveChoice.get()) {
+            return updatePokedata(repositoryDir);
         }
         return Set.of();
     }
