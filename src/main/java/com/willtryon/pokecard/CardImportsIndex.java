@@ -24,6 +24,7 @@ public class CardImportsIndex {
     private final List<CardSignature> hashed;
     private final CardIndex cardDB;
     private final Config.Settings settings;
+    private final Connection catalog;
     private final List<Hash> seenHashes = new ArrayList<>();
     private final HashingAlgorithm hasher = new PerceptiveHash(64);
     private final List<CardImports> imports = new ArrayList<>();
@@ -34,10 +35,11 @@ public class CardImportsIndex {
 
     private record Scored(CardSignature sig, double score){}
 
-    public CardImportsIndex(List<CardSignature> hashed, CardIndex cardDB, Config.Settings settings){
+    public CardImportsIndex(List<CardSignature> hashed, CardIndex cardDB, Config.Settings settings, Connection catalog){
         this.hashed = hashed;
         this.cardDB = cardDB;
         this.settings = settings;
+        this.catalog = catalog;
     }
 
     public synchronized List<CardImports> scan(ScanProgress progress) throws SQLException {
@@ -128,7 +130,8 @@ public class CardImportsIndex {
     public synchronized CardImports scanOne(Path image, ScanProgress progress) throws IOException{
         Hash qHash = hasher.hash(new File(image.toString()));
         CardImports result = compareOne(image, qHash, 1, 1, progress, guess);
-        if (result != null){ seenHashes.add(qHash); imports.add(result); }
+        seenHashes.add(qHash);
+        imports.add(result);
         if (progress != null) progress.report("Scan complete", 1.0);
         return result;
     }
@@ -220,8 +223,7 @@ public class CardImportsIndex {
                             c.index(), c.rotation(), c.top(), c.bottom());
                     CardImports parent = byPath.get(c.path());
                     if (parent == null) continue;
-                    String url = "jdbc:sqlite:" + settings.dbPath();
-                    CardImports.Match m = resolveViaSql(c.top(), c.bottom(), url);
+                    CardImports.Match m = resolveViaSql(c.top(), c.bottom());
                     //CardImports.Match m = new CardImports.Match(c.top(), parent.getQueryImage().toString(), 67.0);
                     if (m != null) parent.setOcrWinner(m);
                 } else
@@ -237,7 +239,7 @@ public class CardImportsIndex {
 
 
 
-    public CardImports.Match resolveViaSql(String top, String bottom, String url) throws SQLException {
+    public CardImports.Match resolveViaSql(String top, String bottom) throws SQLException {
         Integer number = parseCardNumber(bottom);   // "…36/106●" -> 36,   or null
         String year = parseYear(bottom);// "©2014"    -> "2014", or null
         logger.debug(number + " " + year);
@@ -250,8 +252,7 @@ public class CardImportsIndex {
                         (number != null ? "AND CAST(expCardNumber AS INTEGER) = ? " : "") +
                         "ORDER BY (substr(releaseDate, 1, 4) = ?) DESC, LENGTH(name) DESC LIMIT 1";
 
-        try (Connection conn = DriverManager.getConnection(url);
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (PreparedStatement ps = catalog.prepareStatement(sql)) {
             int i = 1;
             ps.setString(i++, top);
             if (number != null) ps.setInt(i++, number);

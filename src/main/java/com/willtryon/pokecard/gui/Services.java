@@ -226,7 +226,7 @@ final class Services implements AutoCloseable {
                     InitTask.calculateDB((msg, frac) -> {
                         updateMessage(msg);
                         updateProgress(frac, 1.0);
-                    }, settings);
+                    }, settings, app.ctx.db().getCatalog());
                 }
                 return null;
             }

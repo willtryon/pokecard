@@ -75,6 +75,7 @@ public final class CardIndex{
                 while (j < n && isDashOrIllegalWin(stem.charAt(j))){
                     if (isIllegalWin(stem.charAt(j))) {
                         hasIllegal = true;
+                        break;
                     }
                     j++;
                 }
@@ -107,15 +108,15 @@ public final class CardIndex{
 
     /*Approach so far is the query sql db and dump its contents for every hit to a new Card obj, which is stored
     in an array of cards...*/
-    public CardIndex(int size, String url, Settings settings, ScanProgress progress) throws SQLException, TimeoutException {
+    public CardIndex(int size, Connection catalog, Settings settings, ScanProgress progress) throws SQLException, TimeoutException {
         this.settings = settings;
         this.executor = Executors.newFixedThreadPool(this.settings.scanThreads());
         List<String[]> data = Collections.synchronizedList(new ArrayList<>());
         List<Future<?>> future = new ArrayList<>();
         cardDB = new CardSignature[size];
 
-        try (Connection conn = DriverManager.getConnection(url);
-             Statement st = conn.createStatement();
+        // Shared, read-only catalog connection owned by Db; used only on this thread here.
+        try (Statement st = catalog.createStatement();
              ResultSet rs = st.executeQuery("SELECT cardId, name, expName, expCardNumber, rarity FROM cards")) {
 
             long startTime = System.currentTimeMillis();
@@ -181,7 +182,9 @@ public final class CardIndex{
         HashingAlgorithm hasher = new PerceptiveHash(64);
         String percent = String.format("%.0f", ((double) line / size) * 100);
 
+
         ORB orb = ORB.create();
+
 
         if (img != null && Files.exists(img)) {
             String address = img.toString();
@@ -524,12 +527,12 @@ public final class CardIndex{
         return scores;
     }
 
-    public CardImportsIndex newImportsIndex(){
+    public CardImportsIndex newImportsIndex(Connection catalog){
         List<CardSignature> hashed = new ArrayList<>();
         for(int c = 0; c < cardDB.length; c++){
             if(cardDB[c] != null && cardDB[c].getBinaryHash() != null) hashed.add(cardDB[c]);
         }
-        return new CardImportsIndex(hashed, this, settings);
+        return new CardImportsIndex(hashed, this, settings, catalog);
     }
 
     public void scanImports(CardImportsIndex importDB) throws SQLException {
@@ -577,14 +580,16 @@ public final class CardIndex{
     }*/
     private static final int METADATA_FORMAT_VERSION = 1;
 
-    public void writeToDisk() {
+    public void writeToDisk(ScanProgress progress) {
         Path xmlPath = settings.cacheDir().resolve("cache.xml");
         Path orbPath = settings.cacheDir().resolve("cache_orb.dat");
-
+        progress.report("Saving resources...", -1);
         // Write ORB binary data first — if this fails, skip the XML
         try (DataOutputStream dos = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(orbPath.toFile())))) {
             dos.writeInt(cardDB.length);
             for (int i = 0; i < cardDB.length; i++) {
+                double percent = (double) i /cardDB.length;
+                progress.report("Saving resources...", percent);
                 CardSignature c = cardDB[i];
                 Mat desc = (c != null) ? c.getMatData() : null;
                 KeyPointVector kp = (c != null) ? c.getKeypoints() : null;
@@ -742,13 +747,7 @@ public final class CardIndex{
             for (Future<?> f : futures) f.get();
             logger.debug(timer(startTime));
             return db;
-        } catch (FileNotFoundException e) {
-            throw new RuntimeException(e);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        } catch (ExecutionException e) {
-            throw new RuntimeException(e);
-        } catch (InterruptedException e) {
+        } catch (InterruptedException | ExecutionException | IOException e) {
             throw new RuntimeException(e);
         }
     }
@@ -827,4 +826,3 @@ public final class CardIndex{
     }
 
 }
-

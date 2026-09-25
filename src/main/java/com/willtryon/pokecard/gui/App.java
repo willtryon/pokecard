@@ -154,7 +154,7 @@ public final class App extends Application {
         return !s.kind().isValidValue(value);
     }
 
-    record AppContext(CardIndex cardDB, CardImportsIndex importDB, CardSearchHelper searchDB) {
+    record AppContext(CardIndex cardDB, CardImportsIndex importDB, CardSearchHelper searchDB, Db db) {
     }
 
     @Override
@@ -581,7 +581,7 @@ public final class App extends Application {
             Stage aboutStage = new Stage();
             aboutStage.setTitle("About Pokecard");
             Label name = new Label("Pokecard");
-            Label version = new Label("Version 0.9.0.07");
+            Label version = new Label("Version 0.9.0.08");
             Label author = new Label("by willtryon");
             Button close = new Button("Close");
             VBox aboutLayout = new VBox(12, name, version, author, close);
@@ -1186,7 +1186,7 @@ public final class App extends Application {
             }
             try{
                 SpreadsheetCell subCell = SpreadsheetCellType.STRING.createCell(r, 0, 1, 1, "");
-                Path p1 = (rowImp == null) ? null : rowImp.getQueryImage();
+                Path p1 = rowImp.getQueryImage();
                 if(p1 != null && Files.exists(p1)){
                     Image thumb = new Image(p1.toUri().toString(), 120, 0, true, true, true);
                     ImageView iv = new ImageView(thumb);
@@ -1211,7 +1211,7 @@ public final class App extends Application {
                 if (subSig != null) {
                     FullCardSignature domSig = new FullCardSignature(
                             subSig, settings.dbPath(), settings.cacheDir(),
-                            rowImp == null ? globalCardVersion : rowImp.getCardVersion(), rowImp.getFirstEdition());
+                            rowImp.getCardVersion(), rowImp.getFirstEdition());
                     tcgp = domSig.getIdTCGP();
                     roundedValue = new BigDecimal(Double.toString(domSig.getPrice()))
                             .setScale(3, RoundingMode.DOWN).doubleValue();
@@ -1379,8 +1379,10 @@ final class InitTask extends Task<App.AppContext>{
 
     @Override
     protected App.AppContext call() throws Exception {
-        logger.info("Pokecard v0.9.0.07\nby willtryon\n");
         updateMessage("Loading...");
+        Db db = new Db(settings.dbPath(),
+                settings.cacheDir().resolve("tcg.db"),
+                settings.cacheDir().resolve("user.sqlite"));
         //Thread.sleep(5000);
         if(!(Files.exists(Path.of(settings.dbPath().toUri())))){
             updateMessage("Preparing to clone database...");
@@ -1409,37 +1411,36 @@ final class InitTask extends Task<App.AppContext>{
                 cardDB = calculateDB((msg, frac) -> {
                     updateMessage(msg);
                     updateProgress(frac, 1.0);
-                }, settings);
+                }, settings, db.getCatalog());
             }
         } else {
             cardDB = calculateDB((msg, frac) -> {
                 updateMessage(msg);
                 updateProgress(frac, 1.0);
-            }, settings);
+            }, settings, db.getCatalog());
         }
         updateMessage("Initializing searchDB...");
         updateProgress(1.0, 1.0);
-        CardSearchHelper searchDB = new CardSearchHelper(settings.dbPath(), cardDB);
+        CardSearchHelper searchDB = new CardSearchHelper(db.getCatalog(), cardDB);
         updateMessage("Starting...");
-        CardImportsIndex importDB = cardDB.newImportsIndex();
-        return new App.AppContext(cardDB, importDB, searchDB);
+        CardImportsIndex importDB = cardDB.newImportsIndex(db.getCatalog());
+        logger.info("You are in client mode.");
+        return new App.AppContext(cardDB, importDB, searchDB, db);
     }
 
 
-    static CardIndex calculateDB(ScanProgress progress, Settings settings)
+    static CardIndex calculateDB(ScanProgress progress, Settings settings, Connection catalog)
             throws SQLException, FileNotFoundException, InterruptedException, TimeoutException {
         progress.report("Connecting to database...", -1);
-        String url = "jdbc:sqlite:" + settings.dbPath();
         int size;
-        try (Connection conn = DriverManager.getConnection(url);
-             Statement st = conn.createStatement();
+        try (Statement st = catalog.createStatement();
              ResultSet rs = st.executeQuery("SELECT COUNT(*) AS n FROM cards")) {
             size = rs.next() ? rs.getInt("n") : 0;
         }
         progress.report("Computing image data for " + size + " cards...", -1);
-        CardIndex cardDB = new CardIndex(size, url, settings, progress);
+        CardIndex cardDB = new CardIndex(size, catalog, settings, progress);
         progress.report("Saving cache...", -1);
-        cardDB.writeToDisk();
+        cardDB.writeToDisk(progress);
         return cardDB;
     }
 }

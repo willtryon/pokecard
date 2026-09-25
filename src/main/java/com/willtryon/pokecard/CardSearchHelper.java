@@ -33,11 +33,9 @@ public final class CardSearchHelper implements AutoCloseable {
     private final boolean ftsAvailable;
     private final Map<String, CardSignature> byId;
 
-    public CardSearchHelper(Path dbPath, CardIndex index) throws SQLException {
-        // read only so the db can't get corrupted by an opp which is read only by design.
-        SQLiteConfig cfg = new SQLiteConfig();
-        cfg.setReadOnly(true);
-        this.conn = DriverManager.getConnection("jdbc:sqlite:" + dbPath, cfg.toProperties());
+    public CardSearchHelper(Connection catalog, CardIndex index) throws SQLException {
+        // The catalog connection is owned and shared by Db; don't open or close it here.
+        this.conn = catalog;
 
         this.ftsAvailable = detectFts();
 
@@ -141,7 +139,7 @@ public final class CardSearchHelper implements AutoCloseable {
     }
 
     @Override
-    public void close() throws SQLException {
-        conn.close();
+    public void close() {
+        // no-op: the shared catalog connection is owned and closed by Db, not here.
     }
 }

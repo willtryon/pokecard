@@ -33,9 +33,8 @@ public class Main {
             config.require(Config.OUTPUT_DIR, "Path to output log files", Files::isDirectory, in);
             Path cacheDir = config.require(Config.CACHE_DIR, "Path to cache directory", Files::isDirectory, in);
             Config.Settings settings = Config.Settings.from(config);
-            String url = "jdbc:sqlite:" + dbPath;
-            try (Connection conn = DriverManager.getConnection(url);
-                 Statement st = conn.createStatement();
+            try (Db db = new Db(dbPath, cacheDir.resolve("tcg.db"), cacheDir.resolve("user.sqlite"));
+                 Statement st = db.getCatalog().createStatement();
                  ResultSet rs = st.executeQuery("SELECT COUNT(*) AS n FROM cards")) {
                 logger.debug("Connected to SQL Database.");
                 if (rs.next()) {
@@ -48,7 +47,7 @@ public class Main {
                         cardDB = new CardIndex(settings);
                     } else {
                         logger.debug("Calculating image data, please wait...\n");
-                        cardDB = new CardIndex(size, url, settings, (msg, frac) -> {
+                        cardDB = new CardIndex(size, db.getCatalog(), settings, (msg, frac) -> {
                         });
                     }
                     logger.debug("Verifying Python env...");
@@ -56,7 +55,7 @@ public class Main {
                     PokeocrEnv.EnvHandle handle = env.prepare();
                     logger.debug("Running database tasks...");
                     TcgdbEnv env2 = new TcgdbEnv(tcgdbDefaultCacheDir());
-                    CardImportsIndex importDB = cardDB.newImportsIndex();
+                    CardImportsIndex importDB = cardDB.newImportsIndex(db.getCatalog());
                     int choice;
                     ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
                     do {
